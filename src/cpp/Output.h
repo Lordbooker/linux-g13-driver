@@ -4,6 +4,7 @@
 extern void send_event(int type, int code, int val);
 
 extern void flush();
-extern int create_uinput();
+extern bool create_uinput(); // Return bool for success/failure
+extern void close_uinput();
 
 #endif

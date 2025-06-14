@@ -16,6 +16,7 @@
 #include <fcntl.h>
 
 #include <pthread.h>
+#include <algorithm> // For std::remove
 
 
 #include "Constants.h"
@@ -27,27 +28,27 @@
 
 using namespace std;
 
-void trim(char *s) {
-	// Trim spaces and tabs from beginning:
-	int i = 0, j;
-	while ((s[i] == ' ') || (s[i] == '\t')) {
-		i++;
-	}
-	if (i > 0) {
-		for (j = 0; j < strlen(s); j++) {
-			s[j] = s[j + i];
-		}
-		s[j] = '\0';
-	}
+// Helper to trim whitespace from both ends of a std::string
+std::string trim_string(const std::string& str) {
+    const std::string whitespace = " \t\n\r\f\v";
+    size_t start = str.find_first_not_of(whitespace);
+    if (start == std::string::npos)
+        return ""; // no content
 
-	// Trim spaces and tabs from end:
-	i = strlen(s) - 1;
-	while ((s[i] == ' ') || (s[i] == '\t')) {
-		i--;
-	}
-	if (i < (strlen(s) - 1)) {
-		s[i + 1] = '\0';
-	}
+    size_t end = str.find_last_not_of(whitespace);
+    return str.substr(start, end - start + 1);
+}
+
+// Overload for C-style strings (modifies in place, for compatibility with existing strtok use)
+void trim_c_string(char *s) {
+    char *start = s;
+    while (isspace((unsigned char)*start)) start++;
+
+    char *end = s + strlen(s) - 1;
+    while (end > start && isspace((unsigned char)*end)) end--;
+    *(end + 1) = '\0';
+
+    if (start != s) memmove(s, start, strlen(start) + 1);
 }
 
 
@@ -61,8 +62,9 @@ G13::G13(libusb_device *device) {
 
 	this->stick_mode = STICK_KEYS;
 
+    actions.resize(G13_NUM_KEYS);
 	for (int i = 0; i < G13_NUM_KEYS; i++) {
-		actions[i] = new G13Action();
+		actions[i] = std::make_unique<G13Action>();
 	}
 
 	if (libusb_open(device, &handle) != 0) {
@@ -96,6 +98,7 @@ G13::~G13() {
 
 	libusb_release_interface(this->handle, 0);
 	libusb_close(this->handle);
+    // actions vector with unique_ptr will clean itself up.
 
 }
 
@@ -121,47 +124,50 @@ void G13::stop() {
 	keepGoing = 0;
 }
 
-Macro *G13::loadMacro(int num) {
+std::unique_ptr<Macro> G13::loadMacro(int num) {
 
 	char filename[1024];
+    const char* home_dir = getenv("HOME");
+    if (!home_dir) {
+        cerr << "G13::loadMacro(" << num << ") HOME environment variable not set.\n";
+        return nullptr;
+    }
 
-	sprintf(filename, "%s/.g13/macro-%d.properties", getenv("HOME"), num);
+	snprintf(filename, sizeof(filename), "%s/.g13/macro-%d.properties", home_dir, num);
 	//cout << "G13::loadMacro(" << num << ") filename=" << filename << "\n";
 	ifstream file (filename);
 
 	if (!file.is_open()) {
 		cout << "Could not open config file: " << filename << "\n";
-		return null;
+		return nullptr;
 	}
 
-	Macro *macro = new Macro();
+	auto macro = std::make_unique<Macro>();
 	macro->setId(num);
+    std::string macro_name, macro_sequence;
+
 	while (file.good()) {
 		string line;
 		getline(file, line);
-		//cout << line << "\n";
+        std::string trimmed_line = trim_string(line);
 
-		char l[1024];
-		strcpy(l, (char *)line.c_str());
-		trim(l);
-		if (strlen(l) > 0 && l[0] != '#') {
-			char *key = strtok(l, "=");
-			char *value = strtok(NULL, "\n");
-			trim(key);
-			trim(value);
-			//cout << "G13::loadMacro(" << num << ") key=" << key << ", value=" << value << "\n";
-			if (strcmp(key, "name") == 0) {
-				macro->setName(value);
-			}
-			else if (strcmp(key, "sequence") == 0) {
-				macro->setSequence(value);
+		if (!trimmed_line.empty() && trimmed_line[0] != '#') {
+            size_t eq_pos = trimmed_line.find('=');
+            if (eq_pos != std::string::npos) {
+                std::string key = trim_string(trimmed_line.substr(0, eq_pos));
+                std::string value = trim_string(trimmed_line.substr(eq_pos + 1));
+			    //cout << "G13::loadMacro(" << num << ") key=" << key << ", value=" << value << "\n";
+			    if (key == "name") {
+				    macro_name = value;
+			    } else if (key == "sequence") {
+				    macro_sequence = value;
+			    }
 			}
 		}
 	}
-
-
+    macro->setName(macro_name);
+    macro->setSequence(macro_sequence);
 	return macro;
-
 }
 
 void G13::loadBindings() {
@@ -169,7 +175,12 @@ void G13::loadBindings() {
 	char filename[1024];
 
 	sprintf(filename, "%s/.g13/bindings-%d.properties", getenv("HOME"), bindings);
-	cout << "loading " << filename << "\n";
+    const char* home_dir = getenv("HOME");
+    if (!home_dir) {
+        cerr << "G13::loadBindings() HOME environment variable not set.\n";
+        return;
+    }
+	snprintf(filename, sizeof(filename), "%s/.g13/bindings-%d.properties", home_dir, bindings);
 
 	  ifstream file (filename);
 	  if (!file.is_open()) {
@@ -178,15 +189,17 @@ void G13::loadBindings() {
 		  return;
 	  }
 
-
 	  while (file.good()) {
 		  string line;
 	      getline(file, line);
 
+          // Use C-style char array for strtok compatibility if needed, or parse with std::string methods
 	      char l[1024];
-		  strcpy(l, (char *)line.c_str());
-		  trim(l);
-		  if (strlen(l) > 0) {
+          strncpy(l, line.c_str(), sizeof(l) - 1);
+          l[sizeof(l)-1] = '\0';
+
+		  trim_c_string(l);
+		  if (strlen(l) > 0 && l[0] != '#') { // Also check for comment lines here
 			  char *key = strtok(l, "=");
 			  if (key[0] == '#') {
 				  // ignore line
@@ -208,29 +221,26 @@ void G13::loadBindings() {
 				  int gKey = atoi(&key[1]);
 				  //cout << "gKey = " << gKey << "\n";
 				  char *type = strtok(NULL, ",");
-				  trim(type);
+				  trim_c_string(type);
 				  //cout << "type = " << type << "\n";
 				  if (strcmp(type, "p") == 0) { /* passthrough */
 					  char *keytype = strtok(NULL, ",\n ");
-					  trim(keytype);
+					  trim_c_string(keytype);
 					  int keycode = atoi(&keytype[2]);
 
-					  if (actions[gKey] != null) {
-						  delete actions[gKey];
-					  }
-
+                      if (gKey >= 0 && gKey < G13_NUM_KEYS) {
 					  //cout << "assigning G" << gKey << " to keycode " << keycode << "\n";
-					  G13Action *action = new PassThroughAction(keycode);
-					  actions[gKey] = action;
+					      actions[gKey] = std::make_unique<PassThroughAction>(keycode);
+                      }
 				  }
 				  else if (strcmp(type, "m") == 0) { /* macro */
 					  int macroId = atoi(strtok(NULL, ",\n "));
 					  int repeats = atoi(strtok(NULL, ",\n "));
-					  //cout << "macroId = " << macroId << "\n";
-					  Macro *macro = loadMacro(macroId);
-					  MacroAction *action = new MacroAction(macro->getSequence());
-					  action->setRepeats(repeats);
-					  actions[gKey] = action;
+					  auto macro = loadMacro(macroId); // Returns std::unique_ptr<Macro>
+                      if (macro && gKey >= 0 && gKey < G13_NUM_KEYS) {
+					      actions[gKey] = std::make_unique<MacroAction>(macro->getSequence());
+					      static_cast<MacroAction*>(actions[gKey].get())->setRepeats(repeats);
+                      } // macro unique_ptr goes out of scope and is deleted if not moved
 				  }
 				  else {
 					  cout << "G13::loadBindings() unknown type '" << type << "\n";
@@ -241,8 +251,6 @@ void G13::loadBindings() {
 				  cout << "G13::loadBindings() Unknown first token: " << key << "\n";
 			  }
 		  }
-
-	      //cout << line << endl;
 	  }
 
 	  file.close();
@@ -343,7 +351,7 @@ void G13::parse_joystick(unsigned char *buf) {
 		int codes[4] = {36, 37, 38, 39};
 		for (int i = 0; i < 4; i++) {
 			int key = codes[i];
-			int p = pressed[i];
+			int p = pressed[i]; // p is 0 or 1
 			if (actions[key]->set(p)) {
 				//cout << "key " << key << ", pressed=" << p << ", actions[key]->isPressed()="
 				//		<< actions[key]->isPressed() <<  ", x=" << stick_x << "\n";
@@ -356,6 +364,11 @@ void G13::parse_joystick(unsigned char *buf) {
 
 }
 void G13::parse_key(int key, unsigned char *byte) {
+    if (key < 0 || key >= G13_NUM_KEYS) {
+        cerr << "G13::parse_key: Invalid key index " << key << endl;
+        return;
+    }
+
 	unsigned char actual_byte = byte[key / 8];
 	unsigned char mask = 1 << (key % 8);
 
@@ -380,18 +393,19 @@ void G13::parse_key(int key, unsigned char *byte) {
 		return;
 	}
 
+    if (actions[key]) { // Check if action exists
+	    int changed = actions[key]->set(pressed);
 
-	int changed = actions[key]->set(pressed);
-
-	/*
-	if (changed) {
-		string type = "released";
-		if (actions[key]->isPressed()) {
-			type = "pressed";
-		}
-		cout << "G" << (key+1) << " " << type << "\n";
-	}
-	*/
+	    /*
+	    if (changed) {
+		    string type = "released";
+		    if (actions[key]->isPressed()) {
+			    type = "pressed";
+		    }
+		    cout << "G" << (key+1) << " " << type << "\n";
+	    }
+	    */
+    }
 }
 
 
@@ -444,4 +458,3 @@ void G13::parse_keys(unsigned char *buf) {
 	 cout << hex << setw(2) << setfill('0') << (int)buf[4];
 	 cout << hex << setw(2) << setfill('0') << (int)buf[3] << endl;*/
 }
-

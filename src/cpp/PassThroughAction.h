@@ -9,14 +9,14 @@ private:
 	int keycode;
 
 protected:
-	virtual void key_down();
-	virtual void key_up();
+	void key_down() override;
+	void key_up() override;
 
 public:
 	PassThroughAction(int code);
 	virtual ~PassThroughAction();
 
-	int getKeyCode();
+	int getKeyCode() const;
 	void setKeyCode(int code);
 };
 

@@ -12,8 +12,8 @@ protected:
 public:
 	G13Action();
 	virtual ~G13Action();
-	virtual int set(int state);
-	int isPressed();
+	virtual int set(int state); // Returns 1 if state changed, 0 otherwise
+	int isPressed() const;
 };
 
 #endif

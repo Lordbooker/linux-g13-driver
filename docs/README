@@ -11,10 +11,6 @@ if you don't have it, you can get it by "sudo apt-get install libusb-1.0"
 
 Java version 1.6 or higher
 
-Download:
-Download zip file from https://github.com/Tetz95/linux-g13-driver/releases/latest
-Unzip into your favorite directory
-
 Build:
 Open a console (command prompt)
 Go to the directory where you unzipped your download

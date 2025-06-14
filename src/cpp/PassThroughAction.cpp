@@ -1,21 +1,20 @@
 #include <linux/uinput.h>
-
-#include <iostream>
+// #include <iostream> // Unused
 
 #include "PassThroughAction.h"
 #include "Output.h"
 
-using namespace std;
+// using namespace std; // Not strictly needed here
 
 PassThroughAction::PassThroughAction(int code) {
 	this->keycode = code;
 }
-PassThroughAction::~PassThroughAction() {
 
+PassThroughAction::~PassThroughAction() {
 }
 
-int PassThroughAction::getKeyCode() {
-	return keycode;
+int PassThroughAction::getKeyCode() const {
+	return this->keycode;
 }
 
 void PassThroughAction::setKeyCode(int code) {
@@ -23,9 +22,11 @@ void PassThroughAction::setKeyCode(int code) {
 }
 
 void PassThroughAction::key_down() {
-	send_event(EV_KEY, keycode, 1);
+	send_event(EV_KEY, this->keycode, 1);
+	send_event(0, 0, 0); // SYN_REPORT
 }
 
 void PassThroughAction::key_up() {
-	send_event(EV_KEY, keycode, 0);
+	send_event(EV_KEY, this->keycode, 0);
+	send_event(0, 0, 0); // SYN_REPORT
 }

@@ -1,16 +1,13 @@
 # Readme File
 
-This code was forked from Jim Gupta's code at <https://code.google.com/p/linux-g13-driver/>
+I forked the repo because parts of it are already 10 years old, and I still tinker with the hardware.
+So far, I have only modified the C++ part (i.e., the driver itself). I'm not familiar with Java, and the config program isn't strictly necessary, as I can overwrite the default settings at any time using other key mapping tools.
 
-I've forked this code because Google Code is deprecated and I don't want it lost.  Since then, I've started playing with it a little bit (Mostly directory structure and semantic changes for use with git).
-
-I haven't changed the fundamental code because I'm by no means a coder, but we'll see what happens from here.  I'll eventually write a .service file for systemd and perhaps package it for the AUR.  The service file should work with Ubuntu 15.04 and above.
+Nevertheless, it still works with the included mapping tool, and you can use it to save 4 sets.
 
 ## Notes
 
-I've tried this on 64-bit Arch Linux and it works so far.  I haven't tried it in 64-bit Ubuntu but it should work there, too.
-
-I'm having a hard time getting udev rules to work so this can run in user mode.  It seems that `/dev/uinput` is in the kernel and loads before anything is writable and the file's permissions don't get modified.
+I've tried this on 64-bit Arch Linux and it works so far.  
 
 ## Requirements
 
@@ -33,11 +30,6 @@ For Ubuntu, it can be installed by typing:
 For Arch it can be installed by typing:
 
     sudo pacman -S jre8-openjdk
-
-## Download
-
-Download zip file from <https://github.com/Tetz95/linux-g13-driver/releases/latest>  
-Unzip into your favorite directory
 
 ## Build
 

@@ -19,27 +19,27 @@ using namespace std;
 
 
 int file = -1;
-pthread_mutex_t plock;
+pthread_mutex_t plock = PTHREAD_MUTEX_INITIALIZER; // Static initialization
 
 void send_event(int type, int code, int val) {
 
-	/*
-	if (file == -1) {
-		pthread_mutex_init(&plock, NULL);
-		file = create_uinput();
-	}
-	*/
+    // Assuming create_uinput() is called once at startup.
+    // If not, the initialization of 'file' and 'plock' needs to be thread-safe.
+    // pthread_mutex_init(&plock, nullptr); // Should be done once.
+    // Static initialization is generally safer for global mutexes.
 
-	if (file == -2) {
+	if (file < 0) { // Check if uinput is successfully initialized
 		return;
 	}
 
 	pthread_mutex_lock(&plock);
 
 	struct input_event event;
+	// Using gettimeofday with nullptr for the second argument is fine.
+    // However, C++ chrono could be an alternative if more complex time ops were needed.
 
 	memset(&event, 0, sizeof(event));
-	gettimeofday(&event.time, null);
+	gettimeofday(&event.time, nullptr);
 	event.type = type;
 	event.code = code;
 	event.value = val;
@@ -53,14 +53,20 @@ void send_event(int type, int code, int val) {
 }
 
 void flush() {
-
+    if (file < 0) return;
 	pthread_mutex_lock(&plock);
 	fsync(file);
 	pthread_mutex_unlock(&plock);
-
 }
 
-int create_uinput() {
+void close_uinput() {
+    if (file >= 0) {
+        close(file);
+        file = -1;
+    }
+}
+
+bool create_uinput() {
 	//cout << "create uinput\n";
 
 	struct uinput_user_dev uinp;
@@ -70,18 +76,18 @@ int create_uinput() {
 
 	if (!dev_uinput_fname) {
 		cerr << "Could not find an uinput device" << endl;
-		return -2;
+		return false;
 	}
 
 	if (access(dev_uinput_fname, W_OK) != 0) {
 		cerr << dev_uinput_fname << " doesn't grant write permissions" << endl;
-		return -2;
+		return false;
 	}
 
-	int ufile = open(dev_uinput_fname, O_WRONLY | O_NDELAY);
-	if (ufile <= 0) {
+	file = open(dev_uinput_fname, O_WRONLY | O_NDELAY);
+	if (file < 0) { // Changed from ufile <= 0 because 0 is a valid fd
 		cerr << "Could not open uinput" << endl;
-		return -2;
+		return false;
 	}
 
 	memset(&uinp, 0, sizeof(uinp));
@@ -100,30 +106,30 @@ int create_uinput() {
 	//  uinp.absflat[ABS_X] = 0x80;
 	//  uinp.absflat[ABS_Y] = 0x80;
 
-	ioctl(ufile, UI_SET_EVBIT, EV_KEY);
-	ioctl(ufile, UI_SET_EVBIT, EV_ABS);
-	/*  ioctl(ufile, UI_SET_EVBIT, EV_REL);*/
-	ioctl(ufile, UI_SET_MSCBIT, MSC_SCAN);
-	ioctl(ufile, UI_SET_ABSBIT, ABS_X);
-	ioctl(ufile, UI_SET_ABSBIT, ABS_Y);
-	/*  ioctl(ufile, UI_SET_RELBIT, REL_X);
-	 ioctl(ufile, UI_SET_RELBIT, REL_Y);*/
+	ioctl(file, UI_SET_EVBIT, EV_KEY);
+	ioctl(file, UI_SET_EVBIT, EV_ABS);
+	/*  ioctl(file, UI_SET_EVBIT, EV_REL);*/
+	ioctl(file, UI_SET_MSCBIT, MSC_SCAN);
+	ioctl(file, UI_SET_ABSBIT, ABS_X);
+	ioctl(file, UI_SET_ABSBIT, ABS_Y);
+	/*  ioctl(file, UI_SET_RELBIT, REL_X);
+	 ioctl(file, UI_SET_RELBIT, REL_Y);*/
 	for (int i = 0; i < 256; i++)
-		ioctl(ufile, UI_SET_KEYBIT, i);
-	ioctl(ufile, UI_SET_KEYBIT, BTN_THUMB);
+		ioctl(file, UI_SET_KEYBIT, i);
+	ioctl(file, UI_SET_KEYBIT, BTN_THUMB);
 
-	int retcode = write(ufile, &uinp, sizeof(uinp));
+	int retcode = write(file, &uinp, sizeof(uinp));
 	if (retcode < 0) {
 		cerr << "Could not write to uinput device (" << retcode << ")" << endl;
-		return -2;
+        close(file); file = -1;
+		return false;
 	}
 
-	retcode = ioctl(ufile, UI_DEV_CREATE);
+	retcode = ioctl(file, UI_DEV_CREATE);
 	if (retcode) {
 		cerr << "Error creating uinput device for G13" << endl;
-		return -2;
+        close(file); file = -1;
+		return false;
 	}
-
-	file = ufile;
-	return ufile;
+	return true;
 }

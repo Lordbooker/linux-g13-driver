@@ -1,7 +1,10 @@
 #ifndef __CONSTANTS_H__
 #define __CONSTANTS_H__
 
-#define null 0
+// #define null 0 // Replaced with nullptr or 0 directly in C++ code
+
+// Definition for _BV (Bit Value) macro, common in embedded C, means (1 << bit)
+// #define _BV(bit) (1U << (bit))
 
 #define G13_INTERFACE 0
 #define G13_KEY_ENDPOINT 1
@@ -74,6 +77,8 @@ enum G13_KEYS {
     G13_KEY_MISC_TOGGLE
 };
 
+/*
+// This mask appears to be unused in the current codebase.
 #define G13_KEY_ONLY_MASK  (_BV(G13_G1)  | \
                             _BV(G13_G2)  | \
                             _BV(G13_G3)  | \
@@ -106,6 +111,6 @@ enum G13_KEYS {
                             _BV(G13_M3)  | \
                             _BV(G13_MR)  | \
                             _BV(G13_LIGHT))
-
+*/
 
 #endif

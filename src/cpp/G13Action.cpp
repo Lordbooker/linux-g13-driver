@@ -51,6 +51,6 @@ int G13Action::set(int state) {
 }
 
 
-int G13Action::isPressed() {
+int G13Action::isPressed() const {
 	return pressed;
 }

@@ -2,6 +2,8 @@
 #define __G13_H__
 
 #include <string>
+#include <vector>
+#include <memory> // For std::unique_ptr
 #include <map>
 
 #include "Constants.h"
@@ -9,11 +11,11 @@
 #include "Macro.h"
 
 using namespace std;
+// Consider removing 'using namespace std;' from header if possible, or scope it.
 
 class G13 {
 private:
-	G13Action            *actions[G13_NUM_KEYS];
-
+	std::vector<std::unique_ptr<G13Action>> actions;
 	libusb_device        *device;
 	libusb_device_handle *handle;
 	int                   uinput_file;
@@ -26,7 +28,7 @@ private:
 
 	int                   bindings;
 
-	Macro *loadMacro(int id);
+	std::unique_ptr<Macro> loadMacro(int id);
 
 	int  read();
 	void parse_joystick(unsigned char *buf);
