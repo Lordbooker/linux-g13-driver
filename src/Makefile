@@ -19,3 +19,7 @@ $(SRC_DIR)/%.o: $(SRC_DIR)/%.cpp
 
 $(EXE_NAME): $(OBJS)
 	$(CC) $(OBJS) -o $(EXE_NAME) $(LDFLAGS) $(CXXFLAGS) $(LDLIBS)
+
+clean:
+	rm -f $(OBJS) $(EXE_NAME)
+
