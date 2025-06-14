@@ -15,11 +15,9 @@ public:
     G13Action() = default;
     virtual ~G13Action() = default;
 
-    // Prevent copying
     G13Action(const G13Action&) = delete;
     G13Action& operator=(const G13Action&) = delete;
 
-    // Returns true if state changed
     virtual bool set(bool state);
     bool isPressed() const;
 };

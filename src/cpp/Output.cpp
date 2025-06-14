@@ -5,6 +5,7 @@
 #include <fcntl.h>
 #include <sys/ioctl.h>
 #include <linux/uinput.h>
+#include <sys/time.h>
 
 #include "Output.h"
 #include "Constants.h"
@@ -21,15 +22,13 @@ void send_event(int type, int code, int val) {
 
     struct input_event event;
     std::memset(&event, 0, sizeof(event));
-    // gettimeofday is sufficient here
     gettimeofday(&event.time, nullptr);
-    event.type = type;
-    event.code = code;
+    event.type = static_cast<__u16>(type);
+    event.code = static_cast<__u16>(code);
     event.value = val;
 
     std::lock_guard<std::mutex> lock(uinput_mutex);
     if (write(uinput_fd, &event, sizeof(event)) < 0) {
-        // In a real-world scenario, we might want to handle this error more gracefully
         std::cerr << "Warning: Failed to write event to uinput device." << std::endl;
     }
 }
@@ -54,7 +53,7 @@ bool create_uinput() {
             access("/dev/input/uinput", W_OK) == 0? "/dev/input/uinput" : nullptr;
 
     if (!dev_uinput_fname) {
-        std::cerr << "Could not find a writable uinput device. Check permissions for /dev/uinput or /dev/input/uinput." << std::endl;
+        std::cerr << "Could not find a writable uinput device. Check permissions." << std::endl;
         return false;
     }
 
@@ -72,23 +71,20 @@ bool create_uinput() {
     uinp.id.product = G13_PRODUCT_ID;
     uinp.id.version = 1;
 
-    // Setup capabilities
     ioctl(uinput_fd, UI_SET_EVBIT, EV_KEY);
     ioctl(uinput_fd, UI_SET_EVBIT, EV_SYN);
     ioctl(uinput_fd, UI_SET_EVBIT, EV_ABS);
     
-    // Enable all standard keys
     for (int i = 0; i < KEY_MAX; ++i) {
         ioctl(uinput_fd, UI_SET_KEYBIT, i);
     }
 
-    // Setup absolute axes for joystick
     ioctl(uinput_fd, UI_SET_ABSBIT, ABS_X);
     ioctl(uinput_fd, UI_SET_ABSBIT, ABS_Y);
-    uinp.absmin = 0;
-    uinp.absmax = 255;
-    uinp.absmin = 0;
-    uinp.absmax = 255;
+    uinp.absmin[ABS_X] = 0;
+    uinp.absmax[ABS_X] = 255;
+    uinp.absmin[ABS_Y] = 0;
+    uinp.absmax[ABS_Y] = 255;
 
     if (write(uinput_fd, &uinp, sizeof(uinp)) < 0) {
         std::cerr << "Could not write uinput device setup." << std::endl;

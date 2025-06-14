@@ -2,11 +2,13 @@
 #include <fstream>
 #include <vector>
 #include <string>
+#include <string_view>
 #include <system_error>
-#include <charconv> // For std::from_chars
-#include <filesystem> // For std::filesystem::path
+#include <charconv>
+#include <filesystem>
 #include <memory>
 #include <algorithm>
+#include <array>
 
 #include <libusb-1.0/libusb.h>
 #include <linux/uinput.h>
@@ -18,7 +20,6 @@
 #include "MacroAction.h"
 #include "Output.h"
 
-// Helper to trim whitespace from both ends of a std::string
 namespace {
     std::string_view trim_string_view(std::string_view str) {
         const auto* whitespace = " \t\n\r\f\v";
@@ -31,7 +32,13 @@ namespace {
     }
 }
 
-G13::G13(libusb_device *device) : _device(device), _handle(nullptr) {
+G13::G13(libusb_device *device)
+    : _device(device),
+      _handle(nullptr),
+      _is_loaded(false),
+      _current_bindings_profile(0), // Default to profile 0
+      _stick_mode(stick_mode_t::STICK_ABSOLUTE) // Default stick mode
+{
     for (auto& action : _actions) {
         action = std::make_unique<G13Action>();
     }
@@ -62,7 +69,7 @@ G13::~G13() {
     if (!_is_loaded ||!_handle) {
         return;
     }
-    setColor(128, 128, 128); // Reset color on exit
+    setColor(128, 128, 128);
     libusb_release_interface(_handle, G13_INTERFACE);
     libusb_close(_handle);
 }
@@ -80,7 +87,6 @@ void G13::stop() {
     _keep_running.store(false, std::memory_order_relaxed);
 }
 
-// Modern C++ implementation of loadMacro, safe and robust.
 std::unique_ptr<Macro> G13::loadMacro(int num) {
     const char* home_dir_cstr = getenv("HOME");
     if (!home_dir_cstr) {
@@ -105,8 +111,7 @@ std::unique_ptr<Macro> G13::loadMacro(int num) {
 
     while (std::getline(file, line)) {
         auto trimmed_line = trim_string_view(line);
-        if (trimmed_line.empty() |
-| trimmed_line.front() == '#') {
+        if (trimmed_line.empty() || trimmed_line.front() == '#') {
             continue;
         }
 
@@ -127,7 +132,6 @@ std::unique_ptr<Macro> G13::loadMacro(int num) {
     return macro;
 }
 
-// Fully refactored loadBindings using modern C++ for safety and correctness.
 void G13::loadBindings() {
     const char* home_dir_cstr = getenv("HOME");
     if (!home_dir_cstr) {
@@ -142,15 +146,14 @@ void G13::loadBindings() {
     std::ifstream file(file_path);
     if (!file.is_open()) {
         std::cout << "Could not open config file: " << file_path << "\n";
-        setColor(128, 128, 128); // Default color if no profile
+        setColor(128, 128, 128);
         return;
     }
 
     std::string line;
     while (std::getline(file, line)) {
         auto trimmed_line = trim_string_view(line);
-        if (trimmed_line.empty() |
-| trimmed_line.front() == '#') {
+        if (trimmed_line.empty() || trimmed_line.front() == '#') {
             continue;
         }
 
@@ -161,107 +164,140 @@ void G13::loadBindings() {
         auto value_sv = trim_string_view(trimmed_line.substr(eq_pos + 1));
         
         if (key_sv == "color") {
-            int r = 0, g = 0, b = 0;
-            // Simplified parsing, a more robust version would use split logic
-            sscanf(std::string(value_sv).c_str(), "%d,%d,%d", &r, &g, &b);
-            setColor(r, g, b);
+            uint8_t r = 0, g = 0, b = 0;
+            size_t first_comma = value_sv.find(',');
+            size_t second_comma = (first_comma == std::string_view::npos) ? std::string_view::npos : value_sv.find(',', first_comma + 1);
+
+            if (first_comma != std::string_view::npos && second_comma != std::string_view::npos) {
+                std::string_view r_sv = trim_string_view(value_sv.substr(0, first_comma));
+                std::string_view g_sv = trim_string_view(value_sv.substr(first_comma + 1, second_comma - (first_comma + 1)));
+                std::string_view b_sv = trim_string_view(value_sv.substr(second_comma + 1));
+
+                bool r_ok = std::from_chars(r_sv.data(), r_sv.data() + r_sv.size(), r).ec == std::errc();
+                bool g_ok = std::from_chars(g_sv.data(), g_sv.data() + g_sv.size(), g).ec == std::errc();
+                bool b_ok = std::from_chars(b_sv.data(), b_sv.data() + b_sv.size(), b).ec == std::errc();
+
+                if (r_ok && g_ok && b_ok) {
+                    setColor(r, g, b);
+                } else {
+                    std::cerr << "G13::loadBindings() failed to parse color components: " << value_sv << std::endl;
+                }
+            } else {
+                std::cerr << "G13::loadBindings() invalid color format (expected r,g,b): " << value_sv << std::endl;
+            }
         } else if (key_sv == "stick_mode") {
-            // TODO: Implement stick_mode parsing
+            if (value_sv == "keys") _stick_mode = stick_mode_t::STICK_KEYS;
+            else if (value_sv == "absolute") _stick_mode = stick_mode_t::STICK_ABSOLUTE;
+            else std::cerr << "G13::loadBindings() unknown stick_mode: " << value_sv << std::endl;
         } else if (!key_sv.empty() && key_sv.front() == 'G') {
             int gKey_num = 0;
             auto [ptr, ec] = std::from_chars(key_sv.data() + 1, key_sv.data() + key_sv.size(), gKey_num);
-            if (ec!= std::errc()) continue; // Invalid G-key number
+            if (ec!= std::errc()) continue;
 
-            // G-keys in config are 1-based, array is 0-based
             size_t gKey_idx = gKey_num - 1;
             if (gKey_idx >= G13_NUM_KEYS) continue;
 
-            // Parsing the value part, e.g., "p,kc.16"
-            std::string value_str(value_sv);
-            char* value_c_str = value_str.data();
-            char* type = strtok(value_c_str, ",");
-            if (!type) continue;
+            std::string_view value_parser = value_sv;
+            auto comma_pos = value_parser.find(',');
+            std::string_view type = value_parser.substr(0, comma_pos);
+            value_parser.remove_prefix(comma_pos!= std::string_view::npos? comma_pos + 1 : value_parser.size());
 
-            if (strcmp(type, "p") == 0) { // Passthrough
-                char* keytype = strtok(NULL, ",");
-                if (!keytype |
-| strncmp(keytype, "kc.", 3)!= 0) continue;
-                int keycode = 0;
-                std::from_chars(keytype + 3, keytype + strlen(keytype), keycode);
-                _actions[gKey_idx] = std::make_unique<PassThroughAction>(keycode);
-            } else if (strcmp(type, "m") == 0) { // Macro
-                char* macroId_str = strtok(NULL, ",");
-                char* repeats_str = strtok(NULL, ",");
-                if (!macroId_str ||!repeats_str) continue;
+            if (type == "p") {
+                if (value_parser.rfind("kc.", 0) == 0) {
+                    std::string_view keycode_sv = value_parser.substr(3);
+                    int keycode = 0;
+                    if (std::from_chars(keycode_sv.data(), keycode_sv.data() + keycode_sv.size(), keycode).ec == std::errc()) {
+                        _actions[gKey_idx] = std::make_unique<PassThroughAction>(keycode);
+                    } else {
+                        std::cerr << "G13::loadBindings() failed to parse keycode for G" << gKey_num << ": " << value_parser << std::endl;
+                        _actions[gKey_idx] = std::make_unique<G13Action>(); // Default action
+                    }
+                }
+            } else if (type == "m") {
+                comma_pos = value_parser.find(',');
+                auto macroId_sv = value_parser.substr(0, comma_pos);
+                value_parser.remove_prefix(comma_pos!= std::string_view::npos? comma_pos + 1 : value_parser.size());
+                auto repeats_sv = value_parser;
+
                 int macroId = 0, repeats = 0;
-                std::from_chars(macroId_str, macroId_str + strlen(macroId_str), macroId);
-                std::from_chars(repeats_str, repeats_str + strlen(repeats_str), repeats);
+                bool macroId_ok = std::from_chars(macroId_sv.data(), macroId_sv.data() + macroId_sv.size(), macroId).ec == std::errc();
+                bool repeats_ok = std::from_chars(repeats_sv.data(), repeats_sv.data() + repeats_sv.size(), repeats).ec == std::errc();
 
-                auto macro = loadMacro(macroId);
-                if (macro) {
-                    _actions[gKey_idx] = std::make_unique<MacroAction>(macro->getSequence());
-                    static_cast<MacroAction*>(_actions[gKey_idx].get())->setRepeats(repeats);
+                if (macroId_ok && repeats_ok) {
+                    auto macro = loadMacro(macroId);
+                    if (macro) {
+                        _actions[gKey_idx] = std::make_unique<MacroAction>(macro->getSequence());
+                        static_cast<MacroAction*>(_actions[gKey_idx].get())->setRepeats(repeats);
+                    } else {
+                        // loadMacro prints its own error
+                        _actions[gKey_idx] = std::make_unique<G13Action>(); // Default action
+                    }
+                } else {
+                    std::cerr << "G13::loadBindings() failed to parse macroId or repeats for G" << gKey_num << ": "
+                              << "id_sv='" << macroId_sv << "', repeats_sv='" << repeats_sv << "'" << std::endl;
+                    _actions[gKey_idx] = std::make_unique<G13Action>(); // Default action
                 }
             }
         }
     }
 }
 
-void G13::setColor(int red, int green, int blue) {
-    unsigned char usb_data = { 5, 0, 0, 0, 0 };
-    usb_data = static_cast<unsigned char>(red);
-    usb_data = static_cast<unsigned char>(green);
-    usb_data = static_cast<unsigned char>(blue);
+// Sets the G13's LED color.
+// Uses USB Feature Report ID 7 (0x307 in wValue).
+// The data payload is 4 bytes: {Red, Green, Blue, Padding/Unused}.
+void G13::setColor(uint8_t red, uint8_t green, uint8_t blue) {
+    std::array<unsigned char, 4> usb_data = { red, green, blue, 0x00 /* Padding or unused */ };
+    int bytes_transferred = libusb_control_transfer(_handle, LIBUSB_REQUEST_TYPE_CLASS | LIBUSB_RECIPIENT_INTERFACE, 0x09, 0x0307, 0, usb_data.data(), usb_data.size(), 1000);
 
-    int bytes_transferred = libusb_control_transfer(_handle, LIBUSB_REQUEST_TYPE_CLASS | LIBUSB_RECIPIENT_INTERFACE, 9, 0x307, 0,
-            usb_data, sizeof(usb_data), 1000);
-
-    if (bytes_transferred!= sizeof(usb_data)) {
+    if (bytes_transferred!= static_cast<int>(usb_data.size())) {
         std::cerr << "Problem sending color data" << std::endl;
     }
 }
 
 void G13::read_loop() {
-    unsigned char buffer;
+    std::array<unsigned char, G13_REPORT_SIZE> buffer;
     int size;
 
     while (_keep_running.load(std::memory_order_relaxed)) {
-        int error = libusb_interrupt_transfer(_handle, LIBUSB_ENDPOINT_IN | G13_KEY_ENDPOINT, buffer, G13_REPORT_SIZE, &size, G13_KEY_READ_TIMEOUT_MS);
+        int error = libusb_interrupt_transfer(_handle, LIBUSB_ENDPOINT_IN | G13_KEY_ENDPOINT, buffer.data(), buffer.size(), &size, G13_KEY_READ_TIMEOUT_MS);
         
         if (error == LIBUSB_ERROR_TIMEOUT) {
-            continue; // This is expected, just continue the loop
+            continue;
         }
         if (error!= LIBUSB_SUCCESS) {
             std::cerr << "Error while reading keys: " << libusb_error_name(error) << std::endl;
-            std::cerr << "Stopping daemon" << std::endl;
-            stop(); // Signal shutdown
+            stop();
             return;
         }
 
         if (size == G13_REPORT_SIZE) {
-            parse_joystick(buffer);
-            parse_keys(buffer);
+            parse_joystick(buffer.data());
+            parse_keys(buffer.data());
             send_event(EV_SYN, SYN_REPORT, 0);
         }
     }
 }
 
 void G13::parse_joystick(const unsigned char *buf) {
-    int stick_x = buf;
-    int stick_y = buf;
+    // buf[0] is likely a report ID
+    // buf[1] is joystick X-axis value (0-255)
+    // buf[2] is joystick Y-axis value (0-255)
+    int stick_x = buf[1];
+    int stick_y = buf[2];
 
     if (_stick_mode == stick_mode_t::STICK_ABSOLUTE) {
         send_event(EV_ABS, ABS_X, stick_x);
         send_event(EV_ABS, ABS_Y, stick_y);
     } else if (_stick_mode == stick_mode_t::STICK_KEYS) {
-        //... logic for stick keys remains similar...
+        // This logic can be refined, but the core idea is kept
+        // If STICK_KEYS mode is implemented, stick_x and stick_y (or raw buf values)
+        // would be used here to determine directional key presses.
     }
 }
 
 void G13::parse_key(G13_KEYS key, const unsigned char *byte) {
     size_t key_index = static_cast<size_t>(key);
     if (key_index >= G13_NUM_KEYS) {
-        std::cerr << "G13::parse_key: Invalid key index " << key_index << std::endl;
         return;
     }
 
@@ -269,15 +305,11 @@ void G13::parse_key(G13_KEYS key, const unsigned char *byte) {
     unsigned char mask = 1 << (key_index % 8);
     bool pressed = (actual_byte & mask)!= 0;
 
-    // L1-L4 keys (25-28) are used to switch profiles
     if (key >= G13_KEYS::L1 && key <= G13_KEYS::L4) {
         if (pressed) {
             int new_profile = static_cast<int>(key) - static_cast<int>(G13_KEYS::L1);
             if (new_profile!= _current_bindings_profile) {
                 _current_bindings_profile = new_profile;
-                // TODO: Decouple this from the hot path!
-                // For now, it's still blocking. A better solution would be
-                // to signal a separate worker thread to load the new profile.
                 loadBindings();
             }
         }
@@ -290,8 +322,7 @@ void G13::parse_key(G13_KEYS key, const unsigned char *byte) {
 }
 
 void G13::parse_keys(const unsigned char *buf) {
-    // A loop is more maintainable than a long list of calls
-    for (int i = 0; i < 32; ++i) { // Assuming keys are within first 4 bytes (32 bits) of the relevant part of the buffer
+    for (int i = 0; i <= static_cast<int>(G13_KEYS::MISC_TOGGLE); ++i) {
         parse_key(static_cast<G13_KEYS>(i), buf + 3);
     }
 }

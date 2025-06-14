@@ -6,7 +6,8 @@ CC       = g++
 # LIBS     = -lusb-1.0             # Replaced by LDLIBS
 
 # Compiler and Linker Flags
-CXXFLAGS = -pthread # Add other C++ compilation flags like -Wall, -O2, -std=c++11
+#CXXFLAGS = -pthread # Add other C++ compilation flags like -Wall, -O2, -std=c++11
+CXXFLAGS += -g -Wall -Wextra -std=c++17 # Add -g
 CPPFLAGS =           # For preprocessor flags like -Iinclude/ -DDEBUG (e.g. -I../include if headers are in a parent include dir)
 LDFLAGS  = -L/lib64
 LDLIBS   = -lusb-1.0 # -pthread in CXXFLAGS, when passed to the linker, handles pthread linking

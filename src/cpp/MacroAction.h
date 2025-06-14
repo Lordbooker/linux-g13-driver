@@ -14,14 +14,12 @@
 
 class MacroAction : public G13Action {
 public:
-    // Abstract base class for macro events
     class Event {
     public:
         virtual ~Event() = default;
         virtual void execute() = 0;
     };
 
-    // Concrete event types
     class KeyDownEvent : public Event {
     public:
         explicit KeyDownEvent(int code) : _keycode(code) {}
@@ -48,9 +46,8 @@ public:
 
 private:
     std::vector<std::unique_ptr<Event>> _events;
-    int                                 _repeats_on_press = 0; // 0 = play once, 1 = repeat
+    int                                 _repeats_on_press = 0;
     
-    // Threading and synchronization primitives
     std::thread                         _macro_thread;
     std::mutex                          _thread_mutex;
     std::atomic<bool>                   _stop_requested{false};
@@ -59,17 +56,14 @@ protected:
     void key_down() override;
     void key_up() override;
 
-    // The function executed by the thread
     void execute_macro_loop();
     
-    // Helper to parse tokens from the sequence string
     static std::unique_ptr<Event> tokenToEvent(std::string_view token);
 
 public:
     explicit MacroAction(const std::string& sequence);
     ~MacroAction() override;
 
-    // Prevent copying
     MacroAction(const MacroAction&) = delete;
     MacroAction& operator=(const MacroAction&) = delete;
 
