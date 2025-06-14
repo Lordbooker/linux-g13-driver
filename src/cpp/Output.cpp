@@ -1,135 +1,108 @@
 #include <iostream>
-#include <fstream>
-#include <vector>
-#include <sys/stat.h>
-#include <stdio.h>
-#include <string.h>
-#include <signal.h>
-#include <stdlib.h>
+#include <cstring>
+#include <mutex>
 #include <unistd.h>
-
-#include <iomanip>
-#include <linux/uinput.h>
 #include <fcntl.h>
+#include <sys/ioctl.h>
+#include <linux/uinput.h>
 
 #include "Output.h"
 #include "Constants.h"
 
-using namespace std;
-
-
-int file = -1;
-pthread_mutex_t plock = PTHREAD_MUTEX_INITIALIZER; // Static initialization
+namespace {
+    int uinput_fd = -1;
+    std::mutex uinput_mutex;
+}
 
 void send_event(int type, int code, int val) {
+    if (uinput_fd < 0) {
+        return;
+    }
 
-    // Assuming create_uinput() is called once at startup.
-    // If not, the initialization of 'file' and 'plock' needs to be thread-safe.
-    // pthread_mutex_init(&plock, nullptr); // Should be done once.
-    // Static initialization is generally safer for global mutexes.
+    struct input_event event;
+    std::memset(&event, 0, sizeof(event));
+    // gettimeofday is sufficient here
+    gettimeofday(&event.time, nullptr);
+    event.type = type;
+    event.code = code;
+    event.value = val;
 
-	if (file < 0) { // Check if uinput is successfully initialized
-		return;
-	}
-
-	pthread_mutex_lock(&plock);
-
-	struct input_event event;
-	// Using gettimeofday with nullptr for the second argument is fine.
-    // However, C++ chrono could be an alternative if more complex time ops were needed.
-
-	memset(&event, 0, sizeof(event));
-	gettimeofday(&event.time, nullptr);
-	event.type = type;
-	event.code = code;
-	event.value = val;
-
-	write(file, &event, sizeof(event));
-
-	//cout << "write(type=" << type << ", code=" <<  code << ", val=" << val << ")\n";
-
-	pthread_mutex_unlock(&plock);
-
+    std::lock_guard<std::mutex> lock(uinput_mutex);
+    if (write(uinput_fd, &event, sizeof(event)) < 0) {
+        // In a real-world scenario, we might want to handle this error more gracefully
+        std::cerr << "Warning: Failed to write event to uinput device." << std::endl;
+    }
 }
 
 void flush() {
-    if (file < 0) return;
-	pthread_mutex_lock(&plock);
-	fsync(file);
-	pthread_mutex_unlock(&plock);
+    if (uinput_fd < 0) return;
+    std::lock_guard<std::mutex> lock(uinput_mutex);
+    fsync(uinput_fd);
 }
 
 void close_uinput() {
-    if (file >= 0) {
-        close(file);
-        file = -1;
+    if (uinput_fd >= 0) {
+        ioctl(uinput_fd, UI_DEV_DESTROY);
+        close(uinput_fd);
+        uinput_fd = -1;
     }
 }
 
 bool create_uinput() {
-	//cout << "create uinput\n";
+    const char* dev_uinput_fname =
+            access("/dev/uinput", W_OK) == 0? "/dev/uinput" :
+            access("/dev/input/uinput", W_OK) == 0? "/dev/input/uinput" : nullptr;
 
-	struct uinput_user_dev uinp;
-	const char* dev_uinput_fname =
-			access("/dev/input/uinput", F_OK) == 0 ? "/dev/input/uinput" :
-			access("/dev/uinput", F_OK) == 0 ? "/dev/uinput" : 0;
+    if (!dev_uinput_fname) {
+        std::cerr << "Could not find a writable uinput device. Check permissions for /dev/uinput or /dev/input/uinput." << std::endl;
+        return false;
+    }
 
-	if (!dev_uinput_fname) {
-		cerr << "Could not find an uinput device" << endl;
-		return false;
-	}
+    uinput_fd = open(dev_uinput_fname, O_WRONLY | O_NONBLOCK);
+    if (uinput_fd < 0) {
+        std::cerr << "Could not open uinput device: " << dev_uinput_fname << std::endl;
+        return false;
+    }
 
-	if (access(dev_uinput_fname, W_OK) != 0) {
-		cerr << dev_uinput_fname << " doesn't grant write permissions" << endl;
-		return false;
-	}
+    struct uinput_user_dev uinp;
+    std::memset(&uinp, 0, sizeof(uinp));
+    strncpy(uinp.name, "Logitech G13", UINPUT_MAX_NAME_SIZE - 1);
+    uinp.id.bustype = BUS_USB;
+    uinp.id.vendor  = G13_VENDOR_ID;
+    uinp.id.product = G13_PRODUCT_ID;
+    uinp.id.version = 1;
 
-	file = open(dev_uinput_fname, O_WRONLY | O_NDELAY);
-	if (file < 0) { // Changed from ufile <= 0 because 0 is a valid fd
-		cerr << "Could not open uinput" << endl;
-		return false;
-	}
+    // Setup capabilities
+    ioctl(uinput_fd, UI_SET_EVBIT, EV_KEY);
+    ioctl(uinput_fd, UI_SET_EVBIT, EV_SYN);
+    ioctl(uinput_fd, UI_SET_EVBIT, EV_ABS);
+    
+    // Enable all standard keys
+    for (int i = 0; i < KEY_MAX; ++i) {
+        ioctl(uinput_fd, UI_SET_KEYBIT, i);
+    }
 
-	memset(&uinp, 0, sizeof(uinp));
-	char name[] = "G13";
-	strncpy(uinp.name, name, sizeof(name));
-	uinp.id.version = 1;
-	uinp.id.bustype = BUS_USB;
-	uinp.id.product = G13_PRODUCT_ID;
-	uinp.id.vendor = G13_VENDOR_ID;
-	uinp.absmin[ABS_X] = 0;
-	uinp.absmin[ABS_Y] = 0;
-	uinp.absmax[ABS_X] = 0xff;
-	uinp.absmax[ABS_Y] = 0xff;
-	//  uinp.absfuzz[ABS_X] = 4;
-	//  uinp.absfuzz[ABS_Y] = 4;
-	//  uinp.absflat[ABS_X] = 0x80;
-	//  uinp.absflat[ABS_Y] = 0x80;
+    // Setup absolute axes for joystick
+    ioctl(uinput_fd, UI_SET_ABSBIT, ABS_X);
+    ioctl(uinput_fd, UI_SET_ABSBIT, ABS_Y);
+    uinp.absmin = 0;
+    uinp.absmax = 255;
+    uinp.absmin = 0;
+    uinp.absmax = 255;
 
-	ioctl(file, UI_SET_EVBIT, EV_KEY);
-	ioctl(file, UI_SET_EVBIT, EV_ABS);
-	/*  ioctl(file, UI_SET_EVBIT, EV_REL);*/
-	ioctl(file, UI_SET_MSCBIT, MSC_SCAN);
-	ioctl(file, UI_SET_ABSBIT, ABS_X);
-	ioctl(file, UI_SET_ABSBIT, ABS_Y);
-	/*  ioctl(file, UI_SET_RELBIT, REL_X);
-	 ioctl(file, UI_SET_RELBIT, REL_Y);*/
-	for (int i = 0; i < 256; i++)
-		ioctl(file, UI_SET_KEYBIT, i);
-	ioctl(file, UI_SET_KEYBIT, BTN_THUMB);
+    if (write(uinput_fd, &uinp, sizeof(uinp)) < 0) {
+        std::cerr << "Could not write uinput device setup." << std::endl;
+        close(uinput_fd);
+        uinput_fd = -1;
+        return false;
+    }
 
-	int retcode = write(file, &uinp, sizeof(uinp));
-	if (retcode < 0) {
-		cerr << "Could not write to uinput device (" << retcode << ")" << endl;
-        close(file); file = -1;
-		return false;
-	}
+    if (ioctl(uinput_fd, UI_DEV_CREATE) < 0) {
+        std::cerr << "Could not create uinput device." << std::endl;
+        close(uinput_fd);
+        uinput_fd = -1;
+        return false;
+    }
 
-	retcode = ioctl(file, UI_DEV_CREATE);
-	if (retcode) {
-		cerr << "Error creating uinput device for G13" << endl;
-        close(file); file = -1;
-		return false;
-	}
-	return true;
+    return true;
 }

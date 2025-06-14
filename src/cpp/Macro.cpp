@@ -1,39 +1,25 @@
 #include "Macro.h"
 
-// Default constructor
-Macro::Macro() : id(0) {
-    // name and sequence are default-constructed (empty strings)
+int Macro::getId() const {
+    return _id;
 }
 
-// Parameterized constructor
-Macro::Macro(int id, const std::string& name, const std::string& sequence)
-    : id(id), name(name), sequence(sequence) {
+const std::string& Macro::getName() const {
+    return _name;
 }
 
-int Macro::getId() const
-{
-    return this->id;
+const std::string& Macro::getSequence() const {
+    return _sequence;
 }
 
-const std::string& Macro::getName() const
-{
-    return this->name;
+void Macro::setId(int id) {
+    _id = id;
 }
 
-const std::string& Macro::getSequence() const
-{
-    return this->sequence;
+void Macro::setName(const std::string& name) {
+    _name = name;
 }
 
-void Macro::setId(int id)
-{
-    this->id = id;
-}
-void Macro::setName(const std::string& name)
-{
-    this->name = name;
-}
-void Macro::setSequence(const std::string& sequence)
-{
-    this->sequence = sequence;
+void Macro::setSequence(const std::string& sequence) {
+    _sequence = sequence;
 }

@@ -1,23 +1,25 @@
 #ifndef __MACRO_H__
 #define __MACRO_H__
 
+#pragma once
+
 #include <string>
 
-class Macro
-{
+class Macro {
 private:
-    int id;
-    std::string name;
-    std::string sequence;
+    int _id = 0;
+    std::string _name;
+    std::string _sequence;
 public:
-    Macro();
-    Macro(int id, const std::string& name, const std::string& sequence);
+    Macro() = default;
+
     int getId() const;
     const std::string& getName() const;
     const std::string& getSequence() const;
+
     void setId(int id);
     void setName(const std::string& name);
     void setSequence(const std::string& sequence);
 };
 
-#endif
+#endif // __MACRO_H__

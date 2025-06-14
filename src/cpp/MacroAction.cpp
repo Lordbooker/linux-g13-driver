@@ -1,122 +1,126 @@
-#include <unistd.h>
-#include <linux/uinput.h>
-#include <vector>
-#include <pthread.h>
-#include <string.h>
-#include <stdlib.h>
 #include <iostream>
-#include <vector> // For std::vector<char>
+#include <string_view>
+#include <cstring> // For strcmp
+#include <charconv> // For std::from_chars
 
 #include "MacroAction.h"
+#include "Output.h"
 
-// Static function to be called by pthread_create
-void* MacroAction::run_macro_thread(void *context) {
-    MacroAction* self = static_cast<MacroAction*>(context);
-    self->execute_macro_loop();
+// Event implementations
+void MacroAction::KeyDownEvent::execute() {
+    send_event(EV_KEY, _keycode, 1);
+    send_event(EV_SYN, SYN_REPORT, 0);
+}
+
+void MacroAction::KeyUpEvent::execute() {
+    send_event(EV_KEY, _keycode, 0);
+    send_event(EV_SYN, SYN_REPORT, 0);
+}
+
+void MacroAction::DelayEvent::execute() {
+    std::this_thread::sleep_for(std::chrono::milliseconds(_delay_ms));
+}
+
+// Helper to parse a single token into an event
+std::unique_ptr<MacroAction::Event> MacroAction::tokenToEvent(std::string_view token) {
+    if (token.rfind("kd.", 0) == 0) { // starts_with in C++20
+        int code = 0;
+        std::from_chars(token.data() + 3, token.data() + token.size(), code);
+        return std::make_unique<KeyDownEvent>(code);
+    }
+    if (token.rfind("ku.", 0) == 0) {
+        int code = 0;
+        std::from_chars(token.data() + 3, token.data() + token.size(), code);
+        return std::make_unique<KeyUpEvent>(code);
+    }
+    if (token.rfind("d.", 0) == 0) {
+        int delay = 0;
+        std::from_chars(token.data() + 2, token.data() + token.size(), delay);
+        return std::make_unique<DelayEvent>(delay);
+    }
+    std::cerr << "MacroAction::tokenToEvent() unknown token: " << token << "\n";
     return nullptr;
 }
 
-void MacroAction::execute_macro_loop() {
-    bool repeat_this_invocation = (_repeats_on_press == 1);
-    _thread_keep_repeating_flag = repeat_this_invocation; // Initialize for this run
+MacroAction::MacroAction(const std::string& sequence) {
+    if (sequence.empty()) {
+        return;
+    }
 
-    do {
-        for (const auto& event_ptr : _events) {
-            if (!event_ptr) continue; // Should not happen with unique_ptr if properly managed
-            
-            // Check flag before each event if repeating
-            if (repeat_this_invocation && !_thread_keep_repeating_flag) {
-                 _is_macro_running = false;
-                return; // Exit loop if signaled to stop
-            }
-            event_ptr->execute();
-            usleep(100); // Small delay between events in sequence
+    std::string_view sequence_sv(sequence);
+    size_t start = 0;
+    size_t end = sequence_sv.find(',');
+
+    while (end!= std::string_view::npos) {
+        auto token = sequence_sv.substr(start, end - start);
+        if (auto event = tokenToEvent(token)) {
+            _events.push_back(std::move(event));
         }
-    } while (repeat_this_invocation && _thread_keep_repeating_flag);
-
-    _is_macro_running = false; // Mark as not running when loop finishes
-}
-
-
-std::unique_ptr<MacroAction::Event> MacroAction::tokenToEvent(const char *token) {
-	if (token == nullptr) {
-		return nullptr;
-	}
-
-	if (strncmp(token, "kd.", 3) == 0) {
-		int code = atoi(&(token[3]));
-		return std::make_unique<KeyDownEvent>(code);
-	}
-	else if (strncmp(token, "ku.", 3) == 0) {
-		int code = atoi(&(token[3]));
-		return std::make_unique<KeyUpEvent>(code);
-	}
-	else if (strncmp(token, "d.", 2) == 0) {
-		int delay = atoi(&(token[2]));
-		return std::make_unique<DelayEvent>(delay);
-	}
-	else {
-		std::cerr << "MacroAction::tokenToEvent() unknown token: " << token << "\n";
-	}
-	return nullptr;
-}
-
-MacroAction::MacroAction(const std::string& tokens_str)
-    : _repeats_on_press(0), _is_macro_running(false), _thread_keep_repeating_flag(false), _macro_thread_id(0) {
-	if (tokens_str.empty()) {
-		return;
-	}
-
-    // strtok modifies the string, so we need a mutable copy.
-    std::vector<char> tokens_copy(tokens_str.begin(), tokens_str.end());
-    tokens_copy.push_back('\0'); // Null-terminate for strtok
-
-	// kd.keycode,ku.keycode,d.time
-	char *token = strtok(tokens_copy.data(), ",");
-	while (token != nullptr) {
-		auto event = tokenToEvent(token);
-		if (event) {
-			_events.push_back(std::move(event));
-		}
-		token = strtok(nullptr, ",");
-	}
+        start = end + 1;
+        end = sequence_sv.find(',', start);
+    }
+    
+    // Handle the last token
+    auto token = sequence_sv.substr(start);
+    if (auto event = tokenToEvent(token)) {
+        _events.push_back(std::move(event));
+    }
 }
 
 MacroAction::~MacroAction() {
-    if (_is_macro_running) {
-        _thread_keep_repeating_flag = false; // Signal thread to stop
-        pthread_join(_macro_thread_id, nullptr); // Wait for thread to finish
+    // Safely stop and join the thread if it's running
+    if (_macro_thread.joinable()) {
+        _stop_requested.store(true, std::memory_order_relaxed);
+        _macro_thread.join();
     }
-    // _events will be cleared automatically by unique_ptr destructors
 }
 
 void MacroAction::key_down() {
-	if (_is_macro_running) {
-		std::cerr << "MacroAction::key_down(): macro already running.\n";
-		return;
-	}
+    std::lock_guard<std::mutex> lock(_thread_mutex);
+    if (_macro_thread.joinable()) {
+        // Macro is already running, decide on behavior (e.g., ignore, restart)
+        // Current implementation: ignore.
+        return;
+    }
 
     if (_events.empty()) {
-        return; // No events to execute
+        return;
     }
 
-    _is_macro_running = true;
-    if (pthread_create(&_macro_thread_id, nullptr, &MacroAction::run_macro_thread, this) != 0) {
-        _is_macro_running = false;
-        std::cerr << "Error creating macro thread\n";
-    }
+    // Reset stop flag and start a new thread
+    _stop_requested.store(false, std::memory_order_relaxed);
+    _macro_thread = std::thread(&MacroAction::execute_macro_loop, this);
 }
 
 void MacroAction::key_up() {
-    // If the macro is set to repeat, signal it to stop.
-    // The thread itself will set _is_macro_running to false when it exits.
-    _thread_keep_repeating_flag = false;
+    // Signal the thread to stop. It will finish its current loop and exit.
+    _stop_requested.store(true, std::memory_order_relaxed);
 }
 
-int MacroAction::getRepeats() const {
-	return _repeats_on_press;
+void MacroAction::execute_macro_loop() {
+    bool repeat = (_repeats_on_press == 1);
+
+    do {
+        for (const auto& event : _events) {
+            // Check for stop request before each event for faster response
+            if (_stop_requested.load(std::memory_order_relaxed)) {
+                goto cleanup;
+            }
+            if (event) {
+                event->execute();
+            }
+        }
+    } while (repeat &&!_stop_requested.load(std::memory_order_relaxed));
+
+cleanup:
+    // The thread is about to exit. We can join it from another thread now.
+    // The lock here is to ensure that a new thread isn't started while we are cleaning up.
+    std::lock_guard<std::mutex> lock(_thread_mutex);
+    if (_macro_thread.joinable() && _macro_thread.get_id() == std::this_thread::get_id()) {
+        _macro_thread.detach(); // Detach from this thread object to allow destruction
+    }
 }
 
 void MacroAction::setRepeats(int repeats) {
-	this->_repeats_on_press = (repeats == 1) ? 1 : 0; // Ensure it's 0 or 1
+    _repeats_on_press = (repeats == 1)? 1 : 0;
 }

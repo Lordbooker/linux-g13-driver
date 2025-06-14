@@ -1,109 +1,79 @@
 #ifndef __MACRO_ACTION_H__
 #define __MACRO_ACTION_H__
 
-#include <unistd.h>
+#pragma once
+
 #include <vector>
 #include <string>
-#include <memory> // For std::unique_ptr
-#include <pthread.h>
-#include <linux/uinput.h> // For EV_KEY, etc.
+#include <memory>
+#include <thread>
+#include <atomic>
+#include <mutex>
 
 #include "G13Action.h"
-#include "Output.h"
 
-class MacroAction : public G13Action
-{
+class MacroAction : public G13Action {
 public:
-	class Event {
-	public:
-		Event() {};
-		virtual ~Event() = default; // Important: virtual destructor
-		virtual void execute() = 0; // Make pure virtual if no default behavior
-	};
-
-	class KeyDownEvent : public Event { // Inherit publicly
-	private:
-		int keycode;
-	public:
-		explicit KeyDownEvent(int code) : keycode(code) {}
-		void execute() override {
-			send_event(EV_KEY, keycode, 1);
-			send_event(0, 0, 0);
-		}
-	};
-
-	class KeyUpEvent : public Event { // Inherit publicly
-	private:
-		int keycode;
-	public:
-		explicit KeyUpEvent(int code) : keycode(code) {}
-		void execute() override {
-			send_event(EV_KEY, keycode, 0);
-			send_event(0, 0, 0);
-		}
-	};
-
-	class DelayEvent : public Event { // Inherit publicly
-	private:
-		int delayInMillisecs;
-	public:
-		explicit DelayEvent(int delay) : delayInMillisecs(delay) {}
-		void execute() override {
-			usleep(1000*delayInMillisecs);
-		}
-	};
-
-private:
-    // Structure to hold data for the macro execution thread
-    struct MacroRunnerArgs {
-        std::vector<Event*>* p_events; // Pointer to the events owned by MacroAction
-        volatile bool* p_keepRepeating;
-        int initial_repeats; // 0 for once, 1 for repeat until key_up
+    // Abstract base class for macro events
+    class Event {
+    public:
+        virtual ~Event() = default;
+        virtual void execute() = 0;
     };
 
-    // Renamed from MultiEventThread for clarity, and it's now a helper struct/class
-	/* class MultiEventThread {
-	public:
-		int keepRepeating;
-		vector<MacroAction::Event *> local_events;
+    // Concrete event types
+    class KeyDownEvent : public Event {
+    public:
+        explicit KeyDownEvent(int code) : _keycode(code) {}
+        void execute() override;
+    private:
+        int _keycode;
+    };
 
-		MultiEventThread() {keepRepeating = 0;}
+    class KeyUpEvent : public Event {
+    public:
+        explicit KeyUpEvent(int code) : _keycode(code) {}
+        void execute() override;
+    private:
+        int _keycode;
+    };
 
-		virtual void execute() {
-			do {
-				//cout << "MultiEventThread::execute() local_events.size() = " << local_events.size() << "\n";
+    class DelayEvent : public Event {
+    public:
+        explicit DelayEvent(int delay) : _delay_ms(delay) {}
+        void execute() override;
+    private:
+        int _delay_ms;
+    };
 
-				for (unsigned int i = 0; i < local_events.size(); i++) {
-					local_events.at(i)->execute();
-					usleep(100);
-				}
-
-			} while (keepRepeating);
-		}
-	}; */
-
-	std::vector<std::unique_ptr<Event>>  _events;
-    int                                  _repeats_on_press; // 0 = play once, 1 = repeat until key_up
-    volatile bool                        _is_macro_running;
-    volatile bool                        _thread_keep_repeating_flag; // Controlled by key_up
-    pthread_t                            _macro_thread_id;
-    // MultiEventThread             *thread; // Replaced by direct thread management
+private:
+    std::vector<std::unique_ptr<Event>> _events;
+    int                                 _repeats_on_press = 0; // 0 = play once, 1 = repeat
+    
+    // Threading and synchronization primitives
+    std::thread                         _macro_thread;
+    std::mutex                          _thread_mutex;
+    std::atomic<bool>                   _stop_requested{false};
 
 protected:
-    std::unique_ptr<Event> tokenToEvent(const char *token);
-	void        key_down() override;
-	void        key_up() override;
+    void key_down() override;
+    void key_up() override;
 
-    static void* run_macro_thread(void *context);
+    // The function executed by the thread
     void execute_macro_loop();
+    
+    // Helper to parse tokens from the sequence string
+    static std::unique_ptr<Event> tokenToEvent(std::string_view token);
 
 public:
-    explicit MacroAction(const std::string& tokens_str);
+    explicit MacroAction(const std::string& sequence);
     ~MacroAction() override;
 
-    int  getRepeats() const;
-    void setRepeats(int repeats); // This sets how it behaves on next key_down
-    // const std::vector<std::unique_ptr<Event>>& getEvents() const; // If needed
+    // Prevent copying
+    MacroAction(const MacroAction&) = delete;
+    MacroAction& operator=(const MacroAction&) = delete;
+
+    void setRepeats(int repeats);
 };
 
-#endif
+#endif // __MACRO_ACTION_H__

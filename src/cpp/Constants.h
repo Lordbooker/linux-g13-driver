@@ -1,116 +1,59 @@
 #ifndef __CONSTANTS_H__
 #define __CONSTANTS_H__
 
-// #define null 0 // Replaced with nullptr or 0 directly in C++ code
+#pragma once // Modern, simpler header guard
 
-// Definition for _BV (Bit Value) macro, common in embedded C, means (1 << bit)
-// #define _BV(bit) (1U << (bit))
+#include <cstdint> // For fixed-width integer types
 
-#define G13_INTERFACE 0
-#define G13_KEY_ENDPOINT 1
-#define G13_LCD_ENDPOINT 2
-#define G13_KEY_READ_TIMEOUT 0
-#define G13_VENDOR_ID 0x046d
-#define G13_PRODUCT_ID 0xc21c
-#define G13_REPORT_SIZE 8
-#define G13_LCD_BUFFER_SIZE 0x3c0
-#define G13_NUM_KEYS 40
+// USB Device Constants
+constexpr uint16_t G13_VENDOR_ID = 0x046d;
+constexpr uint16_t G13_PRODUCT_ID = 0xc21c;
 
-enum stick_mode_t { STICK_KEYS = 0, STICK_ABSOLUTE, /*STICK_RELATIVE,*/  };
+// USB Interface and Endpoint Constants
+constexpr int G13_INTERFACE = 0;
+constexpr int G13_KEY_ENDPOINT = 1;
+constexpr int G13_LCD_ENDPOINT = 2;
 
-enum stick_key_t { STICK_LEFT, STICK_UP, STICK_DOWN, STICK_RIGHT };
+// USB Transfer Constants
+constexpr int G13_KEY_READ_TIMEOUT_MS = 100; // Reduced timeout for better responsiveness
+constexpr int G13_REPORT_SIZE = 8;
+constexpr int G13_LCD_BUFFER_SIZE = 0x3c0;
 
-enum G13_KEYS {
-    /* byte 3 */
-    G13_KEY_G1 = 0,
-    G13_KEY_G2,
-    G13_KEY_G3,
-    G13_KEY_G4,
+// G13 Device Constants
+constexpr size_t G13_NUM_KEYS = 40;
 
-    G13_KEY_G5,
-    G13_KEY_G6,
-    G13_KEY_G7,
-    G13_KEY_G8,
-
-    /* byte 4 */
-    G13_KEY_G9,
-    G13_KEY_G10,
-    G13_KEY_G11,
-    G13_KEY_G12,
-
-    G13_KEY_G13,
-    G13_KEY_G14,
-    G13_KEY_G15,
-    G13_KEY_G16,
-
-    /* byte 5 */
-    G13_KEY_G17,
-    G13_KEY_G18,
-    G13_KEY_G19,
-    G13_KEY_G20,
-
-    G13_KEY_G21,
-    G13_KEY_G22,
-    G13_KEY_UNDEF1,
-    G13_KEY_LIGHT_STATE,
-
-    /* byte 6 */
-    G13_KEY_BD,
-    G13_KEY_L1,
-    G13_KEY_L2,
-    G13_KEY_L3,
-
-    G13_KEY_L4,
-    G13_KEY_M1,
-    G13_KEY_M2,
-    G13_KEY_M3,
-
-    /* byte 7 */
-    G13_KEY_MR,
-    G13_KEY_LEFT,
-    G13_KEY_DOWN,
-    G13_KEY_TOP,
-
-    G13_KEY_UNDEF3,
-    G13_KEY_LIGHT,
-    G13_KEY_LIGHT2,
-    G13_KEY_MISC_TOGGLE
+// Stick mode definition using a scoped enum for type safety
+enum class stick_mode_t { 
+    STICK_KEYS, 
+    STICK_ABSOLUTE 
+    /* STICK_RELATIVE, */ 
 };
 
-/*
-// This mask appears to be unused in the current codebase.
-#define G13_KEY_ONLY_MASK  (_BV(G13_G1)  | \
-                            _BV(G13_G2)  | \
-                            _BV(G13_G3)  | \
-                            _BV(G13_G4)  | \
-                            _BV(G13_G5)  | \
-                            _BV(G13_G6)  | \
-                            _BV(G13_G7)  | \
-                            _BV(G13_G8)  | \
-                            _BV(G13_G9)  | \
-                            _BV(G13_G10) | \
-                            _BV(G13_G11) | \
-                            _BV(G13_G12) | \
-                            _BV(G13_G13) | \
-                            _BV(G13_G14) | \
-                            _BV(G13_G15) | \
-                            _BV(G13_G16) | \
-                            _BV(G13_G17) | \
-                            _BV(G13_G18) | \
-                            _BV(G13_G19) | \
-                            _BV(G13_G20) | \
-                            _BV(G13_G21) | \
-                            _BV(G13_G22) | \
-                            _BV(G13_BD)  | \
-                            _BV(G13_L1)  | \
-                            _BV(G13_L2)  | \
-                            _BV(G13_L3)  | \
-                            _BV(G13_L4)  | \
-                            _BV(G13_M1)  | \
-                            _BV(G13_M2)  | \
-                            _BV(G13_M3)  | \
-                            _BV(G13_MR)  | \
-                            _BV(G13_LIGHT))
-*/
+// Stick key mapping using a scoped enum
+enum class stick_key_t { 
+    STICK_LEFT, 
+    STICK_UP, 
+    STICK_DOWN, 
+    STICK_RIGHT 
+};
 
-#endif
+// G13 Key mapping using a scoped enum for type safety and to avoid name clashes.
+// The underlying type is specified as uint8_t to match usage.
+enum class G13_KEYS : uint8_t {
+    /* byte 3 */
+    G1 = 0, G2, G3, G4, G5, G6, G7, G8,
+
+    /* byte 4 */
+    G9, G10, G11, G12, G13, G14, G15, G16,
+
+    /* byte 5 */
+    G17, G18, G19, G20, G21, G22, UNDEF1, LIGHT_STATE,
+
+    /* byte 6 */
+    BD, L1, L2, L3, L4, M1, M2, M3,
+
+    /* byte 7 */
+    MR, LEFT, DOWN, TOP, UNDEF3, LIGHT, LIGHT2, MISC_TOGGLE
+};
+
+#endif // __CONSTANTS_H__
