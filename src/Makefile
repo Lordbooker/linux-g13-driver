@@ -1,9 +1,11 @@
 EXE_NAME = Linux-G13-Driver
 SRC_DIR  = cpp
-OBJS     = $(SRC_DIR)/G13.o $(SRC_DIR)/G13Action.o $(SRC_DIR)/Macro.o $(SRC_DIR)/MacroAction.o $(SRC_DIR)/Main.o $(SRC_DIR)/Output.o $(SRC_DIR)/PassThroughAction.o
+BUILD_DIR = build
+
+# Die Objektdateien werden nun im BUILD_DIR erwartet
+OBJS     = $(BUILD_DIR)/G13.o $(BUILD_DIR)/G13Action.o $(BUILD_DIR)/Macro.o $(BUILD_DIR)/MacroAction.o $(BUILD_DIR)/Main.o $(BUILD_DIR)/Output.o $(BUILD_DIR)/PassThroughAction.o
+
 CC       = g++
-# FLAGS    = -L /lib64 -l pthread  # Replaced by CXXFLAGS, LDFLAGS
-# LIBS     = -lusb-1.0             # Replaced by LDLIBS
 
 # Compiler and Linker Flags
 CXXFLAGS = -pthread # Add other C++ compilation flags like -Wall, -O2, -std=c++11
@@ -11,15 +13,25 @@ CPPFLAGS =           # For preprocessor flags like -Iinclude/ -DDEBUG (e.g. -I..
 LDFLAGS  = -L/lib64
 LDLIBS   = -lusb-1.0 # -pthread in CXXFLAGS, when passed to the linker, handles pthread linking
 
+.PHONY: all clean
+
 all: $(EXE_NAME)
 
-# Pattern rule for compiling .cpp files from SRC_DIR to .o files in SRC_DIR
-$(SRC_DIR)/%.o: $(SRC_DIR)/%.cpp
-	$(CC) $(CXXFLAGS) $(CPPFLAGS) -c $< -o $@
-
+# Regel zum Linken des Programms. Hängt von den Objektdateien ab.
 $(EXE_NAME): $(OBJS)
 	$(CC) $(OBJS) -o $(EXE_NAME) $(LDFLAGS) $(CXXFLAGS) $(LDLIBS)
 
+# Pattern-Regel, um.cpp-Dateien aus SRC_DIR in.o-Dateien im BUILD_DIR zu kompilieren.
+# Stellt sicher, dass das BUILD_DIR existiert, bevor kompiliert wird.
+$(BUILD_DIR)/%.o: $(SRC_DIR)/%.cpp | $(BUILD_DIR)
+	$(CC) $(CXXFLAGS) $(CPPFLAGS) -c $< -o $@
+
+# Regel, um das Build-Verzeichnis zu erstellen.
+$(BUILD_DIR):
+	@mkdir -p $@
+
+# Regel zum Aufräumen
 clean:
-	rm -f $(OBJS) $(EXE_NAME)
+	rm -rf $(BUILD_DIR)
+	rm -f $(EXE_NAME)
 
