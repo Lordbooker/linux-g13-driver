@@ -5,11 +5,14 @@ So far, I have only modified the C++ part (i.e., the driver itself). I'm not fam
 
 Nevertheless, it still works with the included mapping tool, and you can use it to save 4 sets.
 
+
 ## Notes
 
 I've tried this on 64-bit Arch Linux and it works so far.  
 
+
 ## Requirements
+
 
 ### libusb-1.0
 
@@ -21,6 +24,7 @@ For Arch Linux you can install it by typing:
 
     sudo pacman -S libusb
 
+
 ### Java version 1.6 or higher
 
 For Ubuntu, it can be installed by typing:
@@ -31,15 +35,24 @@ For Arch it can be installed by typing:
 
     sudo pacman -S jre8-openjdk
 
+
 ## Build
 
 Open a console (command prompt)  
 Go to the directory where you unzipped your download  
-type `make`
+
+type `make all` to build the driver
+
+then type `make install` to write the UDEV-Rules
+
 
 ## Running Application
 
-Run the config tool first!  
+The Driver needs a Ruleset to work. There are (at this point) no standard bindings for the G-Keys.
+If you don't want to use des GUI App, just copy the Folder ".g13" to your 'home' Directory an you be able to use Tools
+like "Input Remapper" to make your own sets.
+
+Else, Run the config tool first!  
 In a command prompt go to the directory where you unzipped your download and type:
 
     java -jar Linux-G13-GUI.jar
@@ -47,8 +60,14 @@ In a command prompt go to the directory where you unzipped your download and typ
 This will bring up the UI and create the initial files needed for your driver.  
 All config files are saved in `$(HOME)/.g13`
 
+
 Run the driver  
 In a command prompt go to the directory where you unzipped your download and type:
+If you have set the UDEV Rules, you now can start the driver with 
+
+    ./G13-Linux-Driver .
+
+else without UDEV-Rule Installation
 
     sudo -E ./G13-Linux-Driver
 
