@@ -269,7 +269,7 @@ void G13::loadBindings() {
 		const std::string default_bindings = R"RAW(
 # Standard G13 Tastenbelegung
 G19=p,k.42
-G18=p,k.0
+G18=p,k.18
 G17=p,k.16
 G16=p,k.10
 G9=p,k.3
@@ -289,7 +289,7 @@ G2=p,k.80
 G1=p,k.79
 G0=p,k.1
 G39=p,k.31
-color=51,153,255
+color=0,0,255
 G38=p,k.32
 G37=p,k.30
 G36=p,k.17
