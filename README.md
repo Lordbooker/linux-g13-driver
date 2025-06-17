@@ -26,7 +26,7 @@ For Arch Linux you can install it by typing:
     sudo pacman -S libusb
 
 
-### Java version 1.6 or higher (needed only for the GUI)
+### Java version 17 or higher (needed only for the GUI)
 
 For Ubuntu, it can be installed by typing:
 
