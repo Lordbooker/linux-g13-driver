@@ -59,8 +59,6 @@ The Driver needs a Ruleset to work.
 
 I've implemented a Standard Key-Set for the G13. So its now "plug'n'play".
 
-Akk Keys not in Standard Set have been mapped to 'G'.
-
 If you don't want to use des GUI App, just copy the Folder ".g13" from /bindings to your 'home' Directory an you be able to use Tools
 like "Input Remapper" to make your own sets. Or you can make entries manually in the files.
 
