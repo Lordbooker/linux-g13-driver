@@ -17,9 +17,9 @@ import javax.swing.event.DocumentListener;
 public class MacroEditorPanel extends JPanel {
 
 	private static final long serialVersionUID = 1L;
-	private static final ImageIcon UP_ICON = ImageIconHelper.loadEmbeddedImage("/com/gupta/g13/images/up.png", 16, 16);
-	private static final ImageIcon DOWN_ICON = ImageIconHelper.loadEmbeddedImage("/com/gupta/g13/images/down.png", 16, 16);
-	private static final ImageIcon DELAY_ICON = ImageIconHelper.loadEmbeddedImage("/com/gupta/g13/images/pause.png", 16, 16);
+	private static final ImageIcon UP_ICON = ImageIconHelper.loadEmbeddedImage("/com/booker/g13/images/up.png", 16, 16);
+	private static final ImageIcon DOWN_ICON = ImageIconHelper.loadEmbeddedImage("/com/booker/g13/images/down.png", 16, 16);
+	private static final ImageIcon DELAY_ICON = ImageIconHelper.loadEmbeddedImage("/com/booker/g13/images/pause.png", 16, 16);
 
 	private final JComboBox<Properties> macroSelectionBox = new JComboBox<>();
 	private final DefaultListModel<String> listModel = new DefaultListModel<>();

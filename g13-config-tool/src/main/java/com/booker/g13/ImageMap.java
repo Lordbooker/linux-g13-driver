@@ -16,7 +16,7 @@ import javax.swing.JLabel;
 public class ImageMap extends JLabel {
 
 	private static final long serialVersionUID = 1L;
-	public static final ImageIcon G13_KEYPAD = ImageIconHelper.loadEmbeddedImage("/com/gupta/g13/images/g13.gif");
+	public static final ImageIcon G13_KEYPAD = ImageIconHelper.loadEmbeddedImage("/com/booker/g13/images/g13.gif");
 
 	private final List<ImageMapListener> listeners = new ArrayList<>();
 	private final Color outlineColor = Color.RED.darker();
