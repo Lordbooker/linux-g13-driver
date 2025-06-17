@@ -56,11 +56,19 @@ this will delete the build-files, the driver an the UDEV-Rule.
 ( The Java Part (GUI) is still the Original from Jim Gupta. I am no Java Developer.)
 
 The Driver needs a Ruleset to work. 
-
 I've implemented a Standard Key-Set for the G13. So its now "plug'n'play".
 
 If you don't want to use des GUI App, just copy the Folder ".g13" from /bindings to your 'home' Directory an you be able to use Tools
 like "Input Remapper" to make your own sets. Or you can make entries manually in the files.
+
+In the 'docs' folder is an example List for Eventcodes.
+            Usage Example
+
+            If you want to map the G20 key on your G13 to the T key on the keyboard:
+
+            Find T in the table. The Event Code is 20.
+            Open your bindings-0.properties file.
+            Add or change the following line: G20=p,k.20.
 
 Else, Run the config tool first!  
 In a command prompt go to the directory where you unzipped your download and type:
@@ -73,6 +81,7 @@ All config files are saved in `$(HOME)/.g13`
 
 Run the driver  
 In a command prompt go to the directory where you unzipped your download and type:
+
 If you have set the UDEV Rules, you now can start the driver with 
 
     ./G13-Linux-Driver 
