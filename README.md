@@ -62,13 +62,12 @@ If you don't want to use des GUI App, just copy the Folder ".g13" from /bindings
 like "Input Remapper" to make your own sets. Or you can make entries manually in the files.
 
 In the 'docs' folder is an example List for Eventcodes.
-            Usage Example
+Usage Example:
 
-            If you want to map the G20 key on your G13 to the T key on the keyboard:
-
-            Find T in the table. The Event Code is 20.
-            Open your bindings-0.properties file.
-            Add or change the following line: G20=p,k.20.
+    If you want to map the G20 key on your G13 to the T key on the keyboard:
+    Find T in the table. The Event Code is 20.
+    Open your bindings-0.properties file.
+    Add or change the following line: G20=p,k.20.
 
 Else, Run the config tool first!  
 In a command prompt go to the directory where you unzipped your download and type:
