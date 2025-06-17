@@ -46,8 +46,6 @@ void send_event(int type, int code, int val) {
 
 	write(file, &event, sizeof(event));
 
-	//cout << "write(type=" << type << ", code=" <<  code << ", val=" << val << ")\n";
-
 	pthread_mutex_unlock(&plock);
 
 }
@@ -101,19 +99,13 @@ bool create_uinput() {
 	uinp.absmin[ABS_Y] = 0;
 	uinp.absmax[ABS_X] = 0xff;
 	uinp.absmax[ABS_Y] = 0xff;
-	//  uinp.absfuzz[ABS_X] = 4;
-	//  uinp.absfuzz[ABS_Y] = 4;
-	//  uinp.absflat[ABS_X] = 0x80;
-	//  uinp.absflat[ABS_Y] = 0x80;
 
 	ioctl(file, UI_SET_EVBIT, EV_KEY);
 	ioctl(file, UI_SET_EVBIT, EV_ABS);
-	/*  ioctl(file, UI_SET_EVBIT, EV_REL);*/
 	ioctl(file, UI_SET_MSCBIT, MSC_SCAN);
 	ioctl(file, UI_SET_ABSBIT, ABS_X);
 	ioctl(file, UI_SET_ABSBIT, ABS_Y);
-	/*  ioctl(file, UI_SET_RELBIT, REL_X);
-	 ioctl(file, UI_SET_RELBIT, REL_Y);*/
+
 	for (int i = 0; i < 256; i++)
 		ioctl(file, UI_SET_KEYBIT, i);
 	ioctl(file, UI_SET_KEYBIT, BTN_THUMB);

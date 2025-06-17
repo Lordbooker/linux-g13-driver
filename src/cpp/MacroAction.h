@@ -61,27 +61,6 @@ private:
         int initial_repeats; // 0 for once, 1 for repeat until key_up
     };
 
-    // Renamed from MultiEventThread for clarity, and it's now a helper struct/class
-	/* class MultiEventThread {
-	public:
-		int keepRepeating;
-		vector<MacroAction::Event *> local_events;
-
-		MultiEventThread() {keepRepeating = 0;}
-
-		virtual void execute() {
-			do {
-				//cout << "MultiEventThread::execute() local_events.size() = " << local_events.size() << "\n";
-
-				for (unsigned int i = 0; i < local_events.size(); i++) {
-					local_events.at(i)->execute();
-					usleep(100);
-				}
-
-			} while (keepRepeating);
-		}
-	}; */
-
 	std::vector<std::unique_ptr<Event>>  _events;
     int                                  _repeats_on_press; // 0 = play once, 1 = repeat until key_up
     volatile bool                        _is_macro_running;

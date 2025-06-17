@@ -77,40 +77,4 @@ enum G13_KEYS {
     G13_KEY_MISC_TOGGLE
 };
 
-/*
-// This mask appears to be unused in the current codebase.
-#define G13_KEY_ONLY_MASK  (_BV(G13_G1)  | \
-                            _BV(G13_G2)  | \
-                            _BV(G13_G3)  | \
-                            _BV(G13_G4)  | \
-                            _BV(G13_G5)  | \
-                            _BV(G13_G6)  | \
-                            _BV(G13_G7)  | \
-                            _BV(G13_G8)  | \
-                            _BV(G13_G9)  | \
-                            _BV(G13_G10) | \
-                            _BV(G13_G11) | \
-                            _BV(G13_G12) | \
-                            _BV(G13_G13) | \
-                            _BV(G13_G14) | \
-                            _BV(G13_G15) | \
-                            _BV(G13_G16) | \
-                            _BV(G13_G17) | \
-                            _BV(G13_G18) | \
-                            _BV(G13_G19) | \
-                            _BV(G13_G20) | \
-                            _BV(G13_G21) | \
-                            _BV(G13_G22) | \
-                            _BV(G13_BD)  | \
-                            _BV(G13_L1)  | \
-                            _BV(G13_L2)  | \
-                            _BV(G13_L3)  | \
-                            _BV(G13_L4)  | \
-                            _BV(G13_M1)  | \
-                            _BV(G13_M2)  | \
-                            _BV(G13_M3)  | \
-                            _BV(G13_MR)  | \
-                            _BV(G13_LIGHT))
-*/
-
 #endif
