@@ -1,8 +1,6 @@
 package com.booker.g13;
 
 import java.awt.BorderLayout;
-import java.awt.Dimension;
-import java.awt.Toolkit;
 import java.util.Properties;
 import javax.swing.BorderFactory;
 import javax.swing.JFrame;
