@@ -33,7 +33,7 @@ For Ubuntu, it can be installed by typing:
 
 For Arch it can be installed by typing:
 
-    sudo pacman -S jre8-openjdk
+    sudo pacman -S jre-openjdk
 
 
 ## Build
@@ -42,11 +42,18 @@ Open a console (command prompt)
 Go to the directory where you unzipped your download  
 
 type `make all` to build the driver
+then type `make install` to write the UDEV-Rule
 
-then type `make install` to write the UDEV-Rules
+for cleaning up 
+use `make clean`
+and `make uninstall`
+
+this will delete the build-files, the driver an the UDEV-Rule.
 
 
 ## Running Application
+
+( The Java Part (GUI) is still the Original from Jim Gupta. I am no Java Developer.)
 
 The Driver needs a Ruleset to work. There are (at this point) no standard bindings for the G-Keys.
 If you don't want to use des GUI App, just copy the Folder ".g13" to your 'home' Directory an you be able to use Tools
@@ -65,7 +72,7 @@ Run the driver
 In a command prompt go to the directory where you unzipped your download and type:
 If you have set the UDEV Rules, you now can start the driver with 
 
-    ./G13-Linux-Driver .
+    ./G13-Linux-Driver 
 
 else without UDEV-Rule Installation
 
