@@ -1,88 +1,88 @@
 #ifndef __MACRO_ACTION_H__
 #define __MACRO_ACTION_H__
 
-#include <unistd.h>
+#include <linux/uinput.h>
 #include <vector>
 #include <string>
-#include <memory> // For std::unique_ptr
-#include <pthread.h>
-#include <linux/uinput.h> // For EV_KEY, etc.
+#include <unistd.h>
+#include <memory>       // ANPASSUNG: Für std::unique_ptr hinzugefügt
+#include <pthread.h>    // ANPASSUNG: Für pthread_t hinzugefügt
 
 #include "G13Action.h"
 #include "Output.h"
 
-class MacroAction : public G13Action
-{
+class MacroAction : public G13Action {
 public:
-	class Event {
-	public:
-		Event() {};
-		virtual ~Event() = default; // Important: virtual destructor
-		virtual void execute() = 0; // Make pure virtual if no default behavior
-	};
-
-	class KeyDownEvent : public Event { // Inherit publicly
-	private:
-		int keycode;
-	public:
-		explicit KeyDownEvent(int code) : keycode(code) {}
-		void execute() override {
-			send_event(EV_KEY, keycode, 1);
-			send_event(0, 0, 0);
-		}
-	};
-
-	class KeyUpEvent : public Event { // Inherit publicly
-	private:
-		int keycode;
-	public:
-		explicit KeyUpEvent(int code) : keycode(code) {}
-		void execute() override {
-			send_event(EV_KEY, keycode, 0);
-			send_event(0, 0, 0);
-		}
-	};
-
-	class DelayEvent : public Event { // Inherit publicly
-	private:
-		int delayInMillisecs;
-	public:
-		explicit DelayEvent(int delay) : delayInMillisecs(delay) {}
-		void execute() override {
-			usleep(1000*delayInMillisecs);
-		}
-	};
-
-private:
-    // Structure to hold data for the macro execution thread
-    struct MacroRunnerArgs {
-        std::vector<Event*>* p_events; // Pointer to the events owned by MacroAction
-        volatile bool* p_keepRepeating;
-        int initial_repeats; // 0 for once, 1 for repeat until key_up
+    // ANPASSUNG: Umbenannt von MacroEvent zu Event für die Verwendung in tokenToEvent
+    class Event {
+    public:
+        virtual ~Event() = default;
+        virtual void execute() = 0;
     };
 
-	std::vector<std::unique_ptr<Event>>  _events;
-    int                                  _repeats_on_press; // 0 = play once, 1 = repeat until key_up
-    volatile bool                        _is_macro_running;
-    volatile bool                        _thread_keep_repeating_flag; // Controlled by key_up
-    pthread_t                            _macro_thread_id;
-    // MultiEventThread             *thread; // Replaced by direct thread management
+    class KeyDownEvent : public Event {
+    private:
+        int keycode;
+    public:
+        KeyDownEvent(int code) : keycode(code) {}
+        void execute() override {
+            UInput::send_event(EV_KEY, keycode, 1);
+            UInput::send_event(EV_SYN, SYN_REPORT, 0); // SYN_REPORT hinzugefügt für bessere Kompatibilität
+        }
+    };
+
+    class KeyUpEvent : public Event {
+    private:
+        int keycode;
+    public:
+        KeyUpEvent(int code) : keycode(code) {}
+        void execute() override {
+            UInput::send_event(EV_KEY, keycode, 0);
+            UInput::send_event(EV_SYN, SYN_REPORT, 0); // SYN_REPORT hinzugefügt für bessere Kompatibilität
+        }
+    };
+
+    class WaitEvent : public Event {
+    private:
+        int delay_ms;
+    public:
+        WaitEvent(int delay) : delay_ms(delay) {}
+        void execute() override {
+            usleep(delay_ms * 1000);
+        }
+    };
+
+    // --- Öffentliche Methoden ---
+    MacroAction(const std::string& sequence);
+    virtual ~MacroAction();
+
+    // ANPASSUNG: Inline-Definition entfernt, um Redefinition-Fehler zu vermeiden.
+    // Die Definition befindet sich nun in der .cpp-Datei.
+    void setRepeats(int r);
+    int getRepeats() const;
+
 
 protected:
-    std::unique_ptr<Event> tokenToEvent(const char *token);
-	void        key_down() override;
-	void        key_up() override;
+    void key_down() override;
+    void key_up() override;
 
-    static void* run_macro_thread(void *context);
+private:
+    // --- Private Methoden ---
+    // ANPASSUNG: Fehlende Funktionsdeklarationen hinzugefügt.
     void execute_macro_loop();
+    std::unique_ptr<MacroAction::Event> tokenToEvent(const char* token);
 
-public:
-    explicit MacroAction(const std::string& tokens_str);
-    ~MacroAction() override;
+    // ANPASSUNG: Die Thread-Funktion muss statisch sein.
+    static void* run_macro_thread(void* context);
 
-    int  getRepeats() const;
-    void setRepeats(int repeats); // This sets how it behaves on next key_down
-    // const std::vector<std::unique_ptr<Event>>& getEvents() const; // If needed
+    // --- Private Member-Variablen ---
+    // ANPASSUNG: Fehlende Member-Variablen deklariert.
+    std::vector<std::unique_ptr<Event>> _events;
+    int _repeats;
+    int _repeats_on_press;
+    bool _is_macro_running;
+    bool _thread_keep_repeating_flag;
+    pthread_t _macro_thread_id;
 };
 
-#endif
+#endif // __MACRO_ACTION_H__

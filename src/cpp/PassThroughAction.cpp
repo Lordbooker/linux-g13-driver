@@ -1,10 +1,7 @@
 #include <linux/uinput.h>
-// #include <iostream> // Unused
 
 #include "PassThroughAction.h"
 #include "Output.h"
-
-// using namespace std; // Not strictly needed here
 
 PassThroughAction::PassThroughAction(int code) {
 	this->keycode = code;
@@ -22,11 +19,15 @@ void PassThroughAction::setKeyCode(int code) {
 }
 
 void PassThroughAction::key_down() {
-	send_event(EV_KEY, this->keycode, 1);
-	send_event(0, 0, 0); // SYN_REPORT
+	// ANPASSUNG START: Aufrufe an die statische Methode der UInput-Klasse angepasst.
+	UInput::send_event(EV_KEY, this->keycode, 1);
+	UInput::send_event(0, 0, 0); // SYN_REPORT
+    // ANPASSUNG ENDE
 }
 
 void PassThroughAction::key_up() {
-	send_event(EV_KEY, this->keycode, 0);
-	send_event(0, 0, 0); // SYN_REPORT
+	// ANPASSUNG START: Aufrufe an die statische Methode der UInput-Klasse angepasst.
+	UInput::send_event(EV_KEY, this->keycode, 0);
+	UInput::send_event(0, 0, 0); // SYN_REPORT
+    // ANPASSUNG ENDE
 }

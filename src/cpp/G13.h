@@ -1,38 +1,44 @@
 #ifndef __G13_H__
 #define __G13_H__
 
+// ANPASSUNG START: 'using namespace std;' entfernt und Typen explizit mit std:: qualifiziert.
+// Dies verhindert Namenskonflikte im globalen Namespace und ist "good practice" für Header-Dateien.
 #include <string>
 #include <vector>
-#include <memory> // For std::unique_ptr
+#include <memory>
 #include <map>
-#include <istream> // HINZUGEFÜGT: Wird für die neue Funktion benötigt
+#include <istream>
+// ANPASSUNG ENDE
 
 #include "Constants.h"
 #include "G13Action.h"
 #include "Macro.h"
 
-using namespace std;
-// Consider removing 'using namespace std;' from header if possible, or scope it.
+// ANPASSUNG START: 'using namespace std;' wurde entfernt.
+// using namespace std;
+// ANPASSUNG ENDE
 
 class G13 {
 private:
+    // ANPASSUNG START: std:: Präfixe hinzugefügt
 	std::vector<std::unique_ptr<G13Action>> actions;
+    // ANPASSUNG ENDE
 	libusb_device        *device;
 	libusb_device_handle *handle;
 	int                   uinput_file;
 
 	int                   loaded;
-	volatile int          keepGoing; // volatile, da es von einem anderen Thread geändert werden kann
+	volatile int          keepGoing;
 
 	stick_mode_t          stick_mode;
 	int                   stick_keys[4];
 
 	int                   bindings;
 
+    // ANPASSUNG START: std:: Präfixe hinzugefügt
 	std::unique_ptr<Macro> loadMacro(int id);
-
-	// HINZUGEFÜGT: Deklaration der neuen Parsing-Funktion
 	void parse_bindings_from_stream(std::istream& stream);
+    // ANPASSUNG ENDE
 
 	int  read();
 	void parse_joystick(unsigned char *buf);

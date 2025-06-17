@@ -1,122 +1,114 @@
-#include <unistd.h>
-#include <linux/uinput.h>
-#include <vector>
-#include <pthread.h>
 #include <string.h>
-#include <stdlib.h>
+#include <vector>
 #include <iostream>
-#include <vector> // For std::vector<char>
+#include <memory> // ANPASSUNG: Fehlender Header für std::unique_ptr hinzugefügt
 
 #include "MacroAction.h"
 
-// Static function to be called by pthread_create
+// Diese Funktion muss außerhalb der Klasse stehen oder statisch sein,
+// um sie an pthread_create übergeben zu können. Die statische Methode ist sauberer.
 void* MacroAction::run_macro_thread(void *context) {
-    MacroAction* self = static_cast<MacroAction*>(context);
-    self->execute_macro_loop();
+    MacroAction* action = static_cast<MacroAction*>(context);
+    action->execute_macro_loop();
     return nullptr;
 }
 
 void MacroAction::execute_macro_loop() {
-    bool repeat_this_invocation = (_repeats_on_press == 1);
-    _thread_keep_repeating_flag = repeat_this_invocation; // Initialize for this run
+    _thread_keep_repeating_flag = true;
+    int current_repeats = 0;
 
-    do {
-        for (const auto& event_ptr : _events) {
-            if (!event_ptr) continue; // Should not happen with unique_ptr if properly managed
-            
-            // Check flag before each event if repeating
-            if (repeat_this_invocation && !_thread_keep_repeating_flag) {
-                 _is_macro_running = false;
-                return; // Exit loop if signaled to stop
-            }
-            event_ptr->execute();
-            usleep(100); // Small delay between events in sequence
+    while (_thread_keep_repeating_flag && (_repeats == 0 || current_repeats < _repeats)) {
+        for (const auto& event : _events) {
+            event->execute();
         }
-    } while (repeat_this_invocation && _thread_keep_repeating_flag);
-
-    _is_macro_running = false; // Mark as not running when loop finishes
+        if (_repeats > 0) {
+            current_repeats++;
+        }
+    }
+    _is_macro_running = false;
 }
 
-
+// Hilfsfunktion zum Parsen der Makro-Sequenz
 std::unique_ptr<MacroAction::Event> MacroAction::tokenToEvent(const char *token) {
-	if (token == nullptr) {
-		return nullptr;
-	}
-
-	if (strncmp(token, "kd.", 3) == 0) {
-		int code = atoi(&(token[3]));
-		return std::make_unique<KeyDownEvent>(code);
-	}
-	else if (strncmp(token, "ku.", 3) == 0) {
-		int code = atoi(&(token[3]));
-		return std::make_unique<KeyUpEvent>(code);
-	}
-	else if (strncmp(token, "d.", 2) == 0) {
-		int delay = atoi(&(token[2]));
-		return std::make_unique<DelayEvent>(delay);
-	}
-	else {
-		std::cerr << "MacroAction::tokenToEvent() unknown token: " << token << "\n";
-	}
-	return nullptr;
+    switch (token[0]) {
+        case '+':
+            return std::make_unique<KeyDownEvent>(atoi(&token[1]));
+        case '-':
+            return std::make_unique<KeyUpEvent>(atoi(&token[1]));
+        case 'W':
+            return std::make_unique<WaitEvent>(atoi(&token[1]));
+    }
+    return nullptr;
 }
 
-MacroAction::MacroAction(const std::string& tokens_str)
-    : _repeats_on_press(0), _is_macro_running(false), _thread_keep_repeating_flag(false), _macro_thread_id(0) {
-	if (tokens_str.empty()) {
-		return;
-	}
 
-    // strtok modifies the string, so we need a mutable copy.
-    std::vector<char> tokens_copy(tokens_str.begin(), tokens_str.end());
-    tokens_copy.push_back('\0'); // Null-terminate for strtok
+// --- Konstruktor / Destruktor ---
 
-	// kd.keycode,ku.keycode,d.time
-	char *token = strtok(tokens_copy.data(), ",");
-	while (token != nullptr) {
-		auto event = tokenToEvent(token);
-		if (event) {
-			_events.push_back(std::move(event));
-		}
-		token = strtok(nullptr, ",");
-	}
+MacroAction::MacroAction(const std::string& sequence)
+    // ANPASSUNG: Member-Variablen korrigiert und initialisiert.
+    : _repeats(0), _repeats_on_press(0), _is_macro_running(false), _thread_keep_repeating_flag(false), _macro_thread_id(0) {
+
+    char* seq_c_str = new char[sequence.length() + 1];
+    strcpy(seq_c_str, sequence.c_str());
+
+    char* token = strtok(seq_c_str, " ");
+    while (token != nullptr) {
+        if (strlen(token) > 0) {
+            auto event = tokenToEvent(token);
+            if (event) {
+                // ANPASSUNG: Korrekten Variablennamen "_events" verwenden
+                _events.push_back(std::move(event));
+            }
+        }
+        token = strtok(nullptr, " ");
+    }
+
+    delete[] seq_c_str;
 }
 
 MacroAction::~MacroAction() {
     if (_is_macro_running) {
-        _thread_keep_repeating_flag = false; // Signal thread to stop
-        pthread_join(_macro_thread_id, nullptr); // Wait for thread to finish
+        _thread_keep_repeating_flag = false; // Signal an den Thread zum Stoppen
+        pthread_join(_macro_thread_id, nullptr); // Warten, bis der Thread beendet ist
     }
-    // _events will be cleared automatically by unique_ptr destructors
+    // unique_ptr bereinigt die Events automatisch
 }
 
+// --- Key-Events ---
+
 void MacroAction::key_down() {
-	if (_is_macro_running) {
-		std::cerr << "MacroAction::key_down(): macro already running.\n";
-		return;
-	}
+    if (isPressed()) {
+        if (_is_macro_running) {
+            // Wenn Makro läuft und Taste erneut gedrückt wird, stoppen wir es
+            _thread_keep_repeating_flag = false;
+            return;
+        }
 
-    if (_events.empty()) {
-        return; // No events to execute
-    }
+        if (_events.empty()) {
+            return; // Kein Makro zum Ausführen
+        }
 
-    _is_macro_running = true;
-    if (pthread_create(&_macro_thread_id, nullptr, &MacroAction::run_macro_thread, this) != 0) {
-        _is_macro_running = false;
-        std::cerr << "Error creating macro thread\n";
+        _is_macro_running = true;
+        if (pthread_create(&_macro_thread_id, nullptr, &MacroAction::run_macro_thread, this) != 0) {
+            perror("pthread_create() error");
+            _is_macro_running = false;
+        }
     }
 }
 
 void MacroAction::key_up() {
-    // If the macro is set to repeat, signal it to stop.
-    // The thread itself will set _is_macro_running to false when it exits.
-    _thread_keep_repeating_flag = false;
+    // Wenn das Makro nicht wiederholt werden soll, stoppen wir es beim Loslassen der Taste
+    if (_repeats == 1) {
+       _thread_keep_repeating_flag = false;
+    }
 }
 
+// --- Getter / Setter ---
+
 int MacroAction::getRepeats() const {
-	return _repeats_on_press;
+    return _repeats;
 }
 
 void MacroAction::setRepeats(int repeats) {
-	this->_repeats_on_press = (repeats == 1) ? 1 : 0; // Ensure it's 0 or 1
+    this->_repeats = repeats;
 }

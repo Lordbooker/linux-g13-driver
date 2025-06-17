@@ -7,37 +7,33 @@
 #include <signal.h>
 #include <stdlib.h>
 #include <unistd.h>
-
 #include <iomanip>
 #include <linux/uinput.h>
 #include <fcntl.h>
+#include <pthread.h> // Sicherstellen, dass der Header inkludiert ist
 
 #include "Output.h"
 #include "Constants.h"
 
 using namespace std;
 
+// ANPASSUNG START: Globale Variablen werden zu statischen Membern der UInput-Klasse.
+int UInput::file = -1;
+pthread_mutex_t UInput::plock = PTHREAD_MUTEX_INITIALIZER;
+// ANPASSUNG ENDE
 
-int file = -1;
-pthread_mutex_t plock = PTHREAD_MUTEX_INITIALIZER; // Static initialization
 
-void send_event(int type, int code, int val) {
+// ANPASSUNG START: Implementierung der statischen Klassenmethoden.
+// Die Logik bleibt identisch, ist aber nun innerhalb der Klasse gekapselt.
 
-    // Assuming create_uinput() is called once at startup.
-    // If not, the initialization of 'file' and 'plock' needs to be thread-safe.
-    // pthread_mutex_init(&plock, nullptr); // Should be done once.
-    // Static initialization is generally safer for global mutexes.
-
-	if (file < 0) { // Check if uinput is successfully initialized
+void UInput::send_event(int type, int code, int val) {
+	if (file < 0) {
 		return;
 	}
 
 	pthread_mutex_lock(&plock);
 
 	struct input_event event;
-	// Using gettimeofday with nullptr for the second argument is fine.
-    // However, C++ chrono could be an alternative if more complex time ops were needed.
-
 	memset(&event, 0, sizeof(event));
 	gettimeofday(&event.time, nullptr);
 	event.type = type;
@@ -47,26 +43,25 @@ void send_event(int type, int code, int val) {
 	write(file, &event, sizeof(event));
 
 	pthread_mutex_unlock(&plock);
-
 }
 
-void flush() {
+void UInput::flush() {
     if (file < 0) return;
 	pthread_mutex_lock(&plock);
 	fsync(file);
 	pthread_mutex_unlock(&plock);
 }
 
-void close_uinput() {
+void UInput::close_uinput() {
     if (file >= 0) {
+        // WICHTIGE KORREKTUR: Zerstört das uinput-Gerät, bevor die Datei geschlossen wird.
+        ioctl(file, UI_DEV_DESTROY);
         close(file);
         file = -1;
     }
 }
 
-bool create_uinput() {
-	//cout << "create uinput\n";
-
+bool UInput::create_uinput() {
 	struct uinput_user_dev uinp;
 	const char* dev_uinput_fname =
 			access("/dev/input/uinput", F_OK) == 0 ? "/dev/input/uinput" :
@@ -83,7 +78,7 @@ bool create_uinput() {
 	}
 
 	file = open(dev_uinput_fname, O_WRONLY | O_NDELAY);
-	if (file < 0) { // Changed from ufile <= 0 because 0 is a valid fd
+	if (file < 0) {
 		cerr << "Could not open uinput" << endl;
 		return false;
 	}
@@ -125,3 +120,4 @@ bool create_uinput() {
 	}
 	return true;
 }
+// ANPASSUNG ENDE

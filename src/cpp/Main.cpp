@@ -5,9 +5,7 @@
 #include <signal.h>
 #include <stdlib.h>
 #include <unistd.h>
-
 #include <pthread.h>
-
 #include <libusb-1.0/libusb.h>
 
 #include "G13.h"
@@ -16,7 +14,7 @@
 using namespace std;
 
 vector<G13 *> g13s;
-vector<pthread_t> g13_threads; // Use std::vector for pthreads
+vector<pthread_t> g13_threads;
 volatile sig_atomic_t keep_running = 1;
 
 void discover() {
@@ -28,8 +26,6 @@ void discover() {
 		cout << "Initialization error: " << ret << "\n";
 		return;
 	}
-
-	// libusb_set_debug(ctx, 3); // Optional: for debugging
 
 	ssize_t count = libusb_get_device_list(ctx, &devs);
 	if (count < 0) {
@@ -58,7 +54,7 @@ void discover() {
 void *executeG13(void *arg) {
 	G13 *g13 = (G13 *)arg;
     if (g13) {
-	    g13->start(); // This loop will run as long as g13->keepGoing is true
+	    g13->start();
     }
 	return nullptr;
 }
@@ -67,8 +63,6 @@ void start() {
 	if (g13s.size() > 0) {
 		pthread_attr_t attr;
 		pthread_attr_init(&attr);
-        // Consider pthread_attr_setdetachstate if they are not meant to be joined,
-        // but joining is generally better for controlled shutdown.
 
         g13_threads.resize(g13s.size());
 		for (unsigned int i = 0; i < g13s.size(); i++) {
@@ -76,9 +70,6 @@ void start() {
 		}
         pthread_attr_destroy(&attr);
 
-        // Wait for all G13 threads to complete.
-        // They will complete when their respective g13->stop() is called and
-        // their internal keepGoing flag becomes false.
 		for (unsigned int i = 0; i < g13s.size(); i++) {
 			pthread_join(g13_threads[i], nullptr);
 		}
@@ -86,10 +77,10 @@ void start() {
 }
 
 void signal_handler(int signal) {
-    keep_running = 0; // Signal main loop and G13 threads to stop
+    keep_running = 0;
 	for (unsigned int i = 0; i < g13s.size(); i++) {
         if (g13s[i]) {
-		    g13s[i]->stop(); // Tell each G13 instance to stop its loop
+		    g13s[i]->stop();
         }
 	}
 }
@@ -99,12 +90,15 @@ void cleanup() {
 		delete g13s[i];
 	}
     g13s.clear();
-    close_uinput(); // Close the uinput device
+    // ANPASSUNG START: Aufruf an die statische Methode der UInput-Klasse angepasst.
+    UInput::close_uinput();
+    // ANPASSUNG ENDE
 }
 
 int main(int argc, char *argv[]) {
-
-	if (!create_uinput()) {
+    // ANPASSUNG START: Aufruf an die statische Methode der UInput-Klasse angepasst.
+	if (!UInput::create_uinput()) {
+    // ANPASSUNG ENDE
         cerr << "Failed to initialize uinput. Exiting." << endl;
         return 1;
     }
@@ -117,10 +111,10 @@ int main(int argc, char *argv[]) {
 	cout << "Found " << g13s.size() << " G13s" << "\n";
 
     if (!g13s.empty()) {
-	    start(); // This will block until all G13 threads are joined
+	    start();
     }
 
-	cleanup(); // Perform cleanup after threads have finished
+	cleanup();
 
 	return 0;
 }

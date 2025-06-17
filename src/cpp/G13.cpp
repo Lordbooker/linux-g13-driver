@@ -7,23 +7,14 @@
 #include <signal.h>
 #include <stdlib.h>
 #include <unistd.h>
-
 #include <libusb-1.0/libusb.h>
-
 #include <iomanip>
-
 #include <linux/uinput.h>
 #include <fcntl.h>
-
 #include <pthread.h>
-#include <algorithm> // For std::remove
-
-// *** ANPASSUNG START ***
-// Benötigte Header für die Fallback-Logik
-#include <sstream> 
-#include <istream> 
-// *** ANPASSUNG ENDE ***
-
+#include <algorithm>
+#include <sstream>
+#include <istream>
 
 #include "Constants.h"
 #include "G13.h"
@@ -45,7 +36,8 @@ std::string trim_string(const std::string& str) {
     return str.substr(start, end - start + 1);
 }
 
-// Overload for C-style strings (modifies in place, for compatibility with existing strtok use)
+// ANPASSUNG START: Veraltete C-String-Trim-Funktion wird nicht mehr benötigt und wurde entfernt.
+/*
 void trim_c_string(char *s) {
     char *start = s;
     while (isspace((unsigned char)*start)) start++;
@@ -56,16 +48,14 @@ void trim_c_string(char *s) {
 
     if (start != s) memmove(s, start, strlen(start) + 1);
 }
+*/
+// ANPASSUNG ENDE
 
 
 G13::G13(libusb_device *device) {
-
 	this->device = device;
-
 	this->loaded = 0;
-
 	this->bindings = 0;
-
 	this->stick_mode = STICK_KEYS;
 
     actions.resize(G13_NUM_KEYS);
@@ -90,33 +80,24 @@ G13::G13(libusb_device *device) {
 	}
 
 	setColor(128, 128, 128);
-
 	this->loaded = 1;
-
 }
 
 G13::~G13() {
 	if (!this->loaded) {
 		return;
 	}
-
 	setColor(128, 128, 128);
-
 	libusb_release_interface(this->handle, 0);
 	libusb_close(this->handle);
-    // actions vector with unique_ptr will clean itself up.
-
 }
 
 void G13::start() {
 	if (!this->loaded) {
 		return;
 	}
-
 	loadBindings();
-
 	keepGoing = 1;
-
 	while (keepGoing) {
 		read();
 	}
@@ -126,12 +107,10 @@ void G13::stop() {
 	if (!this->loaded) {
 		return;
 	}
-
 	keepGoing = 0;
 }
 
 std::unique_ptr<Macro> G13::loadMacro(int num) {
-
 	char filename[1024];
     const char* home_dir = getenv("HOME");
     if (!home_dir) {
@@ -140,7 +119,6 @@ std::unique_ptr<Macro> G13::loadMacro(int num) {
     }
 
 	snprintf(filename, sizeof(filename), "%s/.g13/macro-%d.properties", home_dir, num);
-	//cout << "G13::loadMacro(" << num << ") filename=" << filename << "\n";
 	ifstream file (filename);
 
 	if (!file.is_open()) {
@@ -152,9 +130,8 @@ std::unique_ptr<Macro> G13::loadMacro(int num) {
 	macro->setId(num);
     std::string macro_name, macro_sequence;
 
-	while (file.good()) {
-		string line;
-		getline(file, line);
+	string line;
+	while (getline(file, line)) {
         std::string trimmed_line = trim_string(line);
 
 		if (!trimmed_line.empty() && trimmed_line[0] != '#') {
@@ -162,7 +139,6 @@ std::unique_ptr<Macro> G13::loadMacro(int num) {
             if (eq_pos != std::string::npos) {
                 std::string key = trim_string(trimmed_line.substr(0, eq_pos));
                 std::string value = trim_string(trimmed_line.substr(eq_pos + 1));
-			    //cout << "G13::loadMacro(" << num << ") key=" << key << ", value=" << value << "\n";
 			    if (key == "name") {
 				    macro_name = value;
 			    } else if (key == "sequence") {
@@ -177,78 +153,91 @@ std::unique_ptr<Macro> G13::loadMacro(int num) {
 }
 
 
-// *** ANPASSUNG START ***
-// Die Parsing-Logik wurde in eine eigene Funktion ausgelagert,
-// um sie sowohl für Dateien als auch für den Standard-String verwenden zu können.
+// ANPASSUNG START: Die Parsing-Logik wurde komplett auf moderne C++-Strings und -Streams umgestellt.
+// Das ist sicherer, besser lesbar und vermeidet die Nachteile von strtok.
 void G13::parse_bindings_from_stream(std::istream& stream) {
-    while (stream.good()) {
-        string line;
-        getline(stream, line);
+    std::string line;
+    while (std::getline(stream, line)) {
+        std::string trimmed_line = trim_string(line);
 
-        // Use C-style char array for strtok compatibility if needed, or parse with std::string methods
-        char l[1024];
-        strncpy(l, line.c_str(), sizeof(l) - 1);
-        l[sizeof(l)-1] = '\0';
+        if (trimmed_line.empty() || trimmed_line[0] == '#') {
+            continue; // Leere Zeilen und Kommentare überspringen
+        }
 
-        trim_c_string(l);
-        if (strlen(l) > 0 && l[0] != '#') { // Also check for comment lines here
-            char *key = strtok(l, "=");
-            if (key == NULL) continue; // Leere Zeile überspringen
+        size_t eq_pos = trimmed_line.find('=');
+        if (eq_pos == std::string::npos) {
+            continue; // Zeilen ohne '=' ignorieren
+        }
 
-            if (key[0] == '#') {
-                // ignore line
+        std::string key = trim_string(trimmed_line.substr(0, eq_pos));
+        std::string value = trim_string(trimmed_line.substr(eq_pos + 1));
+
+        if (key == "color") {
+            std::stringstream ss(value);
+            std::string segment;
+            int r, g, b;
+
+            try {
+                if (std::getline(ss, segment, ',') && (r = std::stoi(segment)) >= 0 &&
+                    std::getline(ss, segment, ',') && (g = std::stoi(segment)) >= 0 &&
+                    std::getline(ss, segment, ',') && (b = std::stoi(segment)) >= 0) {
+                    setColor(r, g, b);
+                }
+            } catch (const std::exception& e) {
+                 cerr << "G13::parse_bindings_from_stream() Invalid color format: " << value << endl;
             }
-            else if (strcmp(key, "color") == 0) {
-                char *num = strtok(NULL, ",");
-                int r = atoi(num);
-                num = strtok(NULL, ",");
-                int g = atoi(num);
-                num = strtok(NULL, ",");
-                int b = atoi(num);
-                setColor(r, g, b);
-            }
-            else if (strcmp(key, "stick_mode") == 0) {
-                // Stick mode logic here
-            }
-            else if (key[0] == 'G') {
-                int gKey = atoi(&key[1]);
-                char *type = strtok(NULL, ",");
-                if (type == NULL) continue;
-                trim_c_string(type);
+        }
+        else if (key == "stick_mode") {
+            // Stick mode logic here
+        }
+        else if (!key.empty() && key[0] == 'G') {
+            try {
+                int gKey = std::stoi(key.substr(1));
 
-                if (strcmp(type, "p") == 0) { /* passthrough */
-                    char *keytype = strtok(NULL, ",\n ");
-                    if (keytype == NULL) continue;
-                    trim_c_string(keytype);
-                    int keycode = atoi(&keytype[2]);
+                std::stringstream ss(value);
+                std::string type;
+                if (!std::getline(ss, type, ',')) continue;
+                type = trim_string(type);
 
-                    if (gKey >= 0 && gKey < G13_NUM_KEYS) {
-                        actions[gKey] = std::make_unique<PassThroughAction>(keycode);
+                if (type == "p") { /* passthrough */
+                    std::string keytype_str;
+                    if (!std::getline(ss, keytype_str, ',')) continue;
+                    keytype_str = trim_string(keytype_str);
+
+                    if (keytype_str.rfind("k.", 0) == 0) { // check if it starts with "k."
+                        int keycode = std::stoi(keytype_str.substr(2));
+                        if (gKey >= 0 && gKey < G13_NUM_KEYS) {
+                            actions[gKey] = std::make_unique<PassThroughAction>(keycode);
+                        }
                     }
                 }
-                else if (strcmp(type, "m") == 0) { /* macro */
-                    char* macroId_str = strtok(NULL, ",\n ");
-                    char* repeats_str = strtok(NULL, ",\n ");
-                    if (macroId_str == NULL || repeats_str == NULL) continue;
-
-                    int macroId = atoi(macroId_str);
-                    int repeats = atoi(repeats_str);
-                    auto macro = loadMacro(macroId); // Returns std::unique_ptr<Macro>
+                else if (type == "m") { /* macro */
+                    std::string macroId_str, repeats_str;
+                    if (!std::getline(ss, macroId_str, ',') || !std::getline(ss, repeats_str, ',')) continue;
+                    
+                    int macroId = std::stoi(trim_string(macroId_str));
+                    int repeats = std::stoi(trim_string(repeats_str));
+                    auto macro = loadMacro(macroId);
                     if (macro && gKey >= 0 && gKey < G13_NUM_KEYS) {
                         actions[gKey] = std::make_unique<MacroAction>(macro->getSequence());
                         static_cast<MacroAction*>(actions[gKey].get())->setRepeats(repeats);
-                    } // macro unique_ptr goes out of scope and is deleted if not moved
+                    }
                 }
                 else {
-                    cout << "G13::parse_bindings_from_stream() unknown type '" << type << "\n";
+                    cout << "G13::parse_bindings_from_stream() unknown type '" << type << "' for key " << key << "\n";
                 }
+            } catch (const std::invalid_argument& ia) {
+                cerr << "G13::parse_bindings_from_stream() Invalid number format in line: " << trimmed_line << endl;
+            } catch (const std::out_of_range& oor) {
+                cerr << "G13::parse_bindings_from_stream() Number out of range in line: " << trimmed_line << endl;
             }
-            else {
-                cout << "G13::parse_bindings_from_stream() Unknown first token: " << key << "\n";
-            }
+        }
+        else {
+            cout << "G13::parse_bindings_from_stream() Unknown token in key: " << key << "\n";
         }
     }
 }
+// ANPASSUNG ENDE
 
 
 void G13::loadBindings() {
@@ -265,8 +254,7 @@ void G13::loadBindings() {
 		cout << "Konfigurationsdatei nicht gefunden: " << filename << endl;
 		cout << "Lade Standard-Tastenbelegung." << endl;
 
-        // Standard-Konfiguration als Fallback, Format entspricht bindings-X.properties
-		const std::string default_bindings = R"RAW(
+        const std::string default_bindings = R"RAW(
 # Standard G13 Tastenbelegung
 G19=p,k.42
 G18=p,k.18
@@ -315,8 +303,6 @@ G20=p,k.50
         file.close();
     }
 }
-// *** ANPASSUNG ENDE ***
-
 
 void G13::setColor(int red, int green, int blue) {
 	int error;
@@ -352,7 +338,7 @@ int G13::read() {
 		errors[LIBUSB_ERROR_INTERRUPTED] = "LIBUSB_ERROR_INTERRUPTED";
 		errors[LIBUSB_ERROR_NO_MEM] = "LIBUSB_ERROR_NO_MEM";
 		errors[LIBUSB_ERROR_NOT_SUPPORTED] = "LIBUSB_ERROR_NOT_SUPPORTED";
-		errors[LIBUSB_ERROR_OTHER] = "LIBUSB_ERROR_OTHER    ";
+		errors[LIBUSB_ERROR_OTHER] = "LIBUSB_ERROR_OTHER";
 		cerr << "Error while reading keys: " << error << " (" << errors[error]
 				<< ")" << endl;
 		cerr << "Stopping daemon" << endl;
@@ -362,7 +348,9 @@ int G13::read() {
 	if (size == G13_REPORT_SIZE) {
 		parse_joystick(buffer);
 		parse_keys(buffer);
-		send_event(EV_SYN, SYN_REPORT, 0);
+		// ANPASSUNG START: Aufruf an die statische Methode der UInput-Klasse angepasst.
+		UInput::send_event(EV_SYN, SYN_REPORT, 0);
+		// ANPASSUNG ENDE
 	}
 	return 0;
 }
@@ -371,17 +359,13 @@ void G13::parse_joystick(unsigned char *buf) {
 	int stick_x = buf[1];
 	int stick_y = buf[2];
 
-	//cout << "stick = (" << stick_x << ", " << stick_y << ")\n";
-
-
 	if (stick_mode == STICK_ABSOLUTE) {
-		send_event(EV_ABS, ABS_X, stick_x);
-		send_event(EV_ABS, ABS_Y, stick_y);
+		// ANPASSUNG START: Aufruf an die statische Methode der UInput-Klasse angepasst.
+		UInput::send_event(EV_ABS, ABS_X, stick_x);
+		UInput::send_event(EV_ABS, ABS_Y, stick_y);
+		// ANPASSUNG ENDE
 	} else if (stick_mode == STICK_KEYS) {
-
-		// 36=up, 37=left, 38=right, 39=down
 		int pressed[4];
-
 		if (stick_y <= 96) {
 			pressed[0] = 1;
 			pressed[3] = 0;
@@ -408,22 +392,18 @@ void G13::parse_joystick(unsigned char *buf) {
 			pressed[2] = 0;
 		}
 
-
 		int codes[4] = {36, 37, 38, 39};
 		for (int i = 0; i < 4; i++) {
 			int key = codes[i];
-			int p = pressed[i]; // p is 0 or 1
+			int p = pressed[i];
 			if (actions[key]->set(p)) {
-				//cout << "key " << key << ", pressed=" << p << ", actions[key]->isPressed()="
-				//		<< actions[key]->isPressed() <<  ", x=" << stick_x << "\n";
 			}
 		}
 	} else {
-		/* send_event(g13->uinput_file, EV_REL, REL_X, stick_x/16 - 8);
-		 send_event(g13->uinput_file, EV_REL, REL_Y, stick_y/16 - 8);*/
+		/* send_event(...) */
 	}
-
 }
+
 void G13::parse_key(int key, unsigned char *byte) {
     if (key < 0 || key >= G13_NUM_KEYS) {
         cerr << "G13::parse_key: Invalid key index " << key << endl;
@@ -432,37 +412,32 @@ void G13::parse_key(int key, unsigned char *byte) {
 
 	unsigned char actual_byte = byte[key / 8];
 	unsigned char mask = 1 << (key % 8);
-
 	int pressed = actual_byte & mask;
 
 	switch (key) {
-	case 25: // key 25-28 are mapped to change bindings
+	case 25:
 	case 26:
 	case 27:
 	case 28:
 		if (pressed) {
-			//cout << "key " << key << "\n";
 			bindings = key - 25;
 			loadBindings();
 		}
 		return;
 
-	case 36: // key 36-39 are mapped as joystick keys
+	case 36:
 	case 37:
 	case 38:
 	case 39:
 		return;
 	}
 
-    if (actions[key]) { // Check if action exists
-	    int changed = actions[key]->set(pressed);
-
+    if (actions[key]) {
+	    actions[key]->set(pressed);
     }
 }
 
-
 void G13::parse_keys(unsigned char *buf) {
-
 	parse_key(G13_KEY_G1, buf + 3);
 	parse_key(G13_KEY_G2, buf + 3);
 	parse_key(G13_KEY_G3, buf + 3);
@@ -471,7 +446,6 @@ void G13::parse_keys(unsigned char *buf) {
 	parse_key(G13_KEY_G6, buf + 3);
 	parse_key(G13_KEY_G7, buf + 3);
 	parse_key(G13_KEY_G8, buf + 3);
-
 	parse_key(G13_KEY_G9, buf + 3);
 	parse_key(G13_KEY_G10, buf + 3);
 	parse_key(G13_KEY_G11, buf + 3);
@@ -480,15 +454,12 @@ void G13::parse_keys(unsigned char *buf) {
 	parse_key(G13_KEY_G14, buf + 3);
 	parse_key(G13_KEY_G15, buf + 3);
 	parse_key(G13_KEY_G16, buf + 3);
-
 	parse_key(G13_KEY_G17, buf + 3);
 	parse_key(G13_KEY_G18, buf + 3);
 	parse_key(G13_KEY_G19, buf + 3);
 	parse_key(G13_KEY_G20, buf + 3);
 	parse_key(G13_KEY_G21, buf + 3);
 	parse_key(G13_KEY_G22, buf + 3);
-	//  parse_key(G13_KEY_LIGHT_STATE, buf+3);
-
 	parse_key(G13_KEY_BD, buf + 3);
 	parse_key(G13_KEY_L1, buf + 3);
 	parse_key(G13_KEY_L2, buf + 3);
@@ -496,17 +467,10 @@ void G13::parse_keys(unsigned char *buf) {
 	parse_key(G13_KEY_L4, buf + 3);
 	parse_key(G13_KEY_M1, buf + 3);
 	parse_key(G13_KEY_M2, buf + 3);
-
 	parse_key(G13_KEY_M3, buf + 3);
 	parse_key(G13_KEY_MR, buf + 3);
 	parse_key(G13_KEY_LEFT, buf + 3);
 	parse_key(G13_KEY_DOWN, buf + 3);
 	parse_key(G13_KEY_TOP, buf + 3);
 	parse_key(G13_KEY_LIGHT, buf + 3);
-	//  parse_key(G13_KEY_LIGHT2, buf+3, file);
-	/* cout << hex << setw(2) << setfill('0') << (int)buf[7];
-	 cout << hex << setw(2) << setfill('0') << (int)buf[6];
-	 cout << hex << setw(2) << setfill('0') << (int)buf[5];
-	 cout << hex << setw(2) << setfill('0') << (int)buf[4];
-	 cout << hex << setw(2) << setfill('0') << (int)buf[3] << endl;*/
 }
