@@ -1,4 +1,4 @@
-package lordbooker.g13;
+package com.booker.g13;
 
 import java.awt.Component;
 import java.util.Properties;
@@ -13,6 +13,7 @@ public final class MacroListCellRenderer extends DefaultListCellRenderer {
 		String displayText = "Unknown";
 		
 		if (value instanceof Properties) {
+			Properties props = (Properties) value;
 			String name = props.getProperty("name", "Unnamed Macro");
 			String id = props.getProperty("id", "?");
             if (name.trim().isEmpty()) {

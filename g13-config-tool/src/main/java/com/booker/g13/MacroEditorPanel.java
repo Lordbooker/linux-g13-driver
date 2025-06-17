@@ -1,4 +1,4 @@
-package lordbooker.g13;
+package com.booker.g13;
 
 import java.awt.BorderLayout;
 import java.awt.Color;
@@ -190,7 +190,7 @@ public class MacroEditorPanel extends JPanel {
 	}
 
 	private void editSelectedItem() {
-		if (macroList.getSelectionCount() != 1 || !canModifyMacro()) return;
+		if (macroList.getSelectedIndices().length != 1 || !canModifyMacro()) return;
 
 		int index = macroList.getSelectedIndex();
 		String item = listModel.getElementAt(index);
