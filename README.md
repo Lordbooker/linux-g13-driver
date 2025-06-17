@@ -56,7 +56,7 @@ this will delete the build-files, the driver an the UDEV-Rule.
 ( The Java Part (GUI) is still the Original from Jim Gupta. I am no Java Developer.)
 
 The Driver needs a Ruleset to work. There are (at this point) no standard bindings for the G-Keys.
-If you don't want to use des GUI App, just copy the Folder ".g13" to your 'home' Directory an you be able to use Tools
+If you don't want to use des GUI App, just copy the Folder ".g13" from /bindings to your 'home' Directory an you be able to use Tools
 like "Input Remapper" to make your own sets.
 
 Else, Run the config tool first!  

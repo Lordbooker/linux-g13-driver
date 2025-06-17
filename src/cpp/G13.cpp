@@ -396,15 +396,6 @@ void G13::parse_key(int key, unsigned char *byte) {
     if (actions[key]) { // Check if action exists
 	    int changed = actions[key]->set(pressed);
 
-	    /*
-	    if (changed) {
-		    string type = "released";
-		    if (actions[key]->isPressed()) {
-			    type = "pressed";
-		    }
-		    cout << "G" << (key+1) << " " << type << "\n";
-	    }
-	    */
     }
 }
 
