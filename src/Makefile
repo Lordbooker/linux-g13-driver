@@ -13,7 +13,12 @@ CPPFLAGS =           # For preprocessor flags like -Iinclude/ -DDEBUG (e.g. -I..
 LDFLAGS  = -L/lib64
 LDLIBS   = -lusb-1.0 # -pthread in CXXFLAGS, when passed to the linker, handles pthread linking
 
-.PHONY: all clean
+# Udev Regel-Konfiguration
+UDEV_RULE_FILE = 99-g13.rules
+UDEV_RULES_DIR = /etc/udev/rules.d
+
+#.PHONY verhindert Konflikte mit Dateinamen und sorgt dafür, dass die Ziele immer ausgeführt werden
+.PHONY: all clean install uninstall
 
 all: $(EXE_NAME)
 
@@ -35,3 +40,20 @@ clean:
 	rm -rf $(BUILD_DIR)
 	rm -f $(EXE_NAME)
 
+# Regel zur Installation der udev-Regel
+install:
+	@echo "Installing udev rule to $(UDEV_RULES_DIR)..."
+	sudo cp $(UDEV_RULE_FILE) $(UDEV_RULES_DIR)/
+	@echo "Reloading udev rules..."
+	sudo udevadm control --reload-rules
+	sudo udevadm trigger
+	@echo "Installation complete. Please re-plug your G13 device."
+	@echo "Make sure your user is part of the 'input' group: 'sudo usermod -aG input $$USER'"
+
+# Regel zur Deinstallation der udev-Regel
+uninstall:
+	@echo "Removing udev rule from $(UDEV_RULES_DIR)..."
+	sudo rm -f $(UDEV_RULES_DIR)/$(UDEV_RULE_FILE)
+	@echo "Reloading udev rules..."
+	sudo udevadm control --reload-rules
+	@echo "Uninstallation complete."
