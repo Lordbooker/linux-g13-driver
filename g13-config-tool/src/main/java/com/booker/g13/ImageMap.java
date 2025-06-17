@@ -1,171 +1,240 @@
 package com.booker.g13;
 
 import java.awt.Color;
-import java.awt.Font;
 import java.awt.Graphics;
 import java.awt.Graphics2D;
-import java.awt.RenderingHints;
-import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
+import java.awt.event.MouseListener;
+import java.awt.event.MouseMotionListener;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Objects;
+
 import javax.swing.ImageIcon;
 import javax.swing.JLabel;
 
 public class ImageMap extends JLabel {
 
+	/**
+	 * 
+	 */
 	private static final long serialVersionUID = 1L;
-	public static final ImageIcon G13_KEYPAD = ImageIconHelper.loadEmbeddedImage("/com/booker/g13/images/g13.gif");
 
-	private final List<ImageMapListener> listeners = new ArrayList<>();
-	private final Color outlineColor = Color.RED.darker();
+	public static final ImageIcon G13_KEYPAD = ImageIconHelper.loadEmbeddedImage("/com/booker/g13/images/g13.gif");
+	
+	private final List<ImageMapListener> listeners = new ArrayList<ImageMapListener>();
+
+	private final Color outlineColor = Color.red.darker();
+	
 	private final Color selectedColor = new Color(0, 255, 0, 128);
+	
 	private final Color mouseoverColor = new Color(255, 0, 0, 128);
 
 	private Key selected = null;
+	
 	private Key mouseover = null;
-
+	
 	public ImageMap() {
 		super(G13_KEYPAD);
+		
+		addMouseMotionListener(new MouseMotionListener() {
 
-		MouseAdapter mouseAdapter = new MouseAdapter() {
 			@Override
-			public void mouseMoved(MouseEvent e) {
-				Key key = Key.getKeyAt(e.getX(), e.getY());
-				if (!Objects.equals(mouseover, key)) {
+			public void mouseDragged(MouseEvent arg0) {
+			}
+
+			@Override
+			public void mouseMoved(MouseEvent arg0) {
+				Key key = Key.getKeyAt(arg0.getPoint().x, arg0.getPoint().y);
+				if (key == null && mouseover == null) {
+					return;
+				}
+				
+				if ((key != null && mouseover == null) || (key == null && mouseover != null)) {
 					mouseover = key;
-					fireMouseover();
 					repaint();
+					fireMouseover();
+					return;
+				}
+				
+				if (key.getG13KeyCode() != mouseover.getG13KeyCode()) {
+					mouseover = key;
+					repaint();
+					fireMouseover();
+					return;
+				}
+			}
+		});
+		
+		addMouseListener(new MouseListener() {
+			@Override
+			public void mouseClicked(MouseEvent arg0) {
+				System.out.println(arg0.getPoint().x + ", " + arg0.getPoint().y);
+				
+				Key key = Key.getKeyAt(arg0.getPoint().x, arg0.getPoint().y);
+				
+				if (key == null && selected == null) {
+					return;
+				}
+				
+				if ((key != null && selected == null) || (key == null && selected != null)) {
+					
+					selected = key;
+					repaint();
+					fireSelected();
+					return;
+				}
+				
+				if (key.getG13KeyCode() != selected.getG13KeyCode()) {
+					selected = key;
+					repaint();
+					fireSelected();
+					return;
 				}
 			}
 
 			@Override
-			public void mouseClicked(MouseEvent e) {
-				Key key = Key.getKeyAt(e.getX(), e.getY());
-				if (!Objects.equals(selected, key)) {
-					selected = key;
-					// For M1-M4 keys, selection highlight is not needed as they trigger an action
-                    if (key != null && key.getG13KeyCode() >= 25 && key.getG13KeyCode() <= 28) {
-                        selected = null;
-                    }
-					fireSelected();
-					repaint();
-				}
+			public void mouseEntered(MouseEvent e) {
 			}
 
-            @Override
-            public void mouseExited(MouseEvent e) {
-                if (mouseover != null) {
-                    mouseover = null;
-                    fireMouseover();
-                    repaint();
-                }
-            }
-		};
+			@Override
+			public void mouseExited(MouseEvent e) {
+			}
 
-		addMouseMotionListener(mouseAdapter);
-		addMouseListener(mouseAdapter);
+			@Override
+			public void mousePressed(MouseEvent e) {
+			}
+
+			@Override
+			public void mouseReleased(MouseEvent e) {
+			}
+		});
+
 	}
-
+	
 	public void addListener(final ImageMapListener listener) {
 		synchronized (listeners) {
 			listeners.add(listener);
 		}
 	}
-
+	
 	public void removeListener(final ImageMapListener listener) {
 		synchronized (listeners) {
 			listeners.remove(listener);
 		}
 	}
-
+	
 	protected void fireSelected() {
 		synchronized (listeners) {
-			for (final ImageMapListener listener : listeners) {
+			for (final ImageMapListener listener: listeners) {
 				listener.selected(selected);
 			}
 		}
 	}
+	
 
 	protected void fireMouseover() {
 		synchronized (listeners) {
-			for (final ImageMapListener listener : listeners) {
+			for (final ImageMapListener listener: listeners) {
 				listener.mouseover(mouseover);
 			}
 		}
 	}
-
+	
+	
 	@Override
-	protected void paintComponent(Graphics g) {
-		super.paintComponent(g);
-		Graphics2D g2d = (Graphics2D) g.create();
-		g2d.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+	public void paint(Graphics _g) {
+		super.paint(_g);
+		
+		paintSelected(_g);
 
-		paintKeyOutlines(g2d);
-		paintKeyHighlight(g2d, selected, selectedColor);
-		paintKeyHighlight(g2d, mouseover, mouseoverColor);
-		paintMouseoverInfo(g2d);
-
-		g2d.dispose();
+		paintMouseover(_g);
+		
+		paintKeyOutlines(_g);
+		
 	}
 
-	private void paintKeyHighlight(Graphics2D g, Key key, Color color) {
-		if (key == null) {
+	void paintSelected(final Graphics _g) {
+		if (selected == null) {
 			return;
 		}
-		g.setColor(color);
-		g.fill(key.getShape());
-		g.setColor(color.darker());
-		g.draw(key.getShape());
-	}
+		
+		final Graphics2D g = (Graphics2D)_g.create();
 
-	private void paintMouseoverInfo(Graphics2D g) {
+		g.setColor(selectedColor);
+		g.fill(selected.getShape());
+		
+		g.setColor(selectedColor.darker());
+		g.draw(selected.getShape());
+		
+		g.dispose();
+	}
+	
+	void paintMouseover(final Graphics _g) {
+		
 		if (mouseover == null) {
 			return;
 		}
-
-		String[][] lines;
-		int gCode = mouseover.getG13KeyCode();
-
-		if (gCode >= 25 && gCode <= 28) { // M1-M4 keys
-			lines = new String[][]{
-					{"Profile Key", "M" + (gCode - 24)},
-					{"Action", "Load Profile " + (gCode - 24)},
-					{"Configuration", "bindings-" + (gCode - 25) + ".properties"},
-			};
-		} else {
-			lines = new String[][]{
-					{"Key", "G" + gCode},
-					{"Mapped To", mouseover.getMappedValue()},
-					{"Repeats", mouseover.getRepeats()},
-			};
+		
+		final Graphics2D g = (Graphics2D)_g.create();
+		
+		g.setColor(mouseoverColor);
+		g.fill(mouseover.getShape());
+		
+		g.setColor(mouseoverColor.darker());
+		g.draw(mouseover.getShape());
+		
+		String [][] lines;
+		if (mouseover.getG13KeyCode() == 25 || mouseover.getG13KeyCode() == 26 ||
+				mouseover.getG13KeyCode() == 27 || mouseover.getG13KeyCode() == 28) {
+			
+			String [][] tmp = {
+					{"G13 Key", "G" + Integer.toString(mouseover.getG13KeyCode() + 1)},
+					{"Configuration", "bindings-" + (mouseover.getG13KeyCode() - 25) + ".properties"},
+					{"This button is reserved to load bindings", ""},
+				};
+				
+				lines = tmp;
 		}
-
-		drawInfoBox(g, lines);
-	}
-    
-    private void drawInfoBox(Graphics2D g, String[][] lines) {
-        final int x0 = 110;
+		else {
+			String [][] tmp = {
+				{"G13 Key", Integer.toString(mouseover.getG13KeyCode() + 1)},
+				{"Mapped Value",   mouseover.getMappedValue()},
+				{"Repeats",        mouseover.getRepeats()},
+			};
+			
+			lines = tmp;
+		}
+		
+		final int x0 = 110;
 		final int x1 = 245;
 		int y = 550;
-        Font originalFont = g.getFont();
-        g.setFont(originalFont.deriveFont(Font.BOLD));
-
-		for (final String[] line : lines) {
+		for (final String [] line: lines) {
 			g.setColor(mouseoverColor.darker());
-			g.drawString(line[0] + ":", x0, y);
-			g.setColor(Color.BLACK);
+			g.drawString(line[0], x0, y);
+			//y+= (3*getFont().getSize()/2);
+			g.setColor(mouseoverColor.brighter());
 			g.drawString(line[1], x1, y);
-			y += originalFont.getSize() * 1.5;
+			
+			y+= 2*getFont().getSize();
 		}
-        g.setFont(originalFont);
-    }
+		
+		g.dispose();
+	}
 
-	private void paintKeyOutlines(Graphics2D g) {
+
+	private void paintKeyOutlines(Graphics _g) {
+		final Graphics2D g = (Graphics2D)_g.create();
+		
 		g.setColor(outlineColor);
-		for (final Key key : Key.getAllKeys()) {
+		
+		final List<Key> list = Key.getAllMasks();
+		//System.out.println("list size=" + list.size());
+		for (final Key key: list) {
 			g.draw(key.getShape());
 		}
+		
+		g.dispose();
 	}
+	
+	
 }

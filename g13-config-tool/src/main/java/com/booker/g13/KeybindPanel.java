@@ -4,50 +4,67 @@ import java.awt.BorderLayout;
 import java.awt.Color;
 import java.awt.FlowLayout;
 import java.awt.GridLayout;
+import java.awt.event.ActionEvent;
+import java.awt.event.ActionListener;
+import java.awt.event.KeyEvent;
+import java.awt.event.KeyListener;
 import java.io.IOException;
 import java.util.Properties;
-import javax.swing.*;
+import java.util.StringTokenizer;
+
+import javax.swing.BorderFactory;
+import javax.swing.ButtonGroup;
+import javax.swing.JButton;
+import javax.swing.JCheckBox;
+import javax.swing.JColorChooser;
+import javax.swing.JComboBox;
+import javax.swing.JComponent;
+import javax.swing.JLabel;
+import javax.swing.JOptionPane;
+import javax.swing.JPanel;
+import javax.swing.JTextField;
+import javax.swing.SwingUtilities;
 
 public class KeybindPanel extends JPanel {
 
 	private static final long serialVersionUID = 1L;
 
 	private final JCheckBox passthroughButton = new JCheckBox("Pass Through");
+	
 	private final JTextField passthroughText = new JTextField();
+	
 	private int passthroughCode = 0;
-
+	
 	private final JCheckBox macroButton = new JCheckBox("Macro");
-	private final JComboBox<Properties> macroSelectionBox = new JComboBox<>();
+	
+	private final JComboBox macroSelectionBox = new JComboBox();
+	
 	private final JCheckBox repeatsCheckBox = new JCheckBox("Auto Repeat");
+	
 	private final JButton colorChangeButton = new JButton("Click Here To Change");
-
+	
 	private int bindingsId = -1;
+	
 	private Properties bindings;
-	private Properties[] macros;
+	
+	private Properties [] macros;
+	
 	private Key key = null;
+	
 	private boolean loadingData = false;
-
+	
 	public KeybindPanel() {
 		setLayout(new BorderLayout());
 		setBorder(BorderFactory.createTitledBorder("Keybindings Panel"));
 		add(createColorPanel(), BorderLayout.NORTH);
-
+		
 		final ButtonGroup buttonGroup = new ButtonGroup();
 		buttonGroup.add(passthroughButton);
 		buttonGroup.add(macroButton);
-
+		
 		passthroughText.setFocusTraversalKeysEnabled(false);
-
-		JPanel grid = createBindingsGrid();
-		add(grid, BorderLayout.CENTER);
-
-		setupListeners();
-		updateComponentStates();
-	}
-
-	private JPanel createBindingsGrid() {
-		final JPanel grid = new JPanel(new GridLayout(0, 2, 5, 5));
-		grid.setBorder(BorderFactory.createTitledBorder("Button Type"));
+		
+		final JPanel grid = new JPanel(new GridLayout(0, 2));
 		grid.add(passthroughButton);
 		grid.add(passthroughText);
 		grid.add(new JLabel(" "));
@@ -56,173 +73,235 @@ public class KeybindPanel extends JPanel {
 		grid.add(macroSelectionBox);
 		grid.add(new JLabel(" "));
 		grid.add(repeatsCheckBox);
+		
+		grid.setBorder(BorderFactory.createTitledBorder("Button Type"));
+		
 		macroSelectionBox.setRenderer(new MacroListCellRenderer());
-		return grid;
-	}
-
-	private void setupListeners() {
-		// Listener for any change that requires saving
-		Runnable saveAction = () -> {
-			try {
-				saveBindings();
-			} catch (IOException e) {
-				e.printStackTrace();
-				JOptionPane.showMessageDialog(KeybindPanel.this, "Error saving bindings: " + e.getMessage(), "Error", JOptionPane.ERROR_MESSAGE);
+		
+		add(grid, BorderLayout.CENTER);
+		
+		
+		final ActionListener changeListener = new ActionListener() {
+			public void actionPerformed(final ActionEvent ae) {
+				try {
+					saveBindings();
+				}
+				catch (Exception e) {
+					e.printStackTrace();
+					JOptionPane.showMessageDialog(KeybindPanel.this, e);
+				}
 			}
 		};
-
-		passthroughButton.addActionListener(e -> {
-			updateComponentStates();
-			saveAction.run();
+		
+		macroButton.addActionListener(changeListener);
+		macroSelectionBox.addActionListener(changeListener);
+		repeatsCheckBox.addActionListener(changeListener);
+		passthroughButton.addActionListener(changeListener);
+		passthroughText.addActionListener(changeListener);
+		
+		macroButton.addActionListener(new ActionListener() {
+			public void actionPerformed(final ActionEvent ae) {
+				passthroughText.setEnabled(false);
+				macroSelectionBox.setEnabled(true);
+				repeatsCheckBox.setEnabled(true);
+			}			
 		});
-		macroButton.addActionListener(e -> {
-			updateComponentStates();
-			saveAction.run();
+		
+		passthroughButton.addActionListener(new ActionListener() {
+			public void actionPerformed(final ActionEvent ae) {
+				passthroughText.setEnabled(true);
+				macroSelectionBox.setEnabled(false);
+				repeatsCheckBox.setEnabled(false);
+			}			
 		});
-		macroSelectionBox.addActionListener(e -> saveAction.run());
-		repeatsCheckBox.addActionListener(e -> saveAction.run());
+		
+		passthroughText.addKeyListener(new KeyListener() {
+			@Override
+			public void keyTyped(KeyEvent event) {
+			}
 
-		passthroughText.addKeyListener(new java.awt.event.KeyAdapter() {
-			public void keyReleased(java.awt.event.KeyEvent evt) {
-				if (loadingData) return;
+			@Override
+			public void keyPressed(KeyEvent event) {
+			}
+
+			@Override
+			public void keyReleased(KeyEvent event) {
+				if (loadingData) {
+					return;
+				}
 				loadingData = true;
-				passthroughCode = JavaToLinuxKeymapping.keyEventToCCode(evt);
+				passthroughCode = JavaToLinuxKeymapping.keyEventToCCode(event);
 				passthroughText.setText(JavaToLinuxKeymapping.cKeyCodeToString(passthroughCode));
 				loadingData = false;
-				saveAction.run();
+				try {
+					saveBindings();
+				}
+				catch (Exception e) {
+					e.printStackTrace();
+					JOptionPane.showMessageDialog(null, "Can't Save Bindings: " + e);
+				}
 			}
 		});
+		
+
+		
+		setSelectedKey(null);
 	}
-
-	private void updateComponentStates() {
-		boolean isKeySelected = (key != null);
-		boolean isPassthrough = passthroughButton.isSelected();
-		boolean isMacro = macroButton.isSelected();
-
-		colorChangeButton.setEnabled(bindings != null);
-		passthroughButton.setEnabled(isKeySelected);
-		macroButton.setEnabled(isKeySelected);
-
-		passthroughText.setEnabled(isKeySelected && isPassthrough);
-		macroSelectionBox.setEnabled(isKeySelected && isMacro);
-		repeatsCheckBox.setEnabled(isKeySelected && isMacro);
-	}
-
-	public void setMacros(final Properties[] macros) {
+	
+	public void setMacros(final Properties [] macros) {
 		loadingData = true;
 		this.macros = macros;
+		
 		macroSelectionBox.removeAllItems();
-		for (final Properties properties : macros) {
+		for (final Properties properties: macros) {
 			macroSelectionBox.addItem(properties);
 		}
+		
 		loadingData = false;
 	}
-
+	
 	public void setBindings(final int propertyNum, final Properties bindings) {
 		loadingData = true;
+		
 		this.bindingsId = propertyNum;
 		this.bindings = bindings;
-
-		try {
-			final String val = bindings.getProperty("color", "255,255,255");
-			final String[] rgb = val.split(",");
-			int r = Integer.parseInt(rgb[0]);
-			int g = Integer.parseInt(rgb[1]);
-			int b = Integer.parseInt(rgb[2]);
-			final Color c = new Color(r, g, b);
-			SwingUtilities.invokeLater(() -> colorChangeButton.setBackground(c));
-		} catch (NumberFormatException | ArrayIndexOutOfBoundsException e) {
-			System.err.println("Invalid color format in bindings: " + bindings.getProperty("color"));
-		}
-
-		setSelectedKey(null);
-		loadingData = false;
-	}
-
-	public void setSelectedKey(final Key key) {
-		this.key = key;
-		loadingData = true;
-
-		if (key != null) {
-			final String propKey = "G" + key.getG13KeyCode();
-			final String val = bindings.getProperty(propKey, "p,k.1"); // Default to "p,k.1" (ESC)
-			
-			try {
-				final String[] parts = val.split("[,\\.]");
-				String type = parts[0];
-
-				if ("p".equals(type)) {
-					passthroughButton.setSelected(true);
-					passthroughCode = Integer.parseInt(parts[2]);
-					passthroughText.setText(JavaToLinuxKeymapping.cKeyCodeToString(passthroughCode));
-				} else { // "m" for macro
-					macroButton.setSelected(true);
-					int macroNum = Integer.parseInt(parts[1]);
-					boolean repeats = Integer.parseInt(parts[2]) != 0;
-					macroSelectionBox.setSelectedIndex(macroNum);
-					repeatsCheckBox.setSelected(repeats);
-				}
-			} catch (NumberFormatException | ArrayIndexOutOfBoundsException e) {
-				System.err.println("Could not parse binding for key " + propKey + ": " + val);
-				passthroughButton.setSelected(true);
-				passthroughCode = 1; // Default to ESC on error
-				passthroughText.setText(JavaToLinuxKeymapping.cKeyCodeToString(passthroughCode));
+		
+		final String val = bindings.getProperty("color");
+		final StringTokenizer st = new StringTokenizer(val, ",");
+		int r = Integer.valueOf(st.nextToken());
+		int g = Integer.valueOf(st.nextToken());
+		int b = Integer.valueOf(st.nextToken());
+		
+		final Color c = new Color(r, g, b);
+		
+		SwingUtilities.invokeLater(new Runnable() {
+			public void run() {
+				colorChangeButton.setBackground(c);
 			}
-
-		}
-		updateComponentStates();
+		});
+		
+		setSelectedKey(null);;
+		
 		loadingData = false;
 	}
-
+	
+	public void setSelectedKey(final Key key) {
+		
+		this.key = key;
+		
+		loadingData = true;
+		
+		final JComponent [] all = {
+				colorChangeButton, macroButton, macroSelectionBox,
+				passthroughButton, passthroughText, repeatsCheckBox
+		};
+		
+		for (final JComponent c: all) {
+			c.setEnabled(key != null);
+		}
+		
+		if (key == null) {
+			return;
+		}
+		
+		final String propKey = "G" + key.getG13KeyCode();
+		final String val = bindings.getProperty(propKey)==null?"":bindings.getProperty(propKey);
+		
+		final StringTokenizer st = new StringTokenizer(val, ",.");
+		String type = st.hasMoreTokens()?st.nextToken():"p";
+		if (type.equals("p")) {
+			passthroughButton.setSelected(true);
+			
+			String tmp = st.hasMoreTokens()?st.nextToken():"";
+			
+			passthroughCode = Integer.valueOf(st.hasMoreTokens()?st.nextToken():"1");
+			passthroughText.setText(JavaToLinuxKeymapping.cKeyCodeToString(passthroughCode));
+			
+			macroSelectionBox.setEnabled(false);
+			repeatsCheckBox.setEnabled(false);
+		}
+		else {
+			macroButton.setSelected(true);
+			int macroNum = Integer.valueOf(st.nextToken());
+			macroSelectionBox.setSelectedIndex(macroNum);
+			boolean repeats = Integer.valueOf(st.nextToken()) != 0;
+			repeatsCheckBox.setSelected(repeats);
+			
+			passthroughText.setEnabled(false);
+		}
+		
+		loadingData = false;
+	}
+	
 	private void changeScreenColor() {
 		final String val = bindings.getProperty("color");
-		String[] rgb = val.split(",");
-		Color initialColor = new Color(Integer.parseInt(rgb[0]), Integer.parseInt(rgb[1]), Integer.parseInt(rgb[2]));
-
-		final Color newColor = JColorChooser.showDialog(this, "Choose Screen Color", initialColor);
-		if (newColor != null) {
-			bindings.setProperty("color", newColor.getRed() + "," + newColor.getGreen() + "," + newColor.getBlue());
-			colorChangeButton.setBackground(newColor);
-			try {
-				Configs.saveBindings(bindingsId, bindings);
-			} catch (Exception e) {
-				e.printStackTrace();
-				JOptionPane.showMessageDialog(this, e);
-			}
+		final StringTokenizer st = new StringTokenizer(val, ",");
+		int r = Integer.valueOf(st.nextToken());
+		int g = Integer.valueOf(st.nextToken());
+		int b = Integer.valueOf(st.nextToken());
+		
+		final Color c = new Color(r, g, b);
+		
+		final Color newColor = JColorChooser.showDialog(this, "Choose Screen Color", c);
+		if (newColor == null) {
+			return;
+		}
+		
+		bindings.setProperty("color", newColor.getRed() + "," + newColor.getGreen() + "," + newColor.getBlue());
+		colorChangeButton.setBackground(newColor);
+		
+		try {
+			Configs.saveBindings(bindingsId, bindings);
+		}
+		catch (Exception e) {
+			e.printStackTrace();
+			JOptionPane.showMessageDialog(this, e);
 		}
 	}
-
+	
 	private JPanel createColorPanel() {
 		final JPanel p = new JPanel(new FlowLayout(FlowLayout.LEFT));
 		p.setBorder(BorderFactory.createTitledBorder("Screen Color"));
+				
 		p.add(colorChangeButton);
-		colorChangeButton.addActionListener(e -> changeScreenColor());
+		
+		colorChangeButton.addActionListener(new ActionListener() {
+			public void actionPerformed(final ActionEvent ae) {
+				changeScreenColor();
+			}
+		});
+		
 		return p;
 	}
-
+	
 	private void saveBindings() throws IOException {
-		if (key == null || loadingData) {
+		
+		if (key == null || loadingData == true) {
 			return;
 		}
-
+		
 		String prop = "G" + key.getG13KeyCode();
 		if (passthroughButton.isSelected()) {
 			String val = "p,k." + passthroughCode;
 			bindings.put(prop, val);
+			
 			key.setMappedValue(passthroughText.getText().trim());
 			key.setRepeats("N/A");
-		} else if (macroButton.isSelected()) {
+		}
+		else if (macroButton.isSelected()) {
 			int macroNum = macroSelectionBox.getSelectedIndex();
-			int repeats = repeatsCheckBox.isSelected() ? 1 : 0;
+			int repeats = repeatsCheckBox.isSelected()?1:0;
 			String val = "m," + macroNum + "," + repeats;
 			bindings.put(prop, val);
 			
-			if(macros != null && macroNum >= 0 && macroNum < macros.length) {
-				final String macroName = macros[macroNum].getProperty("name");
-				key.setMappedValue("Macro: " + macroName);
-				key.setRepeats(repeats == 1 ? "Yes" : "No");
-			}
+			final String macroName = macros[macroNum].getProperty("name");
+			key.setMappedValue("Macro: " + macroName);
+			key.setRepeats(repeats==1?"Yes":"No");
 		}
+		else {
+			System.err.println("KeybindPanel::saveBindings() ==> TODO implent this type of key");
+		}
+		
 		Configs.saveBindings(bindingsId, bindings);
 	}
 }

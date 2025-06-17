@@ -2,26 +2,26 @@ package com.booker.g13;
 
 import java.awt.Component;
 import java.util.Properties;
+
 import javax.swing.DefaultListCellRenderer;
 import javax.swing.JList;
 
-public final class MacroListCellRenderer extends DefaultListCellRenderer {
+public class MacroListCellRenderer extends DefaultListCellRenderer {
 	private static final long serialVersionUID = 1L;
 
 	@Override
-	public Component getListCellRendererComponent(JList<?> list, Object value, int index, boolean isSelected, boolean cellHasFocus) {
-		String displayText = "Unknown";
+	public Component getListCellRendererComponent(JList list, Object value, int index, boolean isSelected, boolean cellHasFocus) {
+		Object newVal = value;
 		
 		if (value instanceof Properties) {
-			Properties props = (Properties) value;
-			String name = props.getProperty("name", "Unnamed Macro");
-			String id = props.getProperty("id", "?");
-            if (name.trim().isEmpty()) {
-                name = "Unnamed Macro";
-            }
-			displayText = String.format("[%s] %s", id, name);
+			final Properties props = (Properties)value;
+			final String name = (String)(props.get("name")==null?"":props.get("name"));
+			final String id = (String)(props.get("id")==null?"":props.get("id"));
+			
+			newVal = "[" + id + "] " + name;
 		}
 		
-		return super.getListCellRendererComponent(list, displayText, index, isSelected, cellHasFocus);
+		return super.getListCellRendererComponent(list, newVal, index, isSelected, cellHasFocus);
 	}
+
 }
