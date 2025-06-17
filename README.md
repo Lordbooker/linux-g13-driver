@@ -1,7 +1,8 @@
 # Readme File
 
 I forked the repo because parts of it are already 10 years old, and I still tinker with the hardware.
-So far, I have only modified the C++ part (i.e., the driver itself). I'm not familiar with Java, and the config program isn't strictly necessary, as I can overwrite the default settings at any time using other key mapping tools.
+So far, I have only modified the C++ part (i.e., the driver itself) and the java build process for maven. 
+I'm not familiar with Java, and the config program isn't strictly necessary, as I can overwrite the default settings at any time using other key mapping tools.
 
 Nevertheless, it still works with the included mapping tool, and you can use it to save 4 different mappingsets.
 
