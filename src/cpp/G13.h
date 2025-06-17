@@ -5,6 +5,7 @@
 #include <vector>
 #include <memory> // For std::unique_ptr
 #include <map>
+#include <istream> // HINZUGEFÜGT: Wird für die neue Funktion benötigt
 
 #include "Constants.h"
 #include "G13Action.h"
@@ -21,7 +22,7 @@ private:
 	int                   uinput_file;
 
 	int                   loaded;
-	int                   keepGoing;
+	volatile int          keepGoing; // volatile, da es von einem anderen Thread geändert werden kann
 
 	stick_mode_t          stick_mode;
 	int                   stick_keys[4];
@@ -29,6 +30,9 @@ private:
 	int                   bindings;
 
 	std::unique_ptr<Macro> loadMacro(int id);
+
+	// HINZUGEFÜGT: Deklaration der neuen Parsing-Funktion
+	void parse_bindings_from_stream(std::istream& stream);
 
 	int  read();
 	void parse_joystick(unsigned char *buf);

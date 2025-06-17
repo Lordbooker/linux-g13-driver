@@ -18,6 +18,12 @@
 #include <pthread.h>
 #include <algorithm> // For std::remove
 
+// *** ANPASSUNG START ***
+// Benötigte Header für die Fallback-Logik
+#include <sstream> 
+#include <istream> 
+// *** ANPASSUNG ENDE ***
+
 
 #include "Constants.h"
 #include "G13.h"
@@ -170,91 +176,147 @@ std::unique_ptr<Macro> G13::loadMacro(int num) {
 	return macro;
 }
 
-void G13::loadBindings() {
 
-	char filename[1024];
+// *** ANPASSUNG START ***
+// Die Parsing-Logik wurde in eine eigene Funktion ausgelagert,
+// um sie sowohl für Dateien als auch für den Standard-String verwenden zu können.
+void G13::parse_bindings_from_stream(std::istream& stream) {
+    while (stream.good()) {
+        string line;
+        getline(stream, line);
 
-	sprintf(filename, "%s/.g13/bindings-%d.properties", getenv("HOME"), bindings);
-    const char* home_dir = getenv("HOME");
-    if (!home_dir) {
-        cerr << "G13::loadBindings() HOME environment variable not set.\n";
-        return;
+        // Use C-style char array for strtok compatibility if needed, or parse with std::string methods
+        char l[1024];
+        strncpy(l, line.c_str(), sizeof(l) - 1);
+        l[sizeof(l)-1] = '\0';
+
+        trim_c_string(l);
+        if (strlen(l) > 0 && l[0] != '#') { // Also check for comment lines here
+            char *key = strtok(l, "=");
+            if (key == NULL) continue; // Leere Zeile überspringen
+
+            if (key[0] == '#') {
+                // ignore line
+            }
+            else if (strcmp(key, "color") == 0) {
+                char *num = strtok(NULL, ",");
+                int r = atoi(num);
+                num = strtok(NULL, ",");
+                int g = atoi(num);
+                num = strtok(NULL, ",");
+                int b = atoi(num);
+                setColor(r, g, b);
+            }
+            else if (strcmp(key, "stick_mode") == 0) {
+                // Stick mode logic here
+            }
+            else if (key[0] == 'G') {
+                int gKey = atoi(&key[1]);
+                char *type = strtok(NULL, ",");
+                if (type == NULL) continue;
+                trim_c_string(type);
+
+                if (strcmp(type, "p") == 0) { /* passthrough */
+                    char *keytype = strtok(NULL, ",\n ");
+                    if (keytype == NULL) continue;
+                    trim_c_string(keytype);
+                    int keycode = atoi(&keytype[2]);
+
+                    if (gKey >= 0 && gKey < G13_NUM_KEYS) {
+                        actions[gKey] = std::make_unique<PassThroughAction>(keycode);
+                    }
+                }
+                else if (strcmp(type, "m") == 0) { /* macro */
+                    char* macroId_str = strtok(NULL, ",\n ");
+                    char* repeats_str = strtok(NULL, ",\n ");
+                    if (macroId_str == NULL || repeats_str == NULL) continue;
+
+                    int macroId = atoi(macroId_str);
+                    int repeats = atoi(repeats_str);
+                    auto macro = loadMacro(macroId); // Returns std::unique_ptr<Macro>
+                    if (macro && gKey >= 0 && gKey < G13_NUM_KEYS) {
+                        actions[gKey] = std::make_unique<MacroAction>(macro->getSequence());
+                        static_cast<MacroAction*>(actions[gKey].get())->setRepeats(repeats);
+                    } // macro unique_ptr goes out of scope and is deleted if not moved
+                }
+                else {
+                    cout << "G13::parse_bindings_from_stream() unknown type '" << type << "\n";
+                }
+            }
+            else {
+                cout << "G13::parse_bindings_from_stream() Unknown first token: " << key << "\n";
+            }
+        }
     }
+}
+
+
+void G13::loadBindings() {
+	char filename[1024];
+	const char* home_dir = getenv("HOME");
+	if (!home_dir) {
+		cerr << "G13::loadBindings() HOME environment variable not set.\n";
+		return;
+	}
 	snprintf(filename, sizeof(filename), "%s/.g13/bindings-%d.properties", home_dir, bindings);
 
-	  ifstream file (filename);
-	  if (!file.is_open()) {
-		  cout << "Could not open config file: " << filename << "\n";
-		  setColor(128, 128, 128);
-		  return;
-	  }
+	ifstream file(filename);
+	if (!file.is_open()) {
+		cout << "Konfigurationsdatei nicht gefunden: " << filename << endl;
+		cout << "Lade Standard-Tastenbelegung." << endl;
 
-	  while (file.good()) {
-		  string line;
-	      getline(file, line);
-
-          // Use C-style char array for strtok compatibility if needed, or parse with std::string methods
-	      char l[1024];
-          strncpy(l, line.c_str(), sizeof(l) - 1);
-          l[sizeof(l)-1] = '\0';
-
-		  trim_c_string(l);
-		  if (strlen(l) > 0 && l[0] != '#') { // Also check for comment lines here
-			  char *key = strtok(l, "=");
-			  if (key[0] == '#') {
-				  // ignore line
-			  }
-			  else if (strcmp(key, "color") == 0) {
-				  char *num = strtok(NULL, ",");
-				  int r = atoi(num);
-				  num = strtok(NULL, ",");
-				  int g = atoi(num);
-				  num = strtok(NULL, ",");
-				  int b = atoi(num);
-
-				  setColor(r, g, b);
-			  }
-			  else if (strcmp(key, "stick_mode") == 0) {
-
-			  }
-			  else if (key[0] == 'G') {
-				  int gKey = atoi(&key[1]);
-				  //cout << "gKey = " << gKey << "\n";
-				  char *type = strtok(NULL, ",");
-				  trim_c_string(type);
-				  //cout << "type = " << type << "\n";
-				  if (strcmp(type, "p") == 0) { /* passthrough */
-					  char *keytype = strtok(NULL, ",\n ");
-					  trim_c_string(keytype);
-					  int keycode = atoi(&keytype[2]);
-
-                      if (gKey >= 0 && gKey < G13_NUM_KEYS) {
-					  //cout << "assigning G" << gKey << " to keycode " << keycode << "\n";
-					      actions[gKey] = std::make_unique<PassThroughAction>(keycode);
-                      }
-				  }
-				  else if (strcmp(type, "m") == 0) { /* macro */
-					  int macroId = atoi(strtok(NULL, ",\n "));
-					  int repeats = atoi(strtok(NULL, ",\n "));
-					  auto macro = loadMacro(macroId); // Returns std::unique_ptr<Macro>
-                      if (macro && gKey >= 0 && gKey < G13_NUM_KEYS) {
-					      actions[gKey] = std::make_unique<MacroAction>(macro->getSequence());
-					      static_cast<MacroAction*>(actions[gKey].get())->setRepeats(repeats);
-                      } // macro unique_ptr goes out of scope and is deleted if not moved
-				  }
-				  else {
-					  cout << "G13::loadBindings() unknown type '" << type << "\n";
-				  }
-
-			  }
-			  else {
-				  cout << "G13::loadBindings() Unknown first token: " << key << "\n";
-			  }
-		  }
-	  }
-
-	  file.close();
+        // Standard-Konfiguration als Fallback, Format entspricht bindings-X.properties
+		const std::string default_bindings = R"RAW(
+# Standard G13 Tastenbelegung
+G19=p,k.42
+G18=p,k.0
+G17=p,k.16
+G16=p,k.10
+G9=p,k.3
+G15=p,k.9
+G8=p,k.2
+G14=p,k.8
+G7=p,k.15
+G13=p,k.7
+G12=p,k.6
+G6=p,k.46
+G11=p,k.5
+G5=p,k.76
+G10=p,k.4
+G4=p,k.75
+G3=p,k.81
+G2=p,k.80
+G1=p,k.79
+G0=p,k.1
+G39=p,k.31
+color=51,153,255
+G38=p,k.32
+G37=p,k.30
+G36=p,k.17
+G35=p,k.11
+G34=p,k.72
+G33=p,k.71
+G32=p,k.62
+G31=p,k.61
+G30=p,k.60
+G29=p,k.59
+G23=p,k.58
+G22=p,k.57
+G21=p,k.57
+G20=p,k.50
+)RAW";
+        
+        std::stringstream ss(default_bindings);
+        parse_bindings_from_stream(ss);
+	}
+    else {
+        cout << "Lade Konfigurationsdatei: " << filename << endl;
+        parse_bindings_from_stream(file);
+        file.close();
+    }
 }
+// *** ANPASSUNG ENDE ***
+
 
 void G13::setColor(int red, int green, int blue) {
 	int error;
@@ -269,7 +331,6 @@ void G13::setColor(int red, int green, int blue) {
 	if (error != 5) {
 		cerr << "Problem sending data" << endl;
 	}
-
 }
 
 int G13::read() {
@@ -358,7 +419,7 @@ void G13::parse_joystick(unsigned char *buf) {
 			}
 		}
 	} else {
-		/*    send_event(g13->uinput_file, EV_REL, REL_X, stick_x/16 - 8);
+		/* send_event(g13->uinput_file, EV_REL, REL_X, stick_x/16 - 8);
 		 send_event(g13->uinput_file, EV_REL, REL_Y, stick_y/16 - 8);*/
 	}
 
@@ -443,7 +504,7 @@ void G13::parse_keys(unsigned char *buf) {
 	parse_key(G13_KEY_TOP, buf + 3);
 	parse_key(G13_KEY_LIGHT, buf + 3);
 	//  parse_key(G13_KEY_LIGHT2, buf+3, file);
-	/*  cout << hex << setw(2) << setfill('0') << (int)buf[7];
+	/* cout << hex << setw(2) << setfill('0') << (int)buf[7];
 	 cout << hex << setw(2) << setfill('0') << (int)buf[6];
 	 cout << hex << setw(2) << setfill('0') << (int)buf[5];
 	 cout << hex << setw(2) << setfill('0') << (int)buf[4];
