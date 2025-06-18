@@ -11,7 +11,7 @@ Nevertheless, it still works with the included mapping tool, and you can use it 
 
 ### libusb-1.0 (recommended for the driver)
 
-For Ubuntu and other Ubuntu based systems, it should be installed already but if you don't have it, you can get it by typing:
+For Ubuntu and other Debian based systems, it should be installed already but if you don't have it, you can get it by typing:
 
     sudo apt-get install libusb-1.0-0
 
@@ -26,7 +26,7 @@ For Fedora and other Fedora based Systems you can install it by typing:
 
 ### Java version 17 or higher (needed only for the GUI)
 
-For Ubuntu and other Ubuntu based systems, it can be installed by typing:
+For Ubuntu and other Debian based systems, it can be installed by typing:
 
     sudo apt-get install default-jre
 

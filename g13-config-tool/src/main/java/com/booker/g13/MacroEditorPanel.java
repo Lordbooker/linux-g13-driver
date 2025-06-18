@@ -1,485 +1,303 @@
-/**
- * 
- */
 package com.booker.g13;
 
 import java.awt.BorderLayout;
 import java.awt.Color;
 import java.awt.Component;
 import java.awt.GridLayout;
-import java.awt.event.ActionEvent;
-import java.awt.event.ActionListener;
 import java.awt.event.KeyEvent;
 import java.awt.event.KeyListener;
+import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
-import java.awt.event.MouseListener;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Properties;
 import java.util.StringTokenizer;
 
-import javax.swing.BorderFactory;
-import javax.swing.DefaultListCellRenderer;
-import javax.swing.DefaultListModel;
-import javax.swing.ImageIcon;
-import javax.swing.JButton;
-import javax.swing.JCheckBox;
-import javax.swing.JComboBox;
-import javax.swing.JComponent;
-import javax.swing.JLabel;
-import javax.swing.JList;
-import javax.swing.JOptionPane;
-import javax.swing.JPanel;
-import javax.swing.JScrollPane;
-import javax.swing.JTextField;
+import javax.swing.*;
 import javax.swing.event.DocumentEvent;
 import javax.swing.event.DocumentListener;
-import javax.swing.event.ListSelectionEvent;
-import javax.swing.event.ListSelectionListener;
 
-/**
- * @author jgupta
- *
- */
 public class MacroEditorPanel extends JPanel {
 
 	private static final long serialVersionUID = 1L;
 
 	private static final ImageIcon UP_ICON = ImageIconHelper.loadEmbeddedImage("/com/booker/g13/images/up.png", 16, 16);
-
 	private static final ImageIcon DOWN_ICON = ImageIconHelper.loadEmbeddedImage("/com/booker/g13/images/down.png", 16, 16);
-
 	private static final ImageIcon DELAY_ICON = ImageIconHelper.loadEmbeddedImage("/com/booker/g13/images/pause.png", 16, 16);
 
-	private final JComboBox macroSelectionBox = new JComboBox();
-
-	private final DefaultListModel listModel = new DefaultListModel();
-	
-	private final JList macroList = new JList(listModel);
-	
+	private final JComboBox<Properties> macroSelectionBox = new JComboBox<>();
+	private final DefaultListModel<String> listModel = new DefaultListModel<>();
+	private final JList<String> macroList = new JList<>(listModel);
 	private final JTextField nameText = new JTextField();
-	
 	private final JButton addDelayButton = new JButton("Add Delay");
-	
 	private final JCheckBox captureDelays = new JCheckBox("Rec Delays", true);
-	
 	private final JButton editButton = new JButton("Edit");
-	
 	private final JButton deleteButton = new JButton("Delete");
-	
 	private final JButton recordButton = new JButton("Clear & Record");
 	
-	private boolean loadingData = false;
-	
-	private boolean captureMode = false;
-	
+	private volatile boolean loadingData = false;
+	private volatile boolean captureMode = false;
 	private long lastCapture = 0;
-	
+
 	public MacroEditorPanel(){
-		
 		setLayout(new BorderLayout());
-		
 		setBorder(BorderFactory.createTitledBorder("Macro Editor Panel"));
 		
-		final JPanel northPanel = new JPanel(new BorderLayout());
-		
+		// UI-Setup (vereinfacht und modernisiert mit Lambdas)
+		setupUI();
+        attachListeners();
+
+        // Initialer Zustand
+        setComponentStates(false);
+	}
+    
+    private void setupUI() {
+        final JPanel northPanel = new JPanel(new BorderLayout());
 		northPanel.add(macroSelectionBox, BorderLayout.NORTH);
-		
+
 		final JPanel namePanel = new JPanel(new BorderLayout());
 		namePanel.add(new JLabel("Name : "), BorderLayout.WEST);
 		namePanel.add(nameText, BorderLayout.CENTER);
 		northPanel.add(namePanel, BorderLayout.SOUTH);
-		
+
 		add(northPanel, BorderLayout.NORTH);
-		
 		add(new JScrollPane(macroList), BorderLayout.CENTER);
-		
+
 		final JPanel controls = new JPanel(new GridLayout(0, 1));
 		final JPanel tmp1 = new JPanel(new GridLayout(1, 2));
 		tmp1.add(captureDelays);
 		tmp1.add(addDelayButton);
 		controls.add(tmp1);
-		
+
 		final JPanel tmp2 = new JPanel(new GridLayout(1, 2));
 		tmp2.add(editButton);
 		tmp2.add(deleteButton);
 		controls.add(tmp2);
-		
+
 		recordButton.setFocusTraversalKeysEnabled(false);
 		controls.add(recordButton);
-		
+
 		add(controls, BorderLayout.SOUTH);
-		
-		editButton.setEnabled(false);
-		deleteButton.setEnabled(false);
-		
-		macroList.addMouseListener(new MouseListener() {
+    }
 
-			@Override
-			public void mouseClicked(MouseEvent e) {
-				if (e.getClickCount() > 1) {
-					edit();
-				}
-			}
+    private void attachListeners() {
+        editButton.addActionListener(e -> edit());
+        deleteButton.addActionListener(e -> delete());
+        addDelayButton.addActionListener(e -> addDelay());
+        recordButton.addActionListener(e -> startStopRecording());
 
-			@Override
-			public void mousePressed(MouseEvent e) {
-			}
+        macroSelectionBox.addActionListener(e -> selectMacro());
+        macroList.setCellRenderer(new MacroStepCellRenderer());
 
-			@Override
-			public void mouseReleased(MouseEvent e) {
-			}
-
-			@Override
-			public void mouseEntered(MouseEvent e) {
-			}
-
-			@Override
-			public void mouseExited(MouseEvent e) {
+        macroList.addMouseListener(new MouseAdapter() {
+            @Override
+            public void mouseClicked(MouseEvent e) {
+                if (e.getClickCount() > 1) {
+                    edit();
+                }
+            }
+        });
+        
+        macroList.getSelectionModel().addListSelectionListener(e -> {
+            if (e.getValueIsAdjusting()) return;
+            updateButtonStates();
+        });
+        
+        // ... (weitere Listener wie DocumentListener für nameText)
+        nameText.getDocument().addDocumentListener(new DocumentListener() {
+			// ... unverändert
+			@Override public void changedUpdate(DocumentEvent e) { updateNameColor(); }
+			@Override public void insertUpdate(DocumentEvent e) { updateNameColor(); }
+			@Override public void removeUpdate(DocumentEvent e) { updateNameColor(); }
+			private void updateNameColor() {
+				nameText.setForeground(loadingData ? Color.black : Color.red);
 			}
 		});
-		
-		macroList.getSelectionModel().addListSelectionListener(
-				new ListSelectionListener() {
-					public void valueChanged(ListSelectionEvent e) {
-						if (e.getValueIsAdjusting() == true) {
-							return;
-						}
-						
-						int [] list = macroList.getSelectedIndices();
-						boolean enable = (list != null && list.length > 0);
-						deleteButton.setEnabled(enable && canModifyMacro());
-						
-						editButton.setEnabled(false);
-						if (list != null && list.length == 1) {
-							if (listModel.getElementAt(list[0]).toString().startsWith("d.")) {
-								editButton.setEnabled(true  && canModifyMacro());
-							}
-						}
-						
-					}
-				});
-		
-		
-		final KeyListener keyListener = new KeyListener() {
 
+        nameText.addActionListener(e -> {
+			nameText.setForeground(Color.black);
+			saveMacro();
+			macroSelectionBox.repaint();
+		});
+
+        // KeyListener für die Aufnahme
+        KeyListener keyListener = new KeyListener() {
 			@Override
 			public void keyPressed(KeyEvent event) {
-				if (captureMode == false) {
-					return;
-				}
-				
+				if (!captureMode) return;
 				if (lastCapture != 0 && captureDelays.isSelected()) {
 					listModel.addElement("d." + (event.getWhen() - lastCapture));
 				}
-				
 				lastCapture = event.getWhen();
-				
 				listModel.addElement("kd." + JavaToLinuxKeymapping.keyEventToCCode(event));
-				//System.out.println("keypressed: " + event.getKeyCode() + " that translates to " + JavaToLinuxKeymapping.keyEventToCCode(event));
 			}
 
 			@Override
 			public void keyReleased(KeyEvent event) {
-				if (captureMode == false) {
-					return;
-				}
-				
+				if (!captureMode) return;
 				if (lastCapture != 0 && captureDelays.isSelected()) {
 					listModel.addElement("d." + (event.getWhen() - lastCapture));
 				}
-				
 				lastCapture = event.getWhen();
-				listModel.addElement("ku." + JavaToLinuxKeymapping.keyEventToCCode(event));				
-				//System.out.println("keyreleased: " + event.getKeyCode());
-				
+				listModel.addElement("ku." + JavaToLinuxKeymapping.keyEventToCCode(event));
 			}
+			@Override public void keyTyped(KeyEvent e) {}
+        };
 
-			@Override
-			public void keyTyped(KeyEvent event) {
-			}
-			
-		};
-		
-		final JComponent [] components = {
-			this, macroSelectionBox, macroList, nameText, addDelayButton, 
-			captureDelays, recordButton, editButton, deleteButton
-		};
-		
-		for (final JComponent c: components) {
+        // Listener zu allen relevanten Komponenten hinzufügen
+		final JComponent[] componentsToListen = { this, macroSelectionBox, macroList, nameText, addDelayButton, captureDelays, recordButton, editButton, deleteButton };
+		for (final JComponent c : componentsToListen) {
 			c.addKeyListener(keyListener);
 		}
-		
-		
-		macroSelectionBox.setRenderer(new MacroListCellRenderer());
+    }
 
-		macroSelectionBox.addActionListener(new ActionListener() {
-			public void actionPerformed(final ActionEvent ae) {
-				selectMacro();
-			}
-		});
-		
-		macroList.setCellRenderer(new DefaultListCellRenderer() {
-			private static final long serialVersionUID = 1L;
+    private void updateButtonStates() {
+        boolean canModify = canModifyMacro();
+        int[] selectedIndices = macroList.getSelectedIndices();
+        boolean selectionExists = selectedIndices.length > 0;
 
-			@Override
-			public Component getListCellRendererComponent(JList list, Object value, int index, boolean isSelected, boolean cellHasFocus) {
-				Object newVal = value;
-				
-				if (value instanceof String) {
-					final StringTokenizer st = new StringTokenizer((String)value, ".");
-					String type = st.nextToken();
-					int keycode = Integer.valueOf(st.nextToken());
-					
-					if (type.equals("d")) {
-						newVal = ((double)(keycode)/1000.0) + " seconds" ;
-					}
-					else {
-						newVal = JavaToLinuxKeymapping.cKeyCodeToString(keycode);
-					}
-				}
+        deleteButton.setEnabled(selectionExists && canModify);
+        
+        boolean singleSelection = selectedIndices.length == 1;
+        boolean isDelay = singleSelection && listModel.getElementAt(selectedIndices[0]).startsWith("d.");
+        editButton.setEnabled(singleSelection && isDelay && canModify);
+    }
+    
+    private void setComponentStates(boolean enabled) {
+        final JComponent[] components = { macroSelectionBox, macroList, nameText, addDelayButton, captureDelays, editButton, deleteButton };
+        for (JComponent c : components) {
+            c.setEnabled(enabled);
+        }
+        recordButton.setEnabled(canModifyMacro());
+    }
 
-				super.getListCellRendererComponent(list, newVal, index, isSelected, cellHasFocus);
-				
-				if (value instanceof String) {
-					final StringTokenizer st = new StringTokenizer((String)value, ".");
-					String type = st.nextToken();
-					String keycode = st.nextToken();
-					
-					if (type.equals("kd")) {
-						setIcon(DOWN_ICON);
-					}
-					else if (type.equals("ku")) {
-						setIcon(UP_ICON);
-					}
-					else if (type.equals("d")) {
-						setIcon(DELAY_ICON);
-					}
-					else {
-						setIcon(null);
-					}
-					
-				}
-				else {
-					setIcon(null);
-				}
-
-				return this;
-			}
-		});
-		
-		nameText.addActionListener(new ActionListener() {
-			public void actionPerformed(final ActionEvent ae) {
-				nameText.setForeground(Color.black);
-				saveMacro();
-				macroSelectionBox.repaint();
-			}
-		});
-		nameText.getDocument().addDocumentListener(new DocumentListener() {
-			@Override
-			public void changedUpdate(DocumentEvent arg0) {
-			}
-
-			@Override
-			public void insertUpdate(DocumentEvent arg0) {
-				if (loadingData == true) {
-					nameText.setForeground(Color.black);
-				}
-				else {
-					nameText.setForeground(Color.red);
-				}
-			}
-
-			@Override
-			public void removeUpdate(DocumentEvent arg0) {
-				if (loadingData == true) {
-					nameText.setForeground(Color.black);
-				}
-				else {
-					nameText.setForeground(Color.red);
-				}
-			}			
-		});
-		
-		recordButton.addActionListener(new ActionListener() {
-			public void actionPerformed(final ActionEvent ae) {
-				startStopRecording();
-			}
-		});
-
-		editButton.addActionListener(new ActionListener() {
-			public void actionPerformed(final ActionEvent ae) {
-				edit();
-			}
-		});
-
-		deleteButton.addActionListener(new ActionListener() {
-			public void actionPerformed(final ActionEvent ae) {
-				delete();
-			}
-		});
-		
-		addDelayButton.addActionListener(new ActionListener() {
-			public void actionPerformed(final ActionEvent ae) {
-				addDelay();
-			}
-		});
-
-	}
-	
 	private boolean canModifyMacro() {
-		return macroSelectionBox.getSelectedIndex() >= Configs.defaultMacros.length;
+		return macroSelectionBox.getSelectedIndex() >= Configs.DEFAULT_MACROS_COUNT;
 	}
-	
-	public void startStopRecording() {
-		final JComponent [] components = {
-				macroSelectionBox, macroList, nameText, addDelayButton, 
-				captureDelays, editButton, deleteButton
-			};
 
-		for (final JComponent c: components) {
-			c.setEnabled(captureMode && canModifyMacro());
-		}
+	public void startStopRecording() {
+		captureMode = !captureMode;
+        setComponentStates(!captureMode && canModifyMacro());
 		
-		if (captureMode == false) {
+		if (captureMode) {
 			recordButton.setText("Stop Recording");
-			captureMode = true;
 			listModel.removeAllElements();
 			lastCapture = 0;
-		}
-		else {
-			recordButton.setText("Clear & Start Recording");
-			captureMode = false;
+            nameText.setEnabled(false); // Während der Aufnahme den Namen nicht ändern
+		} else {
+			recordButton.setText("Clear & Record");
+            nameText.setEnabled(canModifyMacro());
 			saveMacro();
 		}
-		
 	}
-	
+
 	public void delete() {
-		final int [] indicies = macroList.getSelectedIndices();
-		if (indicies == null) {
-			return;
-		}
-		
-		final List<Object> items = new ArrayList<Object>();
-		for (final int i: indicies) {
-			items.add(listModel.getElementAt(i));
-		}
-		
-		for (final Object o: items) {
-			listModel.removeElement(o);
-		}
-		
-		saveMacro();
-	}
+        if (!canModifyMacro()) return;
+        int[] indices = macroList.getSelectedIndices();
+        if (indices == null || indices.length == 0) return;
+
+        // Rückwärts löschen, um Index-Probleme zu vermeiden
+        for (int i = indices.length - 1; i >= 0; i--) {
+            listModel.removeElementAt(indices[i]);
+        }
+        saveMacro();
+    }
 	
 	public void edit() {
-		
-		if (canModifyMacro() == false) {
-			return;
-		}
-		
-		final int [] indicies = macroList.getSelectedIndices();
-		if (indicies == null) {
-			return;
-		}
+		if (!canModifyMacro()) return;
+		int selectedIndex = macroList.getSelectedIndex();
+		if (selectedIndex == -1) return;
 
-		final String str = (String)listModel.getElementAt(indicies[0]);
-		if (str.startsWith("d.") == false) {
-			return;
-		}
-		
-		int delay = Integer.valueOf(str.substring(2));
-		final String newDelay = JOptionPane.showInputDialog("Enter the delay in milliseconds", delay);
-		if (newDelay == null) {
-			return;
-		}
-		
+		final String str = listModel.getElementAt(selectedIndex);
+		if (!str.startsWith("d.")) return;
+
 		try {
-			int d = Integer.valueOf(newDelay);
-			listModel.removeElementAt(indicies[0]);
-			listModel.insertElementAt("d." + d, indicies[0]);
-			saveMacro();
-		}
-		catch (Exception e) {
-			JOptionPane.showMessageDialog(this, "Invalid delay value: " + newDelay);
-		}
+            int currentDelay = Integer.parseInt(str.substring(2));
+            String newDelayStr = JOptionPane.showInputDialog(this, "Enter the delay in milliseconds", currentDelay);
+            if (newDelayStr == null) return;
+
+            int newDelay = Integer.parseInt(newDelayStr);
+            listModel.set(selectedIndex, "d." + newDelay);
+            saveMacro();
+        } catch (NumberFormatException e) {
+            JOptionPane.showMessageDialog(this, "Invalid delay value: " + e.getMessage(), "Error", JOptionPane.ERROR_MESSAGE);
+        }
 	}
 	
 	public void addDelay() {
-		int pos = -1;
-		
-		final int [] indicies = macroList.getSelectedIndices();
-		if (indicies != null && indicies.length > 0) {
-			pos = indicies[0]+1;
-		}
+        if (!canModifyMacro()) return;
+        int pos = macroList.getSelectedIndex();
+        if (pos == -1) {
+            pos = listModel.getSize();
+        } else {
+            pos++; // nach dem selektierten Element einfügen
+        }
 
-		
-		int delay = 100;
-		final String newDelay = JOptionPane.showInputDialog("Enter the delay in milliseconds", delay);
-		if (newDelay == null) {
-			return;
-		}
-		
-		try {
-			int d = Integer.valueOf(newDelay);
-			if (pos == -1) {
-				listModel.addElement("d." + d);
-			}
-			else {
-				listModel.insertElementAt("d." + d, pos);
-			}
-			saveMacro();
-		}
-		catch (Exception e) {
-			JOptionPane.showMessageDialog(this, "Invalid delay value: " + newDelay);
-		}
-
+        try {
+            String newDelayStr = JOptionPane.showInputDialog(this, "Enter the delay in milliseconds", 100);
+            if (newDelayStr == null) return;
+            
+            int newDelay = Integer.parseInt(newDelayStr);
+            listModel.insertElementAt("d." + newDelay, pos);
+            saveMacro();
+        } catch (NumberFormatException e) {
+            JOptionPane.showMessageDialog(this, "Invalid delay value: " + e.getMessage(), "Error", JOptionPane.ERROR_MESSAGE);
+        }
 	}
 	
-	public void setMacros(final Properties [] macros) {
-		
+	public void setMacros(final Properties[] macros) {
+        loadingData = true;
 		macroSelectionBox.removeAllItems();
-		for (final Properties properties: macros) {
+		for (final Properties properties : macros) {
 			macroSelectionBox.addItem(properties);
 		}
-		
-		macroSelectionBox.setSelectedIndex(0);
+        if (macroSelectionBox.getItemCount() > 0) {
+		    macroSelectionBox.setSelectedIndex(0);
+        }
+        loadingData = false;
+        selectMacro();
 	}
 	
 	private void selectMacro() {
-		loadingData = true;
-		
-		captureDelays.setEnabled(canModifyMacro());
-		addDelayButton.setEnabled(false);
-		deleteButton.setEnabled(false);
-		editButton.setEnabled(false);
-		nameText.setEditable(canModifyMacro());
-		recordButton.setEnabled(canModifyMacro());
-		
+		if (loadingData || macroSelectionBox.getSelectedItem() == null) return;
+        loadingData = true;
+
+        boolean canModify = canModifyMacro();
+        captureDelays.setEnabled(canModify);
+        addDelayButton.setEnabled(canModify);
+        nameText.setEditable(canModify);
+        recordButton.setEnabled(canModify);
+        updateButtonStates();
+
 		listModel.clear();
 		
 		final Properties macro = (Properties)macroSelectionBox.getSelectedItem();
-		nameText.setText(macro.getProperty("name"));
+		nameText.setText(macro.getProperty("name", ""));
 		
-		final String sequence = macro.getProperty("sequence");
-		final StringTokenizer st = new StringTokenizer(sequence, ",");
-		while (st.hasMoreTokens()) {
-			listModel.addElement(st.nextToken());
-		}
+		final String sequence = macro.getProperty("sequence", "");
+		if (!sequence.isEmpty()) {
+            // StringTokenizer ist veraltet, split ist besser
+			for (String token : sequence.split(",")) {
+                listModel.addElement(token);
+            }
+        }
 		
 		loadingData = false;
+        nameText.setForeground(Color.black); // Farbe zurücksetzen
 	}
 	
 	private void saveMacro() {
+        if (loadingData || !canModifyMacro()) return;
 		final int id = macroSelectionBox.getSelectedIndex();
-		final Properties macro = (Properties)macroSelectionBox.getSelectedItem();
+		if (id == -1) return;
 
+		final Properties macro = (Properties)macroSelectionBox.getSelectedItem();
 		macro.setProperty("name", nameText.getText());
 		
-		final StringBuffer buf = new StringBuffer();
+        // Effizienter String-Aufbau mit StringJoiner oder StringBuilder
+		final StringBuilder buf = new StringBuilder();
 		for (int i = 0; i < listModel.getSize(); i++) {
-			if (buf.length() > 0) {
+			if (i > 0) {
 				buf.append(",");
 			}
 			buf.append(listModel.getElementAt(i));
@@ -488,10 +306,49 @@ public class MacroEditorPanel extends JPanel {
 		
 		try {
 			Configs.saveMacro(id, macro);
-		}
-		catch (Exception e) {
+		} catch (Exception e) {
 			e.printStackTrace();
-			JOptionPane.showMessageDialog(this, e);
+			JOptionPane.showMessageDialog(this, "Could not save macro: " + e.getMessage(), "Error", JOptionPane.ERROR_MESSAGE);
 		}
 	}
+    
+    // Eigene CellRenderer-Klasse für bessere Übersichtlichkeit
+    private static class MacroStepCellRenderer extends DefaultListCellRenderer {
+        @Override
+        public Component getListCellRendererComponent(JList<?> list, Object value, int index, boolean isSelected, boolean cellHasFocus) {
+            super.getListCellRendererComponent(list, value, index, isSelected, cellHasFocus);
+
+            if (value instanceof String val) {
+                String[] parts = val.split("\\.");
+                if (parts.length == 2) {
+                    String type = parts[0];
+                    try {
+                        int keycode = Integer.parseInt(parts[1]);
+                        switch (type) {
+                            case "d" -> {
+                                setText(String.format("%.3f seconds", keycode / 1000.0));
+                                setIcon(DELAY_ICON);
+                            }
+                            case "kd" -> {
+                                setText(JavaToLinuxKeymapping.cKeyCodeToString(keycode));
+                                setIcon(DOWN_ICON);
+                            }
+                            case "ku" -> {
+                                setText(JavaToLinuxKeymapping.cKeyCodeToString(keycode));
+                                setIcon(UP_ICON);
+                            }
+                            default -> setIcon(null);
+                        }
+                    } catch (NumberFormatException e) {
+                        setText(val); // Fallback
+                        setIcon(null);
+                    }
+                } else {
+                    setText(val);
+                    setIcon(null);
+                }
+            }
+            return this;
+        }
+    }
 }
