@@ -78,8 +78,8 @@ this will delete the build-files, the driver and the UDEV-Rule. )
 
 ### Use the driver buildin Mappingset for mapping with other external tools like "Input Remapper"
 
-The driver has now a fixed mapping in the driver itself, so you don't need the old GUI. 
-You can now map with every other tool, like "Input Remapper".
+The driver has now a fixed mapping included, so the GUI is not strictly necessesary. 
+You can now map the keys with every other tool, like "Input Remapper".
 ( Only the quick change with the four small Buttons under the display doesn't work anymore. This works only with the GUI tool.)
 
 
@@ -89,7 +89,7 @@ If you don't want to use the GUI App, just copy the Folder ".g13" from /bindings
 So you can make entries manually in the files.
 
 In the 'docs' folder is an example List for Eventcodes.
-Usage Example:
+* Usage Example:
 
     If you want to map the G20 key on your G13 to the T key on the keyboard:
     Find T in the table. The Event Code is 20.
@@ -99,7 +99,7 @@ Usage Example:
 
 ### Use the config tool
   
-In a command prompt go to the directory where you unzipped your download and type:
+In a command prompt go to the downloaded and unzipped folder and type:
 
     java -jar Linux-G13-GUI.jar
 
@@ -115,29 +115,34 @@ All config files are saved in `$(HOME)/.g13`
 The top 4 buttons under the LCD screen select the bindings.
 The joystick currently only supports key mappings
 
+If you are configuring the application while the driver is running, the driver will not pick up changes unless you select a different bindings set or you can restart the driver.
+
 
 ### Run the driver
 
-In a command prompt go to the directory where you unzipped your download and type:
+* **In a command prompt go to the directory where you build the driver**
 
-If you have set the UDEV Rules, you now can start the driver with 
-
+* If you have set the UDEV Rules, you now can start the driver with 
+    ```bash
     ./G13-Linux-Driver 
+    ```
 
-or with rightclick on the file in your file-explorer.
+    or with rightclick on the file in your file-explorer.
 
-![alt text](docs/image2.png)
+    ![alt text](docs/image2.png)
 
-else without UDEV-Rule Installation
-
+* else without UDEV-Rule Installation
+    ```bash
     sudo -E ./G13-Linux-Driver
+    ```
 
-The `-E` is to run it using your environment variables so it doesn't look for the `.g13` directory in `/root`  
-If you want to run the command and then detach it so you can close the terminal:
-
+    The `-E` is to run it using your environment variables so it doesn't look for the `.g13` directory in `/root`  
+    If you want to run the command and then detach it so you can close the terminal:
+    ```bash
     sudo -E ./G13-Linux-Driver &
+    ```
 
-If you are configuring the application while the driver is running, the driver will not pick up changes unless you select a different bindings set or you can restart the driver.
+
 
 
 ## Notes
