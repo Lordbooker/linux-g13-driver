@@ -47,7 +47,7 @@ for cleaning up
 use `make clean`
 and `make uninstall`
 
-this will delete the build-files, the driver an the UDEV-Rule.
+this will delete the build-files, the driver and the UDEV-Rule.
 
 
 ## How to use the driver and the GUI App
