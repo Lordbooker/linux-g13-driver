@@ -5,83 +5,102 @@
 #include <vector>
 #include <string>
 #include <unistd.h>
-#include <memory>       // ANPASSUNG: Für std::unique_ptr hinzugefügt
-#include <pthread.h>    // ANPASSUNG: Für pthread_t hinzugefügt
+#include <memory>       // For std::unique_ptr
+#include <pthread.h>    // For pthread_t
 
 #include "G13Action.h"
 #include "Output.h"
 
+/**
+ * @class MacroAction
+ * @brief A G13Action that executes a sequence of key presses, releases, and delays.
+ *
+ * This class manages parsing a macro string, running it in a separate thread,
+ * and handling repeat settings.
+ */
 class MacroAction : public G13Action {
 public:
-    // ANPASSUNG: Umbenannt von MacroEvent zu Event für die Verwendung in tokenToEvent
+    /**
+     * @class Event
+     * @brief Abstract base class for a single step in a macro sequence.
+     */
     class Event {
     public:
         virtual ~Event() = default;
+        /** @brief Executes the event (e.g., press a key, wait). */
         virtual void execute() = 0;
     };
 
+    /** @brief An event that simulates pressing a key down. */
     class KeyDownEvent : public Event {
     private:
         int keycode;
     public:
         KeyDownEvent(int code) : keycode(code) {}
         void execute() override {
-            UInput::send_event(EV_KEY, keycode, 1);
-            UInput::send_event(EV_SYN, SYN_REPORT, 0); // SYN_REPORT hinzugefügt für bessere Kompatibilität
+            UInput::send_event(EV_KEY, keycode, 1); // 1 for press
+            UInput::send_event(EV_SYN, SYN_REPORT, 0); // Send sync event
         }
     };
 
+    /** @brief An event that simulates releasing a key. */
     class KeyUpEvent : public Event {
     private:
         int keycode;
     public:
         KeyUpEvent(int code) : keycode(code) {}
         void execute() override {
-            UInput::send_event(EV_KEY, keycode, 0);
-            UInput::send_event(EV_SYN, SYN_REPORT, 0); // SYN_REPORT hinzugefügt für bessere Kompatibilität
+            UInput::send_event(EV_KEY, keycode, 0); // 0 for release
+            UInput::send_event(EV_SYN, SYN_REPORT, 0); // Send sync event
         }
     };
 
+    /** @brief An event that introduces a delay in the macro sequence. */
     class WaitEvent : public Event {
     private:
         int delay_ms;
     public:
         WaitEvent(int delay) : delay_ms(delay) {}
         void execute() override {
-            usleep(delay_ms * 1000);
+            usleep(delay_ms * 1000); // usleep takes microseconds
         }
     };
 
-    // --- Öffentliche Methoden ---
+    // --- Public Methods ---
     MacroAction(const std::string& sequence);
     virtual ~MacroAction();
 
-    // ANPASSUNG: Inline-Definition entfernt, um Redefinition-Fehler zu vermeiden.
-    // Die Definition befindet sich nun in der .cpp-Datei.
     void setRepeats(int r);
     int getRepeats() const;
 
 
 protected:
+    /** @brief Overridden to start or stop the macro thread. */
     void key_down() override;
+    /** @brief Overridden to potentially stop the macro thread on release. */
     void key_up() override;
 
 private:
-    // --- Private Methoden ---
-    // ANPASSUNG: Fehlende Funktionsdeklarationen hinzugefügt.
+    // --- Private Methods ---
+    /** @brief The main execution loop for the macro thread. */
     void execute_macro_loop();
+    /** @brief Parses a token into an Event object. */
     std::unique_ptr<MacroAction::Event> tokenToEvent(const char* token);
 
-    // ANPASSUNG: Die Thread-Funktion muss statisch sein.
+    /** @brief The static entry point for the pthread. */
     static void* run_macro_thread(void* context);
 
-    // --- Private Member-Variablen ---
-    // ANPASSUNG: Fehlende Member-Variablen deklariert.
+    // --- Private Member Variables ---
+    /** The sequence of events that make up the macro. */
     std::vector<std::unique_ptr<Event>> _events;
+    /** Repeat behavior: 0=infinite, 1=while held, >1=fixed number of times. */
     int _repeats;
-    int _repeats_on_press;
+    int _repeats_on_press; // Potentially for a different repeat mode.
+    /** Flag indicating if the macro thread is currently active. */
     bool _is_macro_running;
+    /** Flag to signal the running thread to terminate. */
     bool _thread_keep_repeating_flag;
+    /** The ID of the macro execution thread. */
     pthread_t _macro_thread_id;
 };
 

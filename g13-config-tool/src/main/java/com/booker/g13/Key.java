@@ -6,12 +6,19 @@ import java.util.List;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
-// Diese Klasse ist hauptsächlich ein Datencontainer und eine Factory.
-// Sie ist bereits stabil. Das Refactoring beschränkt sich auf Modernisierung.
+/**
+ * Represents a single physical key on the G13 keypad.
+ * This class acts as a data container and a factory, holding the key's shape (for UI interaction),
+ * its unique G13 keycode, and its currently assigned function.
+ */
 public class Key {
 
-    // Die Definition der Polygone bleibt erhalten, da sie die Hardware abbildet.
-	private static final int [][][] items = { /* ... unveränderte Daten ... */
+    /**
+     * Raw data defining the polygon shapes for each key on the G13.
+     * Each entry represents one key. The first sub-array is the G13 keycode.
+     * Subsequent sub-arrays are the [x, y] coordinates of the polygon's vertices.
+     */
+	private static final int [][][] items = {
         {{25}, {162, 116}, {195, 116}, {195, 124}, {162, 124}, },
 		{{26}, {205, 116}, {240, 116}, {240, 124}, {205, 124}, },
 		{{27}, {250, 116}, {283, 116}, {283, 124}, {250, 124}, },
@@ -51,15 +58,28 @@ public class Key {
 		{{39}, {440, 450}, {454, 436}, {424, 436}, },
     };
 	
-    // Refactoring: Initialisierung mit Streams, unveränderliche Liste
+    /**
+     * An immutable list of all Key objects, created once at class loading time from the 'items' data.
+     */
 	private static final List<Key> KEYS = Stream.of(items)
             .map(Key::new)
             .collect(Collectors.toUnmodifiableList());
 	
+	/**
+	 * Returns the complete list of all defined G13 keys.
+	 * @return An unmodifiable list of all Key objects.
+	 */
 	public static List<Key> getAllMasks() {
 		return KEYS;
 	}
 	
+	/**
+	 * Finds the Key object located at a specific (x, y) coordinate.
+	 * Used for hit-testing in the ImageMap UI.
+	 * @param x The x-coordinate.
+	 * @param y The y-coordinate.
+	 * @return The Key at that position, or null if no key is found there.
+	 */
 	public static Key getKeyAt(int x, int y) {
 		return KEYS.stream()
                 .filter(key -> key.getShape().contains(x, y))
@@ -67,6 +87,11 @@ public class Key {
                 .orElse(null);
 	}
 	
+	/**
+	 * Finds a Key object by its unique G13 keycode.
+	 * @param g13KeyCode The keycode to search for (e.g., 0 for G0).
+	 * @return The matching Key object, or null if not found.
+	 */
 	public static Key getKeyFor(int g13KeyCode) {
 		return KEYS.stream()
                 .filter(key -> key.getG13KeyCode() == g13KeyCode)
@@ -74,11 +99,17 @@ public class Key {
                 .orElse(null);
 	}
 	
-	private final Shape shape;
-	private final int g13KeyCode;
-	private String mappedValue = "Unknown";
-	private String repeats = "Unknown";
+	// --- Instance Properties ---
+	private final Shape shape; // The polygon shape of the key for UI interaction.
+	private final int g13KeyCode; // The unique identifier for this key.
+	private String mappedValue = "Unknown"; // The human-readable value this key is mapped to.
+	private String repeats = "Unknown"; // A string indicating if the key's macro repeats ("Yes", "No", "N/A").
 	
+	/**
+	 * Private constructor to create a Key instance.
+	 * Called by the static initializer stream.
+	 * @param buttonData The raw data array for a single key.
+	 */
 	private Key(int[][] buttonData) {
 		this.g13KeyCode = buttonData[0][0];
 		
@@ -89,6 +120,7 @@ public class Key {
 		this.shape = polygon;
 	}
 
+	// --- Getters and Setters ---
 	public Shape getShape() { return shape; }
 	public int getG13KeyCode() { return g13KeyCode; }
 	public String getMappedValue() { return mappedValue; }
