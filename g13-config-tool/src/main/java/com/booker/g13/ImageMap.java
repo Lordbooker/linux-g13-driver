@@ -1,6 +1,7 @@
 package com.booker.g13;
 
 import java.awt.Color;
+import java.awt.Font; // HINZUGEFÜGT
 import java.awt.Graphics;
 import java.awt.Graphics2D;
 import java.awt.event.MouseEvent;
@@ -25,7 +26,6 @@ public class ImageMap extends JLabel {
 	private final Color selectedColor = new Color(0, 255, 0, 128);
 	private final Color mouseoverColor = new Color(255, 0, 0, 128);
     
-    // Verwendung eines Sets für die M-Tasten zur besseren Lesbarkeit
     private static final Set<Integer> BINDING_SWITCH_KEYS = Set.of(25, 26, 27, 28);
 
 	private Key selected = null;
@@ -34,7 +34,6 @@ public class ImageMap extends JLabel {
 	public ImageMap() {
 		super(G13_KEYPAD);
 		
-        // KORREKTUR: Zurück zur ursprünglichen, expliziten Listener-Struktur, um 1:1-Verhalten sicherzustellen.
 		addMouseMotionListener(new MouseMotionListener() {
 			@Override
 			public void mouseDragged(MouseEvent e) { }
@@ -53,7 +52,6 @@ public class ImageMap extends JLabel {
 					return;
 				}
 				
-                // Diese Bedingung ist wichtig, wenn man von einer Taste direkt auf die nächste wechselt.
 				if (key != null && mouseover != null && key.getG13KeyCode() != mouseover.getG13KeyCode()) {
 					mouseover = key;
 					repaint();
@@ -120,20 +118,17 @@ public class ImageMap extends JLabel {
 		}
 	}
 	
-	// KORREKTUR: Die korrekte Methode zum Überschreiben ist paintComponent.
-    // Das Überschreiben von paint() wird vermieden, um Rendering-Probleme zu verhindern.
 	@Override
 	protected void paintComponent(Graphics g) {
 		super.paintComponent(g);
 		
-        // Es ist gute Praxis, eine Kopie des Graphics-Objekts zu erstellen.
 		final Graphics2D g2d = (Graphics2D) g.create();
         try {
             paintSelected(g2d);
             paintMouseover(g2d);
             paintKeyOutlines(g2d);
         } finally {
-            g2d.dispose(); // Wichtig: Immer das erstellte Graphics-Objekt freigeben.
+            g2d.dispose();
         }
 	}
 
@@ -150,17 +145,15 @@ public class ImageMap extends JLabel {
 		if (mouseover == null) return;
 		
 		g.setColor(mouseoverColor);
-		g.fill(mouseover.getShape());
+g.fill(mouseover.getShape());
 		g.setColor(mouseoverColor.darker());
 		g.draw(mouseover.getShape());
 		
-		// Tooltip-Zeichnung bleibt erhalten
 		drawTooltip(g, mouseover);
 	}
 
     private void drawTooltip(Graphics2D g, Key key) {
         String[][] lines;
-        // Verwendung des Sets für bessere Lesbarkeit
         if (BINDING_SWITCH_KEYS.contains(key.getG13KeyCode())) {
             lines = new String[][]{
                 {"G13 Key", "M" + (key.getG13KeyCode() - 24)},
@@ -178,6 +171,8 @@ public class ImageMap extends JLabel {
 		final int x0 = 110;
 		final int x1 = 245;
 		int y = 550;
+        g.setFont(getFont().deriveFont(Font.BOLD)); // Font wird hier verwendet
+
 		for (final String [] line: lines) {
 			g.setColor(mouseoverColor.darker());
 			g.drawString(line[0], x0, y);

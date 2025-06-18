@@ -1,11 +1,7 @@
 # Readme File
 
 I forked the repo because parts of it are already 10 years old, and I still tinker with the hardware.
-So far, I have only modified the C++ part (i.e., the driver itself) and the java build process for maven (now JAVA 17). 
-I'm not familiar with Java, and the config program isn't strictly necessary, as I can overwrite the default settings at any time using other key mapping tools.
-
-Nevertheless, it still works with the included mapping tool, and you can use it to save 4 different mappingsets.
-
+So far, I have done a refactoring of the driver itself (modern C++ Standards) and the GUI (build process for Java 17 and maven / code base is now modern Java standards). 
 
 ## Requirements
 
@@ -58,8 +54,9 @@ this will delete the build-files, the driver an the UDEV-Rule.
 
 ### Use the driver buildin Mappingset for mapping with other external tools like "Input Remapper"
 
-The Driver needs a Ruleset to work. 
-I've implemented a Standard Key-Set for the G13. So its now "plug'n'play".
+The driver has now a fixed mapping in the driver itself, so you don't need the old GUI. 
+You can now map with every other tool, like "Input Remapper".
+( Only the quick change with the four small Buttons under the display doesn't work anymore. This works only with the GUI tool.)
 
 
 ### Manually made your own Mappingset
@@ -112,11 +109,5 @@ If you are configuring the application while the driver is running, the driver w
 
 
 ## Notes
-
-The code for the driver is completly refactored in modern C++ standards.
-
-The driver has now a fixed mapping in the driver itself, so you don't need the old GUI. You can now map with every other tool, like "Input Remapper".
-only the quick change with the the four little Buttons under the display doesn't work anymore. This works only with the GUI tool.
-
 
 I've tried this on 64-bit Arch Linux and it works so far.  
