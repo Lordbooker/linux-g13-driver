@@ -90,6 +90,7 @@ You can now map the keys with every other tool, like "Input Remapper".
 
 ### Manually made your own Mappingset
 
+
 If you don't want to use the GUI App, just copy the Folder ".g13" from /bindings to your 'home' Directory. 
 So you can make entries manually in the files.
 
