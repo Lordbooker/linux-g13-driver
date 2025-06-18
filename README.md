@@ -1,53 +1,77 @@
-# Readme File
+# G13 Linux Driver & GUI (Modernized Fork)
 
-I forked the repo because parts of it are already 10 years old, and I still tinker with the hardware.
-So far, I have done a refactoring of the driver itself (modern C++ Standards) and the GUI (build process for Java 17 and maven / code base is now modern Java standards). 
+This is a modernized fork of the G13 driver for Linux. 
+The original project is over 10 years old. This fork has been refactored to use modern C++ standards for the driver and modern Java standards (Java 17 with Maven) for the configuration GUI.
+
+## Features
+
+* Modern C++ Driver: The core driver has been updated for better performance and compatibility.
+* Java GUI: The configuration utility is built with Java 17 and Maven, ensuring it runs on modern systems.
+* Flexible Configuration: Offers multiple ways to configure your G13: via the user-friendly GUI, manual file editing, or using the driver's fixed mapping with external tools.
 
 ## Requirements
 
-### libusb-1.0 (recommended for the driver)
-
-For Ubuntu and other Debian based systems, it should be installed already but if you don't have it, you can get it by typing:
-
-    sudo apt-get install libusb-1.0-0
-
-For Arch Linux and other Arch based systems you can install it by typing:
-
-    sudo pacman -S libusb
-
-For Fedora and other Fedora based Systems you can install it by typing:
-
-    sudo dnf install libusb
+ ### Driver Requirements
+* **`libusb-1.0`**: This library is essential for the driver to communicate with the G13 device.
 
 
-### Java version 17 or higher (needed only for the GUI)
+    * **Debian / Ubuntu**
 
-For Ubuntu and other Debian based systems, it can be installed by typing:
+        ```bash
+        sudo apt-get install libusb-1.0-0
+        ```
+    * **Arch Linux and other Arch based distros**
 
-    sudo apt-get install default-jre
+        ```bash
+        sudo pacman -S libusb
+        ```
 
-For Arch and other Arch based systems, it can be installed by typing:
+    * **Fedora / Nobara / etc.**
+        ```bash
+        sudo dnf install libusb
+        ```
 
-    sudo pacman -S jre-openjdk
+### GUI Requirements
+* **Java 17 (or higher): The graphical configuration tool requires a Java Runtime Environment.**
 
-For Fedora and other Fedora based Systems, it can be installed by typing:
+    * **Debian / Ubuntu**
 
-    sudo dnf install java-latest-openjdk.x86_64
+        ```bash
+        sudo apt-get install default-jre
+        ```
+    * **Arch Linux and other Arch based distros**
+
+        ```bash
+        sudo pacman -S jre-openjdk
+        ```
+
+    * **Fedora / Nobara / etc.**
+        ```bash
+        sudo dnf install java-latest-openjdk.x86_64
+        ```
 
 
-## Build
+## Build & Installation
 
-Open a console (command prompt)  
-Go to the directory where you unzipped your download  
+* Open the terminal (command prompt) 
+* navigate to your download folder
+* unzip your download
+* enter the folder 'src' in the downloaded file 
 
-type `make all` to build the driver
-then type `make install` to write the UDEV-Rule
+    * **building the driver**
+        ```bash
+        make all
+        ```
+    * **write the udev-rule**
+        ```bash
+        make install
+        ```
 
-for cleaning up 
+
+( for cleaning up 
 use `make clean`
 and `make uninstall`
-
-this will delete the build-files, the driver and the UDEV-Rule.
+this will delete the build-files, the driver and the UDEV-Rule. )
 
 
 ## How to use the driver and the GUI App
