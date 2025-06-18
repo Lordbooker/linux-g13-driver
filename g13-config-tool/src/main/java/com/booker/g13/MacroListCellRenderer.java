@@ -2,26 +2,25 @@ package com.booker.g13;
 
 import java.awt.Component;
 import java.util.Properties;
+
 import javax.swing.DefaultListCellRenderer;
 import javax.swing.JList;
 
-public final class MacroListCellRenderer extends DefaultListCellRenderer {
+// Diese Klasse ist für die Darstellung von Makros in der JComboBox zuständig.
+// Sie ist einfach und stabil. Refactoring beschränkt sich auf Generics und @Override.
+public class MacroListCellRenderer extends DefaultListCellRenderer {
 	private static final long serialVersionUID = 1L;
 
 	@Override
 	public Component getListCellRendererComponent(JList<?> list, Object value, int index, boolean isSelected, boolean cellHasFocus) {
-		String displayText = "Unknown";
+		super.getListCellRendererComponent(list, value, index, isSelected, cellHasFocus);
 		
-		if (value instanceof Properties) {
-			Properties props = (Properties) value;
-			String name = props.getProperty("name", "Unnamed Macro");
-			String id = props.getProperty("id", "?");
-            if (name.trim().isEmpty()) {
-                name = "Unnamed Macro";
-            }
-			displayText = String.format("[%s] %s", id, name);
+		if (value instanceof Properties props) {
+			final String name = props.getProperty("name", "Unnamed Macro");
+			final String id = props.getProperty("id", "?");
+			setText("[" + id + "] " + name);
 		}
 		
-		return super.getListCellRendererComponent(list, displayText, index, isSelected, cellHasFocus);
+		return this;
 	}
 }
