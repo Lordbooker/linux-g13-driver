@@ -1,8 +1,6 @@
 package com.booker.g13;
 
 import java.awt.BorderLayout;
-import java.awt.Dimension;
-import java.awt.Toolkit;
 import java.io.IOException;
 import java.util.Properties;
 import java.util.Set;
