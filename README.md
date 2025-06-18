@@ -85,6 +85,8 @@ In a command prompt go to the directory where you unzipped your download and typ
 This will bring up the UI and create the initial files needed for your driver.  
 All config files are saved in `$(HOME)/.g13`
 
+![alt text](docs/ConfigTool.jpg)
+
 The top 4 buttons under the LCD screen select the bindings.
 The joystick currently only supports key mappings
 
