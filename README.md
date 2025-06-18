@@ -11,8 +11,13 @@ The original project is over 10 years old. This fork has been refactored to use 
 
 ## Requirements
 
+ ### Base Requirements
+
+ * 'make' has to be installed
+
+
  ### Driver Requirements
-* **`libusb-1.0`**: This library is essential for the driver to communicate with the G13 device.
+* **`libusb-1.0`**: This library is essential for the driver to communicate with the G13 device. (also the development version)
 
 
     * **Debian / Ubuntu**
@@ -28,7 +33,7 @@ The original project is over 10 years old. This fork has been refactored to use 
 
     * **Fedora / Nobara / etc.**
         ```bash
-        sudo dnf install libusb
+        sudo dnf install libusb1-devel
         ```
 
 ### GUI Requirements
