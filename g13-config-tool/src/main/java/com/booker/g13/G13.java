@@ -12,38 +12,61 @@ import javax.swing.JPanel;
 import javax.swing.SwingUtilities;
 import javax.swing.UIManager;
 
+/**
+ * The main class for the G13 Configuration application.
+ * It builds the main UI, orchestrates the different panels, and handles loading
+ * and mapping of key bindings.
+ */
 public class G13 extends JPanel {
 
 	private static final long serialVersionUID = 1L;
 	
+	/**
+	 * The application version, retrieved from the JAR's manifest file. Defaults to "Development".
+	 */
 	public static final String VERSION = G13.class.getPackage().getImplementationVersion() != null 
 			? G13.class.getPackage().getImplementationVersion() 
 			: "Development";
 	
+	/**
+	 * The maximum number of macros that can be configured.
+	 */
 	private static final int MAX_MACROS = 200;
 
-	// Refactoring: Benannte Konstanten für "magische Zahlen"
+	// Named constants for the G13 keycodes of the M1, M2, M3, and MR buttons.
     private static final int BINDING_KEY_M1 = 25;
     private static final int BINDING_KEY_M2 = 26;
     private static final int BINDING_KEY_M3 = 27;
     private static final int BINDING_KEY_MR = 28;
+    
+    /**
+     * A set containing the keycodes for the binding switch keys (M1, M2, M3, MR).
+     * Used for quick lookups to check if a pressed key should switch the current binding profile.
+     */
     private static final Set<Integer> BINDING_SWITCH_KEYS = Set.of(
             BINDING_KEY_M1, BINDING_KEY_M2, BINDING_KEY_M3, BINDING_KEY_MR
     );
 	
-	private final ImageMap g13Label = new ImageMap();
-	private final KeybindPanel keybindPanel = new KeybindPanel();
-	private final MacroEditorPanel macroEditorPanel = new MacroEditorPanel();
+	// UI Components
+	private final ImageMap g13Label = new ImageMap(); // The interactive G13 keypad image.
+	private final KeybindPanel keybindPanel = new KeybindPanel(); // Panel for editing key bindings.
+	private final MacroEditorPanel macroEditorPanel = new MacroEditorPanel(); // Panel for editing macros.
 	
-	private final Properties[] keyBindings = new Properties[4];
-	private final Properties[] macros = new Properties[MAX_MACROS];
+	// Data storage
+	private final Properties[] keyBindings = new Properties[4]; // Holds the 4 binding profiles (M1, M2, M3, MR).
+	private final Properties[] macros = new Properties[MAX_MACROS]; // Holds all configured macros.
 	
+	/**
+	 * Constructor for the main G13 panel.
+	 * Initializes layout, loads configuration, and sets up UI components and listeners.
+	 */
 	public G13() {
 		setLayout(new BorderLayout());
 		
-		// Lade Konfigurationen und initialisiere UI
+		// Load all configurations and initialize the UI.
 		loadConfiguration();
 		
+		// Set the initial bindings to the first profile (M1).
 		keybindPanel.setBindings(0, keyBindings[0]);
 		
 		g13Label.addListener(new ImageMapListener() {
@@ -54,20 +77,23 @@ public class G13 extends JPanel {
 					return;
 				}
 				
-				// Refactoring: Verwendung des Sets für bessere Lesbarkeit
+				// Check if the selected key is one of the binding switch keys (M1-M3, MR).
 				if (BINDING_SWITCH_KEYS.contains(key.getG13KeyCode())) {
+					// Switch the active binding profile.
 					mapBindings(key.getG13KeyCode() - BINDING_KEY_M1);
 				} else {
+					// A regular key was selected, pass it to the keybind panel for editing.
 					keybindPanel.setSelectedKey(key);
 				}
 			}
 
 			@Override
 			public void mouseover(Key key) {
-				// Funktion bleibt erhalten
+				// Currently unused, but preserved for future functionality.
 			}			
 		});
 		
+		// --- UI Assembly ---
 		final JPanel p = new JPanel(new BorderLayout());
 		p.setBorder(BorderFactory.createTitledBorder("G13 Keypad"));
 		p.add(g13Label, BorderLayout.CENTER);
@@ -78,54 +104,70 @@ public class G13 extends JPanel {
 		rightPanel.add(macroEditorPanel, BorderLayout.CENTER);
 		add(rightPanel, BorderLayout.EAST);
 		
+		// Provide the macro data to the panels that need it.
 		keybindPanel.setMacros(macros);
 		macroEditorPanel.setMacros(macros);
 	}
 
+	/**
+	 * Loads all key binding profiles and macros from configuration files.
+	 * In case of an error, it displays a dialog to the user.
+	 */
 	private void loadConfiguration() {
 		try {
+			// Load the 4 binding profiles.
 			for (int i = 0; i < keyBindings.length; i++) {
 				keyBindings[i] = Configs.loadBindings(i);
 			}
 			
+			// Load all possible macros.
 			for (int i = 0; i < macros.length; i++) {
 				macros[i] = Configs.loadMacro(i);
 			}
 			
+			// Apply the first binding profile (M1) by default.
 			mapBindings(0);
 		}
-		// Refactoring: Spezifischere Exception fangen
 		catch (IOException e) {
 			e.printStackTrace();
 			JOptionPane.showMessageDialog(this, "Failed to load configuration:\n" + e.getMessage(), "Configuration Error", JOptionPane.ERROR_MESSAGE);
-            // In einem Fehlerfall kann die Anwendung hier beendet werden, da sie ohne Konfig nicht sinnvoll ist
+            // The application could exit here as it's not usable without configuration.
             // System.exit(1);
 		}
 	}
 		
+	/**
+	 * Applies a specific binding profile to the keypad UI.
+	 * This method updates the visual representation of each key on the ImageMap
+	 * to show what it is currently mapped to.
+	 * @param bindingNum The index of the binding profile to apply (0-3).
+	 */
 	private void mapBindings(int bindingNum) {
-		keybindPanel.setSelectedKey(null);
+		keybindPanel.setSelectedKey(null); // Deselect any key.
 		keybindPanel.setBindings(bindingNum, keyBindings[bindingNum]);
 		
-		for (int i = 0; i < 40; i++) { // Annahme: Es gibt maximal G39
+		// Iterate through all possible G-keys to update their display text.
+		for (int i = 0; i < 40; i++) { 
 			final Key k = Key.getKeyFor(i);
 			if (k == null) continue;
 
 			String property = "G" + i;
 			String val = keyBindings[bindingNum].getProperty(property);
 			
+			// Set default display values.
 			k.setMappedValue("Unassigned");
 			k.setRepeats("N/A");
 			
 			if (val != null && !val.isBlank()) {
-				// Refactoring: StringTokenizer durch robustes split() ersetzt
+				// The value string is parsed to determine the binding type and value.
+				// Format: "p,k.keycode" for passthrough, "m,macroNum,repeats" for macro.
 				String[] parts = val.split("[,.]");
-				if (parts.length < 2) continue; // Ungültiges Format ignorieren
+				if (parts.length < 2) continue; // Ignore invalid format.
 
 				final String type = parts[0];
 				
 				try {
-					if ("p".equals(type)) { // Passthrough
+					if ("p".equals(type)) { // Passthrough key
 						if (parts.length >= 3) {
 							int keycode = Integer.parseInt(parts[2]);
 							k.setMappedValue(JavaToLinuxKeymapping.cKeyCodeToString(keycode));
@@ -142,6 +184,7 @@ public class G13 extends JPanel {
 						}
 					}
 				} catch (NumberFormatException e) {
+					// Handle cases where the number in the property is malformed.
 					System.err.println("Could not parse binding: " + val);
 					k.setMappedValue("Parse Error");
 				}
@@ -149,11 +192,15 @@ public class G13 extends JPanel {
 		}
 	}
 	
+	/**
+	 * The main entry point for the application.
+	 * @param args Command line arguments (not used).
+	 */
 	public static void main(String[] args) {
-		// UI auf dem Event Dispatch Thread (EDT) starten
+		// Ensure all UI operations are performed on the Event Dispatch Thread (EDT).
         SwingUtilities.invokeLater(() -> {
             try {
-                // Ein moderneres Look-and-Feel setzen
+                // Set a modern look and feel for the UI.
                 UIManager.setLookAndFeel(UIManager.getSystemLookAndFeelClassName());
             } catch (Exception e) {
                 e.printStackTrace();
@@ -166,8 +213,8 @@ public class G13 extends JPanel {
             final G13 g13 = new G13();	
             frame.getContentPane().add(g13, BorderLayout.CENTER);
             
-            frame.pack();
-            frame.setLocationRelativeTo(null); // Zentriert den Frame auf dem Bildschirm
+            frame.pack(); // Size the frame to fit its contents.
+            frame.setLocationRelativeTo(null); // Center the frame on the screen.
             frame.setVisible(true);
         });
 	}
