@@ -47,7 +47,7 @@ for cleaning up
 use `make clean`
 and `make uninstall`
 
-this will delete the build-files, the driver an the UDEV-Rule.
+this will delete the build-files, the driver and the UDEV-Rule.
 
 
 ## How to use the driver and the GUI App
@@ -79,6 +79,10 @@ In a command prompt go to the directory where you unzipped your download and typ
 
     java -jar Linux-G13-GUI.jar
 
+or with rightclick on the file in your file-explorer.
+
+![alt text](docs/image.png)
+
 This will bring up the UI and create the initial files needed for your driver.  
 All config files are saved in `$(HOME)/.g13`
 
@@ -95,6 +99,10 @@ In a command prompt go to the directory where you unzipped your download and typ
 If you have set the UDEV Rules, you now can start the driver with 
 
     ./G13-Linux-Driver 
+
+or with rightclick on the file in your file-explorer.
+
+![alt text](docs/image2.png)
 
 else without UDEV-Rule Installation
 
