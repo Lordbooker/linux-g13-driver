@@ -25,39 +25,29 @@
 
 using namespace std;
 
-/**
- * @brief Helper function to trim whitespace from the beginning and end of a std::string.
- * @param str The string to trim.
- * @return The trimmed string.
- */
+// Globale Variable aus Main.cpp, um ein sauberes Beenden der Threads bei Programmende zu ermöglichen
+extern volatile sig_atomic_t daemon_keep_running;
+
+// Helper to trim whitespace from both ends of a std::string
 std::string trim_string(const std::string& str) {
     const std::string whitespace = " \t\n\r\f\v";
     size_t start = str.find_first_not_of(whitespace);
     if (start == std::string::npos)
-        return ""; // Return empty string if it contains only whitespace.
+        return ""; // no content
 
     size_t end = str.find_last_not_of(whitespace);
     return str.substr(start, end - start + 1);
 }
 
-/**
- * @brief Constructs a G13 object for a given USB device.
- * @param device Pointer to the libusb_device to manage.
- *
- * This constructor initializes member variables, opens the device handle, detaches
- * the kernel driver if necessary, and claims the interface. It sets a default
- * color for the LCD backlight.
- */
 G13::G13(libusb_device *device) {
 	this->device = device;
 	this->loaded = 0;
-	this->bindings = 0; // Default to the first binding profile (M1)
+	this->bindings = 0;
 	this->stick_mode = STICK_KEYS;
 
-    // Initialize action pointers for all keys.
     actions.resize(G13_NUM_KEYS);
 	for (int i = 0; i < G13_NUM_KEYS; i++) {
-		actions[i] = std::make_unique<G13Action>(); // Default to no-op action.
+		actions[i] = std::make_unique<G13Action>();
 	}
 
 	if (libusb_open(device, &handle) != 0) {
@@ -65,7 +55,6 @@ G13::G13(libusb_device *device) {
 		return;
 	}
 
-	// Detach kernel driver if it's active.
 	if (libusb_kernel_driver_active(handle, 0) == 1) {
 		if (libusb_detach_kernel_driver(handle, 0) == 0) {
 			cout << "Kernel driver detached" << endl;
@@ -77,45 +66,34 @@ G13::G13(libusb_device *device) {
 		return;
 	}
 
-	setColor(128, 128, 128); // Set a default backlight color.
-	this->loaded = 1; // Mark as successfully loaded.
+	setColor(128, 128, 128);
+	this->loaded = 1;
 }
 
-/**
- * @brief Destructor for the G13 class.
- *
- * Sets the backlight to a neutral color, releases the USB interface,
- * and closes the device handle.
- */
 G13::~G13() {
 	if (!this->loaded) {
 		return;
 	}
-	setColor(128, 128, 128); // Reset color on exit.
+	setColor(128, 128, 128);
 	libusb_release_interface(this->handle, 0);
 	libusb_close(this->handle);
 }
 
-/**
- * @brief Starts the main event reading loop for the G13 device.
- *
- * This method loads the initial key bindings and enters a loop that
- * continuously reads and processes key and joystick events from the device.
- */
 void G13::start() {
 	if (!this->loaded) {
 		return;
 	}
 	loadBindings();
 	keepGoing = 1;
-	while (keepGoing) {
-		read();
+    // Die Schleife läuft, solange der Thread laufen soll UND das Programm nicht beendet wird
+	while (keepGoing && daemon_keep_running) {
+		// ANPASSUNG: Prüfen, ob das Gerät während des Lesens getrennt wurde
+        if (read() == -4) {
+            break; // Schleife verlassen, damit der Thread sich beenden kann
+        }
 	}
 }
 
-/**
- * @brief Stops the main event reading loop.
- */
 void G13::stop() {
 	if (!this->loaded) {
 		return;
@@ -123,11 +101,6 @@ void G13::stop() {
 	keepGoing = 0;
 }
 
-/**
- * @brief Loads a macro definition from a properties file.
- * @param num The ID number of the macro to load.
- * @return A std::unique_ptr to the loaded Macro object, or nullptr on failure.
- */
 std::unique_ptr<Macro> G13::loadMacro(int num) {
 	char filename[1024];
     const char* home_dir = getenv("HOME");
@@ -171,32 +144,24 @@ std::unique_ptr<Macro> G13::loadMacro(int num) {
 }
 
 
-/**
- * @brief Parses key bindings from a given input stream.
- * @param stream The input stream (e.g., a file stream or string stream) to read from.
- *
- * This method reads a .properties-style format, parsing keys like "G12", "color", etc.,
- * and configures the corresponding actions (Passthrough, Macro) or device settings.
- */
 void G13::parse_bindings_from_stream(std::istream& stream) {
     std::string line;
     while (std::getline(stream, line)) {
         std::string trimmed_line = trim_string(line);
 
         if (trimmed_line.empty() || trimmed_line[0] == '#') {
-            continue; // Skip empty lines and comments
+            continue;
         }
 
         size_t eq_pos = trimmed_line.find('=');
         if (eq_pos == std::string::npos) {
-            continue; // Ignore lines without an '='
+            continue;
         }
 
         std::string key = trim_string(trimmed_line.substr(0, eq_pos));
         std::string value = trim_string(trimmed_line.substr(eq_pos + 1));
 
         if (key == "color") {
-            // Parse "r,g,b" color string
             std::stringstream ss(value);
             std::string segment;
             int r, g, b;
@@ -212,10 +177,9 @@ void G13::parse_bindings_from_stream(std::istream& stream) {
             }
         }
         else if (key == "stick_mode") {
-            // Future logic for stick mode can be placed here.
+            // Stick mode logic here
         }
         else if (!key.empty() && key[0] == 'G') {
-            // Parse G-key assignments
             try {
                 int gKey = std::stoi(key.substr(1));
 
@@ -229,7 +193,7 @@ void G13::parse_bindings_from_stream(std::istream& stream) {
                     if (!std::getline(ss, keytype_str, ',')) continue;
                     keytype_str = trim_string(keytype_str);
 
-                    if (keytype_str.rfind("k.", 0) == 0) { // check if it starts with "k."
+                    if (keytype_str.rfind("k.", 0) == 0) {
                         int keycode = std::stoi(keytype_str.substr(2));
                         if (gKey >= 0 && gKey < G13_NUM_KEYS) {
                             actions[gKey] = std::make_unique<PassThroughAction>(keycode);
@@ -263,12 +227,7 @@ void G13::parse_bindings_from_stream(std::istream& stream) {
     }
 }
 
-/**
- * @brief Loads the key binding configuration file for the current profile.
- *
- * If the user's configuration file is not found, it falls back to a hardcoded
- * default key mapping.
- */
+
 void G13::loadBindings() {
 	char filename[1024];
 	const char* home_dir = getenv("HOME");
@@ -280,12 +239,11 @@ void G13::loadBindings() {
 
 	ifstream file(filename);
 	if (!file.is_open()) {
-		cout << "Config file not found: " << filename << endl;
-		cout << "Loading default key bindings." << endl;
+		cout << "Konfigurationsdatei nicht gefunden: " << filename << endl;
+		cout << "Lade Standard-Tastenbelegung." << endl;
 
-        // Hardcoded default bindings as a fallback.
         const std::string default_bindings = R"RAW(
-# Default G13 Key Bindings
+# Standard G13 Tastenbelegung
 G19=p,k.42
 G18=p,k.18
 G17=p,k.16
@@ -328,18 +286,12 @@ G20=p,k.50
         parse_bindings_from_stream(ss);
 	}
     else {
-        cout << "Loading config file: " << filename << endl;
+        cout << "Lade Konfigurationsdatei: " << filename << endl;
         parse_bindings_from_stream(file);
         file.close();
     }
 }
 
-/**
- * @brief Sets the RGB color of the G13's LCD backlight.
- * @param red Red component (0-255).
- * @param green Green component (0-255).
- * @param blue Blue component (0-255).
- */
 void G13::setColor(int red, int green, int blue) {
 	int error;
 	unsigned char usb_data[] = { 5, 0, 0, 0, 0 };
@@ -355,19 +307,18 @@ void G13::setColor(int red, int green, int blue) {
 	}
 }
 
-/**
- * @brief Reads one report from the G13's interrupt endpoint.
- * @return 0 on success, -1 on a fatal error.
- *
- * This function performs a blocking read on the USB endpoint. If a report is
- * received, it dispatches it to the joystick and key parsing functions.
- */
 int G13::read() {
 	unsigned char buffer[G13_REPORT_SIZE];
 	int size;
 	int error = libusb_interrupt_transfer(handle, LIBUSB_ENDPOINT_IN | G13_KEY_ENDPOINT, buffer, G13_REPORT_SIZE, &size, 1000);
+
+    // ANPASSUNG: Gezielte Fehlerbehandlung für getrennte Geräte
+    if (error == LIBUSB_ERROR_NO_DEVICE) {
+        cerr << "G13 device disconnected." << endl;
+        return -4; // Spezieller Rückgabewert für getrenntes Gerät
+    }
+    
 	if (error && error != LIBUSB_ERROR_TIMEOUT) {
-		// Error handling and reporting.
 		std::map<int, std::string> errors;
 		errors[LIBUSB_SUCCESS] = "LIBUSB_SUCCESS";
 		errors[LIBUSB_ERROR_IO] = "LIBUSB_ERROR_IO";
@@ -385,43 +336,33 @@ int G13::read() {
 		errors[LIBUSB_ERROR_OTHER] = "LIBUSB_ERROR_OTHER";
 		cerr << "Error while reading keys: " << error << " (" << errors[error]
 				<< ")" << endl;
-		cerr << "Stopping daemon" << endl;
 		return -1;
 	}
 
 	if (size == G13_REPORT_SIZE) {
 		parse_joystick(buffer);
 		parse_keys(buffer);
-		UInput::send_event(EV_SYN, SYN_REPORT, 0); // Send sync event after processing.
+		UInput::send_event(EV_SYN, SYN_REPORT, 0);
 	}
 	return 0;
 }
 
-/**
- * @brief Parses the joystick data from the G13 report.
- * @param buf The 8-byte report buffer received from the device.
- *
- * Depending on the stick_mode, this function either sends absolute joystick
- * coordinates or simulates key presses for the four stick directions.
- */
 void G13::parse_joystick(unsigned char *buf) {
 	int stick_x = buf[1];
 	int stick_y = buf[2];
 
 	if (stick_mode == STICK_ABSOLUTE) {
-		// Send absolute X and Y events to uinput.
 		UInput::send_event(EV_ABS, ABS_X, stick_x);
 		UInput::send_event(EV_ABS, ABS_Y, stick_y);
 	} else if (stick_mode == STICK_KEYS) {
-		// Emulate key presses for stick directions.
 		int pressed[4];
 		if (stick_y <= 96) {
-			pressed[0] = 1; // UP
+			pressed[0] = 1;
 			pressed[3] = 0;
 		}
 		else if (stick_y >= 160) {
 			pressed[0] = 0;
-			pressed[3] = 1; // DOWN
+			pressed[3] = 1;
 		}
 		else {
 			pressed[0] = 0;
@@ -429,65 +370,51 @@ void G13::parse_joystick(unsigned char *buf) {
 		}
 
 		if (stick_x <= 96) {
-			pressed[1] = 1; // LEFT
+			pressed[1] = 1;
 			pressed[2] = 0;
 		}
 		else if (stick_x >= 160) {
 			pressed[1] = 0;
-			pressed[2] = 1; // RIGHT
+			pressed[2] = 1;
 		}
 		else {
 			pressed[1] = 0;
 			pressed[2] = 0;
 		}
 
-		// G-key codes for the stick directions.
 		int codes[4] = {36, 37, 38, 39};
 		for (int i = 0; i < 4; i++) {
 			int key = codes[i];
 			int p = pressed[i];
 			if (actions[key]->set(p)) {
-				// State changed, action was triggered.
 			}
 		}
 	} else {
-		// Future mode, e.g., STICK_RELATIVE
+		/* send_event(...) */
 	}
 }
 
-/**
- * @brief Parses a single key's state from the report buffer.
- * @param key The G-key index (0-39) to parse.
- * @param byte The pointer to the start of the key data in the report (byte 3).
- *
- * This function determines if a key is pressed by checking its corresponding bit
- * in the report. It handles special keys (M1-M3, MR) for binding switching and
- * dispatches regular key events to their configured G13Action object.
- */
 void G13::parse_key(int key, unsigned char *byte) {
     if (key < 0 || key >= G13_NUM_KEYS) {
         cerr << "G13::parse_key: Invalid key index " << key << endl;
         return;
     }
 
-	// Determine the state of the key's bit in the report.
 	unsigned char actual_byte = byte[key / 8];
 	unsigned char mask = 1 << (key % 8);
 	int pressed = actual_byte & mask;
 
 	switch (key) {
-	// M1, M2, M3, MR keys switch the binding profile.
-	case 25: // M1
-	case 26: // M2
-	case 27: // M3
-	case 28: // MR
+	case 25:
+	case 26:
+	case 27:
+	case 28:
 		if (pressed) {
-			bindings = key - 25; // Profile index is 0, 1, 2, 3
+			bindings = key - 25;
 			loadBindings();
 		}
 		return;
 
-	// Stick keys are handled by parse_joystick, so we ignore them here.
 	case 36:
 	case 37:
 	case 38:
@@ -495,20 +422,12 @@ void G13::parse_key(int key, unsigned char *byte) {
 		return;
 	}
 
-	// For all other keys, delegate to the assigned action.
     if (actions[key]) {
 	    actions[key]->set(pressed);
     }
 }
 
-/**
- * @brief Parses all keys from the G13 report buffer.
- * @param buf The 8-byte report buffer.
- *
- * This is a helper function that calls parse_key for every non-stick key on the device.
- */
 void G13::parse_keys(unsigned char *buf) {
-	// The key data starts at byte 3 of the report.
 	parse_key(G13_KEY_G1, buf + 3);
 	parse_key(G13_KEY_G2, buf + 3);
 	parse_key(G13_KEY_G3, buf + 3);
