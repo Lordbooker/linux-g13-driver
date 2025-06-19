@@ -33,19 +33,58 @@ private:
 
     // --- Private Methods ---
 	std::unique_ptr<Macro> loadMacro(int id);
+
+    /**
+     * @brief Parses key binding definitions from a stream.
+     * @param stream The input stream containing binding definitions.
+     */
 	void parse_bindings_from_stream(std::istream& stream);
 	int  read();
+
+    /**
+     * @brief Parses joystick data from the report buffer.
+     * @param buf The report buffer.
+     */
 	void parse_joystick(unsigned char *buf);
+
+    /**
+     * @brief Parses the state of a single key from the report buffer.
+     * @param key The G-key index.
+     * @param byte The pointer to the start of the key data in the buffer.
+     */
 	void parse_key(int key, unsigned char *byte);
+
+    /**
+     * @brief Parses all key states from the report buffer.
+     * @param buf The report buffer.
+     */
 	void parse_keys(unsigned char *buf);
 
 public:
+    /**
+     * @brief Constructor.
+     * @param device Pointer to the libusb_device.
+     */
 	G13(libusb_device *device);
+
+    /** @brief Destructor. */
 	~G13();
 
+    /** @brief Starts the main event reading loop. */
 	void start();
+
+    /** @brief Stops the main event reading loop. */
 	void stop();
+
+    /** @brief Loads the bindings for the current profile. */
 	void loadBindings();
+
+    /**
+     * @brief Sets the color of the LCD backlight.
+     * @param r Red component (0-255).
+     * @param g Green component (0-255).
+     * @param b Blue component (0-255).
+     */
 	void setColor(int r, int g, int b);
 
     // --- Methods for display control ---
