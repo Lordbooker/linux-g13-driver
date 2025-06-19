@@ -23,13 +23,12 @@
 #include "MacroAction.h"
 #include "Output.h"
 
-using namespace std;
-
-// Global variable from Main.cpp to enable a clean shutdown of threads on program exit.
+// This global flag is defined in Main.cpp and used here to gracefully
+// terminate the device's event loop when the whole application is shutting down.
 extern volatile sig_atomic_t daemon_keep_running;
 
 // Helper to trim whitespace from both ends of a std::string.
-string trim_string(const std::string& str) {
+std::string trim_string(const std::string& str) {
     const std::string whitespace = " \t\n\r\f\v";
     size_t start = str.find_first_not_of(whitespace);
     if (start == std::string::npos)
@@ -45,31 +44,32 @@ G13::G13(libusb_device *device) {
 	this->bindings = 0;
 	this->stick_mode = STICK_KEYS;
 
+    // Initialize a default (no-op) action for every possible key.
     actions.resize(G13_NUM_KEYS);
 	for (int i = 0; i < G13_NUM_KEYS; i++) {
 		actions[i] = std::make_unique<G13Action>();
 	}
 
 	if (libusb_open(device, &handle) != 0) {
-		cerr << "Error opening G13 device" << endl;
+		std::cerr << "Error opening G13 device" << std::endl;
 		return;
 	}
 
 	if (libusb_kernel_driver_active(handle, 0) == 1) {
 		if (libusb_detach_kernel_driver(handle, 0) == 0) {
-			cout << "Kernel driver detached" << endl;
+			std::cout << "Kernel driver detached" << std::endl;
 		}
 	}
 
 	if (libusb_claim_interface(handle, 0) < 0) {
-		cerr << "Cannot Claim Interface" << endl;
+		std::cerr << "Cannot Claim Interface" << std::endl;
 		return;
 	}
 
-    // ++ ADDED: Explicitly initialize the display ++
+    // Explicitly initialize the display.
     // This control transfer tells the G13 that a host driver wants to take
     // control of the LCD, making it ready to accept data on the bulk endpoint.
-    cout << "Initializing G13 display..." << endl;
+    std::cout << "Initializing G13 display..." << std::endl;
     unsigned char lcd_init_payload[] = { 0x01 };
     int init_error = libusb_control_transfer(handle,
         (LIBUSB_REQUEST_TYPE_CLASS | LIBUSB_RECIPIENT_INTERFACE), // bmRequestType
@@ -82,7 +82,7 @@ G13::G13(libusb_device *device) {
     );
 
     if (init_error < 0) {
-        cerr << "Error initializing G13 LCD: " << libusb_error_name(init_error) << endl;
+        std::cerr << "Error initializing G13 LCD: " << libusb_error_name(init_error) << std::endl;
     }
 
 	setColor(128, 128, 128);
@@ -97,7 +97,7 @@ G13::~G13() {
 	if (!this->loaded) {
 		return;
 	}
-	// setColor(128, 128, 128); removed cause off errorhandling while hot unplug
+	// setColor call was removed to prevent errors on hot-unplug.
 	libusb_release_interface(this->handle, 0);
 	libusb_close(this->handle);
 }
@@ -128,15 +128,15 @@ std::unique_ptr<Macro> G13::loadMacro(int num) {
 	char filename[1024];
     const char* home_dir = getenv("HOME");
     if (!home_dir) {
-        cerr << "G13::loadMacro(" << num << ") HOME environment variable not set.\n";
+        std::cerr << "G13::loadMacro(" << num << ") HOME environment variable not set.\n";
         return nullptr;
     }
 
 	snprintf(filename, sizeof(filename), "%s/.g13/macro-%d.properties", home_dir, num);
-	ifstream file (filename);
+	std::ifstream file (filename);
 
 	if (!file.is_open()) {
-		cout << "Could not open config file: " << filename << "\n";
+		std::cout << "Could not open config file: " << filename << "\n";
 		return nullptr;
 	}
 
@@ -144,7 +144,7 @@ std::unique_ptr<Macro> G13::loadMacro(int num) {
 	macro->setId(num);
     std::string macro_name, macro_sequence;
 
-	string line;
+	std::string line;
 	while (getline(file, line)) {
         std::string trimmed_line = trim_string(line);
 
@@ -196,7 +196,7 @@ void G13::parse_bindings_from_stream(std::istream& stream) {
                     setColor(r, g, b);
                 }
             } catch (const std::exception& e) {
-                 cerr << "G13::parse_bindings_from_stream() Invalid color format: " << value << endl;
+                 std::cerr << "G13::parse_bindings_from_stream() Invalid color format: " << value << std::endl;
             }
         }
         else if (key == "stick_mode") {
@@ -236,16 +236,16 @@ void G13::parse_bindings_from_stream(std::istream& stream) {
                     }
                 }
                 else {
-                    cout << "G13::parse_bindings_from_stream() unknown type '" << type << "' for key " << key << "\n";
+                    std::cout << "G13::parse_bindings_from_stream() unknown type '" << type << "' for key " << key << "\n";
                 }
             } catch (const std::invalid_argument& ia) {
-                cerr << "G13::parse_bindings_from_stream() Invalid number format in line: " << trimmed_line << endl;
+                std::cerr << "G13::parse_bindings_from_stream() Invalid number format in line: " << trimmed_line << std::endl;
             } catch (const std::out_of_range& oor) {
-                cerr << "G13::parse_bindings_from_stream() Number out of range in line: " << trimmed_line << endl;
+                std::cerr << "G13::parse_bindings_from_stream() Number out of range in line: " << trimmed_line << std::endl;
             }
         }
         else {
-            cout << "G13::parse_bindings_from_stream() Unknown token in key: " << key << "\n";
+            std::cout << "G13::parse_bindings_from_stream() Unknown token in key: " << key << "\n";
         }
     }
 }
@@ -255,15 +255,15 @@ void G13::loadBindings() {
 	char filename[1024];
 	const char* home_dir = getenv("HOME");
 	if (!home_dir) {
-		cerr << "G13::loadBindings() HOME environment variable not set.\n";
+		std::cerr << "G13::loadBindings() HOME environment variable not set.\n";
 		return;
 	}
 	snprintf(filename, sizeof(filename), "%s/.g13/bindings-%d.properties", home_dir, bindings);
 
-	ifstream file(filename);
+	std::ifstream file(filename);
 	if (!file.is_open()) {
-		cout << "Config file not found: " << filename << endl;
-		cout << "Loading default key bindings." << endl;
+		std::cout << "Config file not found: " << filename << std::endl;
+		std::cout << "Loading default key bindings." << std::endl;
 
         const std::string default_bindings = R"RAW(
 # Default G13 Key Bindings
@@ -309,7 +309,7 @@ G20=p,k.50
         parse_bindings_from_stream(ss);
 	}
     else {
-        cout << "Loading config file: " << filename << endl;
+        std::cout << "Loading config file: " << filename << std::endl;
         parse_bindings_from_stream(file);
         file.close();
     }
@@ -326,7 +326,7 @@ void G13::setColor(int red, int green, int blue) {
 			usb_data, 5, 1000);
 
 	if (error != 5) {
-		cerr << "Problem sending data" << endl;
+		std::cerr << "Problem sending color data" << std::endl;
 	}
 }
 
@@ -337,7 +337,7 @@ int G13::read() {
 
     // Specifically handle the "NO_DEVICE" error for hot-plugging.
     if (error == LIBUSB_ERROR_NO_DEVICE) {
-        cerr << "G13 device disconnected." << endl;
+        std::cerr << "G13 device disconnected." << std::endl;
         return -4; // Return a special code for a disconnected device.
     }
     
@@ -357,8 +357,8 @@ int G13::read() {
 		errors[LIBUSB_ERROR_NO_MEM] = "LIBUSB_ERROR_NO_MEM";
 		errors[LIBUSB_ERROR_NOT_SUPPORTED] = "LIBUSB_ERROR_NOT_SUPPORTED";
 		errors[LIBUSB_ERROR_OTHER] = "LIBUSB_ERROR_OTHER";
-		cerr << "Error while reading keys: " << error << " (" << errors[error]
-				<< ")" << endl;
+		std::cerr << "Error while reading keys: " << error << " (" << errors[error]
+				<< ")" << std::endl;
 		return -1;
 	}
 
@@ -413,14 +413,12 @@ void G13::parse_joystick(unsigned char *buf) {
 				// State changed, action was triggered.
 			}
 		}
-	} else {
-		/* send_event(...) */
 	}
 }
 
 void G13::parse_key(int key, unsigned char *byte) {
     if (key < 0 || key >= G13_NUM_KEYS) {
-        cerr << "G13::parse_key: Invalid key index " << key << endl;
+        std::cerr << "G13::parse_key: Invalid key index " << key << std::endl;
         return;
     }
 
@@ -493,71 +491,48 @@ void G13::parse_keys(unsigned char *buf) {
 	parse_key(G13_KEY_LIGHT, buf + 3);
 }
 
+// --- Implementation of LCD control methods ---
 
-// ++ ADDED: Implementation of LCD control methods ++
-
-/**
- * @brief Clears the internal 960-byte LCD buffer by setting it to all zeros.
- */
 void G13::clear_lcd_buffer() {
     memset(this->lcd_buffer, 0, G13_LCD_BUFFER_SIZE);
 }
 
-/**
- * @brief Sets or clears a single pixel in the LCD buffer based on its coordinates.
- * @param x The horizontal position (0-159).
- * @param y The vertical position (0-47).
- * @param on The state of the pixel (true=on, false=off).
- */
 void G13::set_pixel(int x, int y, bool on) {
-    // Prevent writing out of bounds.
     if (x < 0 || x >= 160 || y < 0 || y >= 48) {
         return;
     }
 
-    // Calculate the byte index and the bit within that byte.
-    // The buffer is organized in columns of 8 pixels.
     int index = x + (y / 8) * 160;
     int bit = y % 8;
 
     if (on) {
-        // Set the bit using a bitwise OR.
         this->lcd_buffer[index] |= (1 << bit);
     } else {
-        // Clear the bit using a bitwise AND with an inverted mask.
         this->lcd_buffer[index] &= ~(1 << bit);
     }
 }
 
-/**
- * @brief Sends the 960-byte LCD buffer to the device via a bulk USB transfer.
- * The G13 expects a 32-byte header before the image data.
- */
 void G13::write_lcd() {
     if (!this->loaded) return;
 
-    // The total transfer size is 32 (header) + 960 (image data) = 992 bytes.
     unsigned char transfer_buffer[992];
     memset(transfer_buffer, 0, sizeof(transfer_buffer));
 
-    // The first byte of the header is the report ID for the LCD.
     transfer_buffer[0] = 0x03;
 
-    // Copy the pixel data into the transfer buffer, after the 32-byte header.
     memcpy(transfer_buffer + 32, this->lcd_buffer, G13_LCD_BUFFER_SIZE);
 
     int actual_length;
-    // Send the data to the LCD endpoint using a bulk transfer.
     int ret = libusb_bulk_transfer(
         this->handle,
-        (G13_LCD_ENDPOINT | LIBUSB_ENDPOINT_OUT), // Endpoint address
-        transfer_buffer,                         // Data to send
-        sizeof(transfer_buffer),                 // Data length
-        &actual_length,                          // Bytes actually written
-        1000                                     // Timeout in ms
+        (G13_LCD_ENDPOINT | LIBUSB_ENDPOINT_OUT),
+        transfer_buffer,
+        sizeof(transfer_buffer),
+        &actual_length,
+        1000
     );
 
     if (ret < 0) {
-        cerr << "Error writing to G13 LCD: " << libusb_error_name(ret) << endl;
+        std::cerr << "Error writing to G13 LCD: " << libusb_error_name(ret) << std::endl;
     }
 }

@@ -6,7 +6,6 @@
 #include <memory>
 #include <map>
 #include <istream>
-
 #include <libusb-1.0/libusb.h>
 
 #include "Constants.h"
@@ -20,14 +19,16 @@ private:
 
 	libusb_device        *device;       // The USB device pointer.
 	libusb_device_handle *handle;        // The handle for the opened USB device.
+	int                   uinput_file;   // (Legacy) File descriptor for uinput device.
 
 	int                   loaded;        // Flag indicating if the device was loaded successfully.
 	volatile int          keepGoing;     // Flag to control the main event loop of this thread.
 
 	stick_mode_t          stick_mode;    // Current mode of the joystick (keys or absolute).
+	int                   stick_keys[4];   // (Legacy) State of the emulated stick keys.
 	int                   bindings;      // Index of the current key binding profile (0-3).
 
-    // ++ ADDED: Internal buffer to store the 160x48 pixel image for the LCD. ++
+    // Internal buffer to store the 160x48 pixel image for the LCD.
     unsigned char lcd_buffer[G13_LCD_BUFFER_SIZE];
 
     // --- Private Methods ---
@@ -47,7 +48,7 @@ public:
 	void loadBindings();
 	void setColor(int r, int g, int b);
 
-    // --- ADDED: New methods for display control ---
+    // --- Methods for display control ---
 
     /**
      * @brief Clears the internal LCD buffer (sets all pixels to off/black).
@@ -67,5 +68,6 @@ public:
      */
     void write_lcd();
 };
+
 
 #endif
