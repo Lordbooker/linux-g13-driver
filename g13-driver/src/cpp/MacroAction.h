@@ -84,8 +84,13 @@ private:
     // --- Private Methods ---
     /** @brief The main execution loop for the macro thread. */
     void execute_macro_loop();
-    /** @brief Parses a token into an Event object. */
-    std::unique_ptr<MacroAction::Event> tokenToEvent(const char* token);
+
+    /**
+     * @brief Parses a string token (e.g., "kd.29") from the sequence into an Event object.
+     * @param token The string token to parse.
+     * @return A unique_ptr to the created Event, or nullptr if the token is invalid.
+     */
+    std::unique_ptr<MacroAction::Event> tokenToEvent(const std::string& token);
 
     /** @brief The static entry point for the pthread. */
     static void* run_macro_thread(void* context);
