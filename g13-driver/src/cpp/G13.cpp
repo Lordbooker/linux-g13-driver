@@ -114,12 +114,6 @@ void G13::start() {
         if (read() == -4) {
             break; // Exit the loop to allow the thread to terminate cleanly.
         }
-    // The loop runs as long as the thread should run AND the daemon is not shutting down.
-	while (keepGoing && daemon_keep_running) {
-		// Check if the device was disconnected during the read operation.
-        if (read() == -4) {
-            break; // Exit the loop to allow the thread to terminate cleanly.
-        }
 	}
 }
 
@@ -180,12 +174,10 @@ void G13::parse_bindings_from_stream(std::istream& stream) {
 
         if (trimmed_line.empty() || trimmed_line[0] == '#') {
             continue;
-            continue;
         }
 
         size_t eq_pos = trimmed_line.find('=');
         if (eq_pos == std::string::npos) {
-            continue;
             continue;
         }
 
@@ -224,7 +216,6 @@ void G13::parse_bindings_from_stream(std::istream& stream) {
                     if (!std::getline(ss, keytype_str, ',')) continue;
                     keytype_str = trim_string(keytype_str);
 
-                    if (keytype_str.rfind("k.", 0) == 0) {
                     if (keytype_str.rfind("k.", 0) == 0) {
                         int keycode = std::stoi(keytype_str.substr(2));
                         if (gKey >= 0 && gKey < G13_NUM_KEYS) {
@@ -275,7 +266,6 @@ void G13::loadBindings() {
 		std::cout << "Loading default key bindings." << std::endl;
 
         const std::string default_bindings = R"RAW(
-# Default G13 Key Bindings
 # Default G13 Key Bindings
 G19=p,k.42
 G18=p,k.18
@@ -391,12 +381,10 @@ void G13::parse_joystick(unsigned char *buf) {
 		int pressed[4];
 		if (stick_y <= 96) {
 			pressed[0] = 1; // UP
-			pressed[0] = 1; // UP
 			pressed[3] = 0;
 		}
 		else if (stick_y >= 160) {
 			pressed[0] = 0;
-			pressed[3] = 1; // DOWN
 			pressed[3] = 1; // DOWN
 		}
 		else {
@@ -406,12 +394,10 @@ void G13::parse_joystick(unsigned char *buf) {
 
 		if (stick_x <= 96) {
 			pressed[1] = 1; // LEFT
-			pressed[1] = 1; // LEFT
 			pressed[2] = 0;
 		}
 		else if (stick_x >= 160) {
 			pressed[1] = 0;
-			pressed[2] = 1; // RIGHT
 			pressed[2] = 1; // RIGHT
 		}
 		else {
@@ -424,7 +410,6 @@ void G13::parse_joystick(unsigned char *buf) {
 			int key = codes[i];
 			int p = pressed[i];
 			if (actions[key]->set(p)) {
-				// State changed, action was triggered.
 				// State changed, action was triggered.
 			}
 		}
@@ -447,19 +432,12 @@ void G13::parse_key(int key, unsigned char *byte) {
 	case 26: // M2
 	case 27: // M3
 	case 28: // MR
-	// M1, M2, M3, MR keys switch the binding profile.
-	case 25: // M1
-	case 26: // M2
-	case 27: // M3
-	case 28: // MR
 		if (pressed) {
-			bindings = key - 25; // Profile index is 0, 1, 2, 3
 			bindings = key - 25; // Profile index is 0, 1, 2, 3
 			loadBindings();
 		}
 		return;
 
-	// Stick keys are handled by parse_joystick, so we ignore them here.
 	// Stick keys are handled by parse_joystick, so we ignore them here.
 	case 36:
 	case 37:
@@ -469,14 +447,12 @@ void G13::parse_key(int key, unsigned char *byte) {
 	}
 
 	// For all other keys, delegate to the assigned action.
-	// For all other keys, delegate to the assigned action.
     if (actions[key]) {
 	    actions[key]->set(pressed);
     }
 }
 
 void G13::parse_keys(unsigned char *buf) {
-	// The key data starts at byte 3 of the report.
 	// The key data starts at byte 3 of the report.
 	parse_key(G13_KEY_G1, buf + 3);
 	parse_key(G13_KEY_G2, buf + 3);
