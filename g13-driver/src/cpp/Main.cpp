@@ -1,156 +1,143 @@
 #include <iostream>
 #include <fstream>
 #include <vector>
+#include <map>
 #include <string.h>
 #include <signal.h>
 #include <stdlib.h>
 #include <unistd.h>
 #include <pthread.h>
 #include <libusb-1.0/libusb.h>
+#include <iomanip>
 
 #include "G13.h"
 #include "Output.h"
 
 using namespace std;
 
-// --- Global Variables ---
-vector<G13 *> g13s; // Holds pointers to all discovered G13 device instances.
-vector<pthread_t> g13_threads; // Holds thread handles for each G13 device.
-volatile sig_atomic_t keep_running = 1; // Flag to control the main loop, modified by the signal handler.
+// --- Globale Variablen für das Hot-Plug-Management ---
+// Mutex zum Schutz der Thread-Map vor konkurrierendem Zugriff
+pthread_mutex_t g13_map_mutex = PTHREAD_MUTEX_INITIALIZER;
+// Map, um aktive Geräte und ihre Threads zu speichern. Der Key ist eine eindeutige Geräte-ID.
+map<uint16_t, pthread_t> g13_instances;
+// Globale Variable, die durch den Signal-Handler geändert wird, um das Programm zu beenden.
+volatile sig_atomic_t daemon_keep_running = 1;
 
 /**
- * @brief Scans for connected Logitech G13 devices using libusb.
- *
- * Initializes libusb, gets a list of all USB devices, and iterates through
- * them, creating a new G13 object for each device that matches the
- * G13's vendor and product ID.
+ * @brief Erstellt eine eindeutige 16-Bit ID für ein USB-Gerät aus Bus- und Geräteadresse.
+ * @param dev Das libusb-Gerät.
+ * @return Eine eindeutige ID für das Gerät.
  */
-void discover() {
-	libusb_context *ctx = nullptr;
-	libusb_device **devs;
-
-	int ret = libusb_init(&ctx);
-	if (ret < 0) {
-		cout << "Initialization error: " << ret << "\n";
-		return;
-	}
-
-	ssize_t count = libusb_get_device_list(ctx, &devs);
-	if (count < 0) {
-		cout << "Error while getting device list" << "\n";
-		return;
-	}
-
-	for (int i = 0; i < count; i++) {
-		libusb_device_descriptor desc;
-		int r = libusb_get_device_descriptor(devs[i], &desc);
-		if (r < 0) {
-			cout << "Failed to get device descriptor" << endl;
-			return;
-		}
-
-		// Check for Logitech G13 Vendor/Product ID.
-		if (desc.idVendor == G13_VENDOR_ID && desc.idProduct == G13_PRODUCT_ID) {
-			G13 *g13 = new G13(devs[i]);
-			g13s.push_back(g13);
-		}
-	}
-
-	libusb_free_device_list(devs, 1);
+uint16_t get_device_key(libusb_device *dev) {
+    return (libusb_get_bus_number(dev) << 8) | libusb_get_device_address(dev);
 }
 
 /**
- * @brief The entry point function for each G13 device thread.
- * @param arg A void pointer to a G13 object.
- * @return Always returns nullptr.
+ * @brief Thread-Funktion, die für jedes angeschlossene G13-Gerät ausgeführt wird.
+ * @param arg Ein void-Zeiger auf das libusb_device-Objekt.
+ * @return Immer nullptr.
  */
 void *executeG13(void *arg) {
-	G13 *g13 = (G13 *)arg;
-    if (g13) {
-        // Start the main event loop for this G13 instance.
-	    g13->start();
-    }
+	libusb_device *dev = (libusb_device *)arg;
+    uint16_t key = get_device_key(dev);
+
+    // Das G13-Objekt wird auf dem Stack dieses Threads erstellt.
+    // Es wird automatisch zerstört, wenn der Thread endet.
+	G13 g13(dev);
+	g13.start(); // Diese Funktion blockiert, bis das Gerät getrennt wird oder das Programm endet.
+
+    // --- Aufräumen, nachdem das Gerät getrennt wurde ---
+    cout << "Thread for device " << hex << key << " cleaning up." << endl;
+
+    // Thread entfernt sich selbst aus der globalen Map, um eine Wiederverbindung zu ermöglichen.
+    pthread_mutex_lock(&g13_map_mutex);
+    g13_instances.erase(key);
+    pthread_mutex_unlock(&g13_map_mutex);
+
+    // Referenz auf das libusb-Gerät freigeben, die vor dem Thread-Start erstellt wurde.
+    libusb_unref_device(dev);
 	return nullptr;
 }
 
 /**
- * @brief Creates and starts a processing thread for each discovered G13 device.
- *
- * After threads are created, this function waits for all of them to complete
- * by joining them.
- */
-void start() {
-	if (g13s.size() > 0) {
-		pthread_attr_t attr;
-		pthread_attr_init(&attr);
-
-        g13_threads.resize(g13s.size());
-		for (unsigned int i = 0; i < g13s.size(); i++) {
-			pthread_create(&g13_threads[i], &attr, executeG13, g13s[i] );
-		}
-        pthread_attr_destroy(&attr);
-
-		// Wait for all G13 threads to finish.
-		for (unsigned int i = 0; i < g13s.size(); i++) {
-			pthread_join(g13_threads[i], nullptr);
-		}
-	}
-}
-
-/**
- * @brief Signal handler for SIGINT and SIGTERM to ensure graceful shutdown.
- * @param signal The signal number received.
- *
- * Sets the global 'keep_running' flag to false and tells each G13 device
- * to stop its event loop.
+ * @brief Signal-Handler für STRG+C (SIGINT) und SIGTERM zum sauberen Beenden des Programms.
+ * @param signal Das empfangene Signal.
  */
 void signal_handler(int signal) {
-    keep_running = 0;
-	for (unsigned int i = 0; i < g13s.size(); i++) {
-        if (g13s[i]) {
-		    g13s[i]->stop();
-        }
-	}
+    daemon_keep_running = 0;
 }
 
 /**
- * @brief Cleans up all allocated resources before the program exits.
+ * @brief Sucht nach angeschlossenen G13-Geräten und startet/verwaltet deren Threads.
+ * @param ctx Der libusb-Kontext.
  */
-void cleanup() {
-	// Delete all G13 objects.
-	for (unsigned int i = 0; i < g13s.size(); i++) {
-		delete g13s[i];
-	}
-    g13s.clear();
-    // Close the virtual uinput device.
-    UInput::close_uinput();
+void find_and_manage_devices(libusb_context *ctx) {
+    libusb_device **devs;
+    ssize_t count = libusb_get_device_list(ctx, &devs);
+    if (count < 0) return;
+
+    // Iteriert durch alle aktuell angeschlossenen USB-Geräte
+    for (int i = 0; i < count; i++) {
+        libusb_device_descriptor desc;
+        if (libusb_get_device_descriptor(devs[i], &desc) < 0) continue;
+
+        if (desc.idVendor == G13_VENDOR_ID && desc.idProduct == G13_PRODUCT_ID) {
+            uint16_t key = get_device_key(devs[i]);
+
+            pthread_mutex_lock(&g13_map_mutex);
+            // Prüfen, ob für dieses Gerät bereits ein Thread läuft.
+            if (g13_instances.find(key) == g13_instances.end()) {
+                cout << "New G13 device connected (ID: " << hex << key << "). Starting handler thread." << endl;
+                pthread_t thread;
+
+                // Erhöht den Referenzzähler, da das Gerät an einen anderen Thread übergeben wird.
+                libusb_ref_device(devs[i]);
+                pthread_create(&thread, nullptr, executeG13, devs[i]);
+                g13_instances[key] = thread;
+                // Der Thread wird "detached", d.h. er gibt seine Ressourcen nach Beendigung selbst frei.
+                // Wir müssen nicht mehr mit pthread_join auf ihn warten.
+                pthread_detach(thread);
+            }
+            pthread_mutex_unlock(&g13_map_mutex);
+        }
+    }
+    libusb_free_device_list(devs, 1);
 }
 
 /**
- * @brief The main entry point of the G13 driver daemon.
+ * @brief Der Haupteinstiegspunkt des G13-Treiber-Daemons.
  */
 int main(int argc, char *argv[]) {
-    // 1. Initialize the virtual input device.
+    // 1. Virtuelles Eingabegerät initialisieren
 	if (!UInput::create_uinput()) {
         cerr << "Failed to initialize uinput. Exiting." << endl;
         return 1;
     }
 
-    // 2. Register signal handler for clean shutdown (e.g., on Ctrl+C).
+    // 2. Signal-Handler für sauberes Beenden registrieren
 	signal(SIGINT, signal_handler);
     signal(SIGTERM, signal_handler);
 
-    // 3. Discover all connected G13 devices.
-	discover();
-	cout << "Found " << g13s.size() << " G13s" << "\n";
-
-    // 4. Start processing threads if any G13s were found.
-    if (!g13s.empty()) {
-	    start();
+    // 3. libusb initialisieren
+    libusb_context *ctx = nullptr;
+    if (libusb_init(&ctx) < 0) {
+        cerr << "Failed to initialize libusb. Exiting." << endl;
+        UInput::close_uinput();
+        return 1;
     }
 
-    // 5. Perform final cleanup after all threads have exited.
-	cleanup();
+    cout << "G13 driver started. Waiting for devices... (Press Ctrl+C to exit)" << endl;
+
+    // 4. Hauptschleife zur Geräteverwaltung
+    while (daemon_keep_running) {
+        find_and_manage_devices(ctx);
+        sleep(2); // Alle 2 Sekunden nach neuen/entfernten Geräten suchen
+    }
+
+    // 5. Aufräumen nach dem Beenden
+    cout << "\nShutting down driver..." << endl;
+    UInput::close_uinput();
+    libusb_exit(ctx);
 
 	return 0;
 }
