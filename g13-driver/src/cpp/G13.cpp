@@ -27,6 +27,9 @@
 // terminate the device's event loop when the whole application is shutting down.
 extern volatile sig_atomic_t daemon_keep_running;
 
+// HARDENING: Define a constant for the maximum number of macros, matching the GUI.
+const int G13_MAX_MACROS = 200;
+
 // Helper to trim whitespace from both ends of a std::string.
 std::string trim_string(const std::string& str) {
     const std::string whitespace = " \t\n\r\f\v";
@@ -193,7 +196,14 @@ void G13::parse_bindings_from_stream(std::istream& stream) {
                 if (std::getline(ss, segment, ',') && (r = std::stoi(segment)) >= 0 &&
                     std::getline(ss, segment, ',') && (g = std::stoi(segment)) >= 0 &&
                     std::getline(ss, segment, ',') && (b = std::stoi(segment)) >= 0) {
-                    setColor(r, g, b);
+                    
+                    // HARDENING: Validate color values are within the 0-255 range.
+                    if (r <= 255 && g <= 255 && b <= 255) {
+                        setColor(r, g, b);
+                    } else {
+                        std::cerr << "G13::parse_bindings_from_stream() Invalid color value: " << value 
+                                  << ". All values must be between 0 and 255." << std::endl;
+                    }
                 }
             } catch (const std::exception& e) {
                  std::cerr << "G13::parse_bindings_from_stream() Invalid color format: " << value << std::endl;
@@ -202,7 +212,7 @@ void G13::parse_bindings_from_stream(std::istream& stream) {
         else if (key == "stick_mode") {
             // Stick mode logic here
         }
-        else if (!key.empty() && key[0] == 'G') {
+        else if (!key.empty() && key.rfind("G", 0) == 0) { // Check if key starts with "G"
             try {
                 int gKey = std::stoi(key.substr(1));
 
@@ -211,28 +221,43 @@ void G13::parse_bindings_from_stream(std::istream& stream) {
                 if (!std::getline(ss, type, ',')) continue;
                 type = trim_string(type);
 
-                if (type == "p") { /* passthrough */
+                if (type == "p") { // Passthrough type
                     std::string keytype_str;
                     if (!std::getline(ss, keytype_str, ',')) continue;
                     keytype_str = trim_string(keytype_str);
 
                     if (keytype_str.rfind("k.", 0) == 0) {
                         int keycode = std::stoi(keytype_str.substr(2));
+
+                        // HARDENING: Validate key and keycode ranges before creating the action.
                         if (gKey >= 0 && gKey < G13_NUM_KEYS) {
-                            actions[gKey] = std::make_unique<PassThroughAction>(keycode);
+                            if (keycode >= 0 && keycode < 256) {
+                                actions[gKey] = std::make_unique<PassThroughAction>(keycode);
+                            } else {
+                                std::cerr << "G13::parse_bindings_from_stream() Invalid keycode " << keycode << " for key " << key 
+                                          << ". Keycode must be between 0 and 255." << std::endl;
+                            }
                         }
                     }
                 }
-                else if (type == "m") { /* macro */
+                else if (type == "m") { // Macro type
                     std::string macroId_str, repeats_str;
                     if (!std::getline(ss, macroId_str, ',') || !std::getline(ss, repeats_str, ',')) continue;
                     
                     int macroId = std::stoi(trim_string(macroId_str));
                     int repeats = std::stoi(trim_string(repeats_str));
-                    auto macro = loadMacro(macroId);
-                    if (macro && gKey >= 0 && gKey < G13_NUM_KEYS) {
-                        actions[gKey] = std::make_unique<MacroAction>(macro->getSequence());
-                        static_cast<MacroAction*>(actions[gKey].get())->setRepeats(repeats);
+
+                    // HARDENING: Validate macroId and repeats values.
+                    if (macroId >= 0 && macroId < G13_MAX_MACROS && repeats >= 0) {
+                        auto macro = loadMacro(macroId);
+                        if (macro && gKey >= 0 && gKey < G13_NUM_KEYS) {
+                            actions[gKey] = std::make_unique<MacroAction>(macro->getSequence());
+                            static_cast<MacroAction*>(actions[gKey].get())->setRepeats(repeats);
+                        }
+                    } else {
+                        std::cerr << "G13::parse_bindings_from_stream() Invalid macro parameters for key " << key 
+                                  << ". macroId must be 0-" << (G13_MAX_MACROS - 1) 
+                                  << " and repeats must be non-negative." << std::endl;
                     }
                 }
                 else {
