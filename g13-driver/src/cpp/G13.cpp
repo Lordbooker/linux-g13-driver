@@ -66,7 +66,30 @@ G13::G13(libusb_device *device) {
 		return;
 	}
 
+    // ++ ADDED: Explicitly initialize the display ++
+    // This control transfer tells the G13 that a host driver wants to take
+    // control of the LCD, making it ready to accept data on the bulk endpoint.
+    cout << "Initializing G13 display..." << endl;
+    unsigned char lcd_init_payload[] = { 0x01 };
+    int init_error = libusb_control_transfer(handle,
+        (LIBUSB_REQUEST_TYPE_CLASS | LIBUSB_RECIPIENT_INTERFACE), // bmRequestType
+        0x09,           // bRequest
+        0x0300,         // wValue
+        0x0000,         // wIndex
+        lcd_init_payload, // data
+        sizeof(lcd_init_payload), // wLength
+        1000            // timeout
+    );
+
+    if (init_error < 0) {
+        cerr << "Error initializing G13 LCD: " << libusb_error_name(init_error) << endl;
+    }
+
 	setColor(128, 128, 128);
+
+	// Initialize the LCD buffer to all black.
+	clear_lcd_buffer();
+
 	this->loaded = 1;
 }
 
@@ -74,7 +97,7 @@ G13::~G13() {
 	if (!this->loaded) {
 		return;
 	}
-	setColor(128, 128, 128);
+	// setColor(128, 128, 128); removed cause off errorhandling while hot unplug
 	libusb_release_interface(this->handle, 0);
 	libusb_close(this->handle);
 }
@@ -468,4 +491,73 @@ void G13::parse_keys(unsigned char *buf) {
 	parse_key(G13_KEY_DOWN, buf + 3);
 	parse_key(G13_KEY_TOP, buf + 3);
 	parse_key(G13_KEY_LIGHT, buf + 3);
+}
+
+
+// ++ ADDED: Implementation of LCD control methods ++
+
+/**
+ * @brief Clears the internal 960-byte LCD buffer by setting it to all zeros.
+ */
+void G13::clear_lcd_buffer() {
+    memset(this->lcd_buffer, 0, G13_LCD_BUFFER_SIZE);
+}
+
+/**
+ * @brief Sets or clears a single pixel in the LCD buffer based on its coordinates.
+ * @param x The horizontal position (0-159).
+ * @param y The vertical position (0-47).
+ * @param on The state of the pixel (true=on, false=off).
+ */
+void G13::set_pixel(int x, int y, bool on) {
+    // Prevent writing out of bounds.
+    if (x < 0 || x >= 160 || y < 0 || y >= 48) {
+        return;
+    }
+
+    // Calculate the byte index and the bit within that byte.
+    // The buffer is organized in columns of 8 pixels.
+    int index = x + (y / 8) * 160;
+    int bit = y % 8;
+
+    if (on) {
+        // Set the bit using a bitwise OR.
+        this->lcd_buffer[index] |= (1 << bit);
+    } else {
+        // Clear the bit using a bitwise AND with an inverted mask.
+        this->lcd_buffer[index] &= ~(1 << bit);
+    }
+}
+
+/**
+ * @brief Sends the 960-byte LCD buffer to the device via a bulk USB transfer.
+ * The G13 expects a 32-byte header before the image data.
+ */
+void G13::write_lcd() {
+    if (!this->loaded) return;
+
+    // The total transfer size is 32 (header) + 960 (image data) = 992 bytes.
+    unsigned char transfer_buffer[992];
+    memset(transfer_buffer, 0, sizeof(transfer_buffer));
+
+    // The first byte of the header is the report ID for the LCD.
+    transfer_buffer[0] = 0x03;
+
+    // Copy the pixel data into the transfer buffer, after the 32-byte header.
+    memcpy(transfer_buffer + 32, this->lcd_buffer, G13_LCD_BUFFER_SIZE);
+
+    int actual_length;
+    // Send the data to the LCD endpoint using a bulk transfer.
+    int ret = libusb_bulk_transfer(
+        this->handle,
+        (G13_LCD_ENDPOINT | LIBUSB_ENDPOINT_OUT), // Endpoint address
+        transfer_buffer,                         // Data to send
+        sizeof(transfer_buffer),                 // Data length
+        &actual_length,                          // Bytes actually written
+        1000                                     // Timeout in ms
+    );
+
+    if (ret < 0) {
+        cerr << "Error writing to G13 LCD: " << libusb_error_name(ret) << endl;
+    }
 }

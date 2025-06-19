@@ -16,11 +16,11 @@
 using namespace std;
 
 // --- Global Variables for Hot-Plug Management ---
-// Mutex to protect the thread map from concurrent access.
+/** @brief Mutex to protect the g13_instances map from concurrent access by multiple threads. */
 pthread_mutex_t g13_map_mutex = PTHREAD_MUTEX_INITIALIZER;
-// Map to store active devices and their threads. The key is a unique device ID.
+/** @brief Map to store active device threads. The key is a unique device ID. */
 map<uint16_t, pthread_t> g13_instances;
-// Global flag modified by the signal handler to terminate the main loop.
+/** @brief Flag to control the main daemon loop. It is set to 0 by the signal handler to initiate a shutdown. */
 volatile sig_atomic_t daemon_keep_running = 1;
 
 /**
@@ -29,6 +29,7 @@ volatile sig_atomic_t daemon_keep_running = 1;
  * @return A unique ID for the device.
  */
 uint16_t get_device_key(libusb_device *dev) {
+    // Combine the bus number and device address into a single unique short integer.
     return (libusb_get_bus_number(dev) << 8) | libusb_get_device_address(dev);
 }
 
@@ -42,7 +43,7 @@ void *executeG13(void *arg) {
     uint16_t key = get_device_key(dev);
 
     // The G13 object is created on this thread's stack.
-    // It will be automatically destroyed when the thread exits.
+    // Its destructor will be called automatically when the thread exits, ensuring clean resource release.
 	G13 g13(dev);
 	g13.start(); // This function blocks until the device is disconnected or the program exits.
 
@@ -94,9 +95,9 @@ void find_and_manage_devices(libusb_context *ctx) {
                 libusb_ref_device(devs[i]);
                 pthread_create(&thread, nullptr, executeG13, devs[i]);
                 g13_instances[key] = thread;
-                // Detach the thread, allowing it to clean up its own resources upon termination.
-                // We no longer need to join it.
-                pthread_detach(thread);
+                
+                // MODIFICATION: Do NOT detach the thread. We need to join it on shutdown.
+                // pthread_detach(thread);
             }
             pthread_mutex_unlock(&g13_map_mutex);
         }
@@ -134,12 +135,31 @@ int main(int argc, char *argv[]) {
         sleep(2); // Poll for new/removed devices every 2 seconds.
     }
 
-    // 5. Clean up resources upon exit.
-    cout << "\nShutting down driver..." << endl;
+    // --- MODIFIED SHUTDOWN SEQUENCE ---
+    // 5. Wait for all threads to terminate before cleaning up global resources.
+    cout << "\nShutting down driver... Waiting for handler threads to exit." << endl;
+
+    // Create a copy of the current thread handles to join them safely.
+    // This avoids issues if a thread removes itself from the map while we iterate.
+    vector<pthread_t> threads_to_join;
+    pthread_mutex_lock(&g13_map_mutex);
+    for (auto const& [key, thread_id] : g13_instances) {
+        threads_to_join.push_back(thread_id);
+    }
+    pthread_mutex_unlock(&g13_map_mutex);
+
+    // Join all active threads. This call blocks until each thread has completely finished.
+    // This is the crucial step to prevent the race condition.
+    for (pthread_t th : threads_to_join) {
+        pthread_join(th, nullptr);
+    }
+
+    cout << "All handler threads have finished." << endl;
+
+    // 6. Clean up global resources now that threads are safely terminated.
     UInput::close_uinput();
     libusb_exit(ctx);
-    // Since threads are detached, we don't need to join them.
-    // They will terminate because daemon_keep_running is now 0.
+    // --- END OF MODIFICATION ---
 
 	return 0;
 }
