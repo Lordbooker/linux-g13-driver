@@ -2,14 +2,12 @@
 #include <fstream>
 #include <vector>
 #include <map>
-#include <map>
 #include <string.h>
 #include <signal.h>
 #include <stdlib.h>
 #include <unistd.h>
 #include <pthread.h>
 #include <libusb-1.0/libusb.h>
-#include <iomanip>
 #include <iomanip>
 
 #include "G13.h"
@@ -64,10 +62,6 @@ void *executeG13(void *arg) {
  * @brief Signal handler for CTRL+C (SIGINT) and SIGTERM to cleanly shut down the program.
  * @param signal The received signal number.
  */
-/**
- * @brief Signal handler for CTRL+C (SIGINT) and SIGTERM to cleanly shut down the program.
- * @param signal The received signal number.
- */
 void signal_handler(int signal) {
     daemon_keep_running = 0;
 }
@@ -113,13 +107,11 @@ void find_and_manage_devices(libusb_context *ctx) {
  */
 int main(int argc, char *argv[]) {
     // 1. Initialize the virtual input device.
-    // 1. Initialize the virtual input device.
 	if (!UInput::create_uinput()) {
         std::cerr << "Failed to initialize uinput. Exiting." << std::endl;
         return 1;
     }
 
-    // 2. Register signal handler for clean shutdown.
     // 2. Register signal handler for clean shutdown.
 	signal(SIGINT, signal_handler);
     signal(SIGTERM, signal_handler);
