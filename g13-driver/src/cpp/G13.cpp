@@ -25,11 +25,11 @@
 
 using namespace std;
 
-// Globale Variable aus Main.cpp, um ein sauberes Beenden der Threads bei Programmende zu ermöglichen
+// Global variable from Main.cpp to enable a clean shutdown of threads on program exit.
 extern volatile sig_atomic_t daemon_keep_running;
 
-// Helper to trim whitespace from both ends of a std::string
-std::string trim_string(const std::string& str) {
+// Helper to trim whitespace from both ends of a std::string.
+string trim_string(const std::string& str) {
     const std::string whitespace = " \t\n\r\f\v";
     size_t start = str.find_first_not_of(whitespace);
     if (start == std::string::npos)
@@ -85,11 +85,11 @@ void G13::start() {
 	}
 	loadBindings();
 	keepGoing = 1;
-    // Die Schleife läuft, solange der Thread laufen soll UND das Programm nicht beendet wird
+    // The loop runs as long as the thread should run AND the daemon is not shutting down.
 	while (keepGoing && daemon_keep_running) {
-		// ANPASSUNG: Prüfen, ob das Gerät während des Lesens getrennt wurde
+		// Check if the device was disconnected during the read operation.
         if (read() == -4) {
-            break; // Schleife verlassen, damit der Thread sich beenden kann
+            break; // Exit the loop to allow the thread to terminate cleanly.
         }
 	}
 }
@@ -239,11 +239,11 @@ void G13::loadBindings() {
 
 	ifstream file(filename);
 	if (!file.is_open()) {
-		cout << "Konfigurationsdatei nicht gefunden: " << filename << endl;
-		cout << "Lade Standard-Tastenbelegung." << endl;
+		cout << "Config file not found: " << filename << endl;
+		cout << "Loading default key bindings." << endl;
 
         const std::string default_bindings = R"RAW(
-# Standard G13 Tastenbelegung
+# Default G13 Key Bindings
 G19=p,k.42
 G18=p,k.18
 G17=p,k.16
@@ -286,7 +286,7 @@ G20=p,k.50
         parse_bindings_from_stream(ss);
 	}
     else {
-        cout << "Lade Konfigurationsdatei: " << filename << endl;
+        cout << "Loading config file: " << filename << endl;
         parse_bindings_from_stream(file);
         file.close();
     }
@@ -312,10 +312,10 @@ int G13::read() {
 	int size;
 	int error = libusb_interrupt_transfer(handle, LIBUSB_ENDPOINT_IN | G13_KEY_ENDPOINT, buffer, G13_REPORT_SIZE, &size, 1000);
 
-    // ANPASSUNG: Gezielte Fehlerbehandlung für getrennte Geräte
+    // Specifically handle the "NO_DEVICE" error for hot-plugging.
     if (error == LIBUSB_ERROR_NO_DEVICE) {
         cerr << "G13 device disconnected." << endl;
-        return -4; // Spezieller Rückgabewert für getrenntes Gerät
+        return -4; // Return a special code for a disconnected device.
     }
     
 	if (error && error != LIBUSB_ERROR_TIMEOUT) {
@@ -357,12 +357,12 @@ void G13::parse_joystick(unsigned char *buf) {
 	} else if (stick_mode == STICK_KEYS) {
 		int pressed[4];
 		if (stick_y <= 96) {
-			pressed[0] = 1;
+			pressed[0] = 1; // UP
 			pressed[3] = 0;
 		}
 		else if (stick_y >= 160) {
 			pressed[0] = 0;
-			pressed[3] = 1;
+			pressed[3] = 1; // DOWN
 		}
 		else {
 			pressed[0] = 0;
@@ -370,12 +370,12 @@ void G13::parse_joystick(unsigned char *buf) {
 		}
 
 		if (stick_x <= 96) {
-			pressed[1] = 1;
+			pressed[1] = 1; // LEFT
 			pressed[2] = 0;
 		}
 		else if (stick_x >= 160) {
 			pressed[1] = 0;
-			pressed[2] = 1;
+			pressed[2] = 1; // RIGHT
 		}
 		else {
 			pressed[1] = 0;
@@ -387,6 +387,7 @@ void G13::parse_joystick(unsigned char *buf) {
 			int key = codes[i];
 			int p = pressed[i];
 			if (actions[key]->set(p)) {
+				// State changed, action was triggered.
 			}
 		}
 	} else {
@@ -405,16 +406,18 @@ void G13::parse_key(int key, unsigned char *byte) {
 	int pressed = actual_byte & mask;
 
 	switch (key) {
-	case 25:
-	case 26:
-	case 27:
-	case 28:
+	// M1, M2, M3, MR keys switch the binding profile.
+	case 25: // M1
+	case 26: // M2
+	case 27: // M3
+	case 28: // MR
 		if (pressed) {
-			bindings = key - 25;
+			bindings = key - 25; // Profile index is 0, 1, 2, 3
 			loadBindings();
 		}
 		return;
 
+	// Stick keys are handled by parse_joystick, so we ignore them here.
 	case 36:
 	case 37:
 	case 38:
@@ -422,12 +425,14 @@ void G13::parse_key(int key, unsigned char *byte) {
 		return;
 	}
 
+	// For all other keys, delegate to the assigned action.
     if (actions[key]) {
 	    actions[key]->set(pressed);
     }
 }
 
 void G13::parse_keys(unsigned char *buf) {
+	// The key data starts at byte 3 of the report.
 	parse_key(G13_KEY_G1, buf + 3);
 	parse_key(G13_KEY_G2, buf + 3);
 	parse_key(G13_KEY_G3, buf + 3);
