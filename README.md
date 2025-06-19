@@ -137,7 +137,11 @@ If you are configuring the application while the driver is running, the driver w
 
     ![alt text](docs/image2.png)
 
-* else without UDEV-Rule Installation
+* for easier use, put the driver to your 'Autostart' Option in your distro. the driver has hotplug capabilty and its waiting for a new connection in the backround.   
+
+
+
+* else without UDEV-Rule Installation ('Autostart' is not possible without UDEV-Rule set)
     ```bash
     sudo -E ./G13-Linux-Driver
     ```
