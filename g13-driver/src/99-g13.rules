@@ -1,5 +1,0 @@
-# Erlaubt den dynamischen Zugriff auf das physische G13-Gerät für den aktiven Benutzer
-SUBSYSTEM=="usb", ATTR{idVendor}=="046d", ATTR{idProduct}=="c21c", TAG+="uaccess"
-
-# Erlaubt den dynamischen Zugriff auf die uinput-Schnittstelle für den aktiven Benutzer
-KERNEL=="uinput", SUBSYSTEM=="misc", TAG+="uaccess"
