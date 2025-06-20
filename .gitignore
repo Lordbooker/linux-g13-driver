@@ -48,6 +48,12 @@ pom.xml.tag
 
 
 # =========================================
+# Folder for experimental stuff
+# =========================================
+experimental_stuff/
+
+
+# =========================================
 # IDE-spezifische Konfigurationsdateien
 # =========================================
 
