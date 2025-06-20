@@ -16,7 +16,7 @@
  * @brief A G13Action that executes a sequence of key presses, releases, and delays.
  *
  * This class manages parsing a macro string, running it in a separate thread,
- * and handling repeat settings.
+ * and handling repeat settings. The execution is offloaded to a central MacroThreadPool.
  */
 class MacroAction : public G13Action {
 public:
@@ -73,6 +73,11 @@ public:
     void setRepeats(int r);
     int getRepeats() const;
 
+    /** * @brief The main execution loop for the macro.
+     * This is made public to be callable by the MacroThreadPool.
+     */
+    void execute_macro_loop();
+
 
 protected:
     /** @brief Overridden to start or stop the macro thread. */
@@ -82,8 +87,6 @@ protected:
 
 private:
     // --- Private Methods ---
-    /** @brief The main execution loop for the macro thread. */
-    void execute_macro_loop();
 
     /**
      * @brief Parses a string token (e.g., "kd.29") from the sequence into an Event object.
@@ -92,8 +95,8 @@ private:
      */
     std::unique_ptr<MacroAction::Event> tokenToEvent(const std::string& token);
 
-    /** @brief The static entry point for the pthread. */
-    static void* run_macro_thread(void* context);
+    // ENTFERNT: The static entry point is no longer needed.
+    // static void* run_macro_thread(void* context);
 
     // --- Private Member Variables ---
     /** The sequence of events that make up the macro. */
@@ -105,8 +108,9 @@ private:
     bool _is_macro_running;
     /** Flag to signal the running thread to terminate. */
     bool _thread_keep_repeating_flag;
-    /** The ID of the macro execution thread. */
-    pthread_t _macro_thread_id;
+    
+    // ENTFERNT: The thread ID is no longer managed here.
+    // pthread_t _macro_thread_id;
 };
 
 #endif // __MACRO_ACTION_H__
