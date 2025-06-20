@@ -1,0 +1,82 @@
+# =========================================
+# Allgemeine Ausschlüsse
+# =========================================
+
+# Log- und temporäre Dateien
+*.log
+*.tmp
+*~
+*.swp
+
+# Vom Betriebssystem generierte Dateien
+.DS_Store
+Thumbs.db
+
+
+# =========================================
+# C++ Treiber (g13-driver)
+# =========================================
+
+# Kompilierte Objektdateien
+*.o
+*.d
+
+# build-Verzeichnis
+g13-driver/src/build/
+
+# Das kompilierte Treiber-Executable
+# Gemäß README.md heißt das Executable "G13-Linux-Driver"
+Linux-G13-Driver
+
+
+# =========================================
+# Java GUI (g13-config-tool)
+# =========================================
+
+# Maven Build-Verzeichnis
+g13-config-tool/target/
+
+# Die generierte JAR-Datei, falls sie im Hauptverzeichnis landet
+# Gemäß README.md wird diese Datei verwendet
+Linux-G13-GUI.jar
+
+# Dateien des Maven Release-Plugins
+release.properties
+pom.xml.releaseBackup
+pom.xml.versionsBackup
+pom.xml.tag
+
+
+# =========================================
+# Folder for experimental stuff
+# =========================================
+experimental_stuff/
+
+
+# =========================================
+# IDE-spezifische Konfigurationsdateien
+# =========================================
+
+# IntelliJ IDEA
+.idea/
+*.iml
+*.ipr
+*.iws
+
+# Eclipse
+.classpath
+.project
+.settings/
+
+# VS Code
+.vscode/
+
+# Netbeans
+/nbproject/private/
+/nbbuild/
+/dist/
+/nbdist/
+.nb-gradle/
+
+# CLion / CMake (falls Benutzer damit arbeitet)
+/cmake-build-*/

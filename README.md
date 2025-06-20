@@ -120,16 +120,8 @@ If you don't want to use the GUI App, you can copy the folder .g13 from the g13-
 * else without UDEV-Rule Installation ('Autostart' is not possible without UDEV-Rule set)
 
  `!!! strictly not recommended and only for test purposes !!!`
-
-    ```bash
-    sudo -E ./G13-Linux-Driver
-    ```
-
-    The `-E` is to run it using your environment variables so it doesn't look for the `.g13` directory in `/root`  
-    If you want to run the command and then detach it so you can close the terminal:
-    ```bash
-    sudo -E ./G13-Linux-Driver &
-    ```
+ 
+    sudo HOME=$HOME ./G13-Linux-Driver
 
 
 ## Notes
