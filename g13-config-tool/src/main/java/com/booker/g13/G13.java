@@ -84,6 +84,27 @@ public class G13 extends JPanel {
 				} else {
 					// A regular key was selected, pass it to the keybind panel for editing.
 					keybindPanel.setSelectedKey(key);
+
+					// --- NEUE SYNCHRONISATIONS-LOGIK ---
+					// Synchronize the MacroEditorPanel with the selected key's macro.
+					int currentBindingNum = keybindPanel.getBindingsId();
+					if (currentBindingNum != -1) {
+						String property = "G" + key.getG13KeyCode();
+						String val = keyBindings[currentBindingNum].getProperty(property);
+
+						if (val != null && val.startsWith("m,")) {
+							try {
+								String[] parts = val.split("[,.]");
+								if (parts.length >= 2) {
+									int macroId = Integer.parseInt(parts[1]);
+									macroEditorPanel.selectMacroById(macroId);
+								}
+							} catch (NumberFormatException ex) {
+								System.err.println("Could not parse macro ID from binding: " + val);
+							}
+						}
+					}
+					// --- ENDE DER SYNCHRONISATIONS-LOGIK ---
 				}
 			}
 

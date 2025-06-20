@@ -34,8 +34,8 @@ public class MacroEditorPanel extends JPanel {
 	private final JTextField nameText = new JTextField();
 	private final JButton addDelayButton = new JButton("Add Delay");
 	private final JCheckBox captureDelays = new JCheckBox("Rec Delays", true);
-	private final JButton editButton = new JButton("Edit");
-	private final JButton deleteButton = new JButton("Delete");
+	private final JButton editButton = new JButton("Edit Delay");
+	private final JButton deleteButton = new JButton("Delete Step");
 	private final JButton recordButton = new JButton("Clear & Record");
 	
 	// --- State Variables ---
@@ -57,12 +57,27 @@ public class MacroEditorPanel extends JPanel {
         setComponentStates(false);
 	}
     
+	/**
+	 * Programmatically selects a macro in the selection combo box by its ID.
+	 * @param macroId The ID of the macro to select.
+	 */
+	public void selectMacroById(int macroId) {
+		if (macroId >= 0 && macroId < macroSelectionBox.getItemCount()) {
+			// Check if the selection is already correct to prevent listener loops.
+			if (macroSelectionBox.getSelectedIndex() != macroId) {
+				macroSelectionBox.setSelectedIndex(macroId);
+			}
+		}
+	}
+
     /**
      * Creates and arranges all UI components within the panel.
      */
     private void setupUI() {
         final JPanel northPanel = new JPanel(new BorderLayout());
 		northPanel.add(macroSelectionBox, BorderLayout.NORTH);
+
+		macroSelectionBox.setRenderer(new MacroListCellRenderer());
 
 		final JPanel namePanel = new JPanel(new BorderLayout());
 		namePanel.add(new JLabel("Name : "), BorderLayout.WEST);

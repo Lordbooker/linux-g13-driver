@@ -66,6 +66,14 @@ public class KeybindPanel extends JPanel {
 	}
 	
 	/**
+	 * Returns the ID of the currently loaded binding profile.
+	 * @return The binding profile ID (0-3), or -1 if none is loaded.
+	 */
+	public int getBindingsId() {
+		return this.bindingsId;
+	}
+
+	/**
 	 * Creates and arranges all UI components within the panel.
 	 */
 	private void setupUI() {
