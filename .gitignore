@@ -26,7 +26,7 @@ g13-driver/src/build/
 
 # Das kompilierte Treiber-Executable
 # Gemäß README.md heißt das Executable "G13-Linux-Driver"
-g13-driver/G13-Linux-Driver
+g13-driver/Linux-G13-Driver
 
 
 # =========================================
