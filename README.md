@@ -82,7 +82,6 @@ All config files are saved in `$(HOME)/.g13`
 ![alt text](docs/ConfigTool.jpg)
 
 The top 4 buttons under the LCD screen select the bindings.
-The joystick currently only supports key mappings
 
 If you are configuring the application while the driver is running, the driver will not pick up changes unless you select a different bindings set or you can restart the driver.
 
