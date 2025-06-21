@@ -1,7 +1,7 @@
 EXE_NAME = Linux-G13-Driver
 SRC_DIR  = cpp
 BUILD_DIR = build
-OBJS     = $(BUILD_DIR)/G13.o $(BUILD_DIR)/G13Action.o $(BUILD_DIR)/Macro.o $(BUILD_DIR)/MacroAction.o $(BUILD_DIR)/Main.o $(BUILD_DIR)/Output.o $(BUILD_DIR)/PassThroughAction.o $(BUILD_DIR)/MacroThreadPool.o
+OBJS     = $(BUILD_DIR)/G13.o $(BUILD_DIR)/G13Action.o $(BUILD_DIR)/Macro.o $(BUILD_DIR)/MacroAction.o $(BUILD_DIR)/Main.o $(BUILD_DIR)/Output.o $(BUILD_DIR)/PassThroughAction.o
 CC       = g++
 CXXFLAGS = -pthread
 CPPFLAGS =

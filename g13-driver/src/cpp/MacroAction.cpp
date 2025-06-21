@@ -5,22 +5,24 @@
 #include <sstream>    // For std::stringstream, enabling modern C++ string parsing
 
 #include "MacroAction.h"
-#include "MacroThreadPool.h" // <-- NEU
 
 /**
- * ENTFERNT: The static thread entry function is no longer needed.
- * The logic is now handled by the worker threads in the pool.
+ * @brief Static thread entry function.
+ * @param context A void pointer to the MacroAction instance.
+ * @return Always returns nullptr.
+ *
+ * This function is the entry point for the new thread created to run a macro.
+ * It casts the context back to a MacroAction pointer and calls the instance's
+ * execution loop.
  */
-/*
 void* MacroAction::run_macro_thread(void *context) {
     MacroAction* action = static_cast<MacroAction*>(context);
     action->execute_macro_loop();
     return nullptr;
 }
-*/
 
 /**
- * @brief The main loop for macro execution. Now called by a worker thread from the pool.
+ * @brief The main loop for macro execution within its own thread.
  *
  * This loop's logic is corrected to properly handle the repeat settings from the UI.
  * - _repeats == 0: Run the macro sequence once.
@@ -28,8 +30,6 @@ void* MacroAction::run_macro_thread(void *context) {
  * - _repeats > 1: Repeat the macro sequence a fixed number of times.
  */
 void MacroAction::execute_macro_loop() {
-    // Set running state at the beginning of execution.
-    _is_macro_running = true;
     _thread_keep_repeating_flag = true;
 
     // Case: Run Once. The GUI sends _repeats = 0 for this.
@@ -119,7 +119,7 @@ std::unique_ptr<MacroAction::Event> MacroAction::tokenToEvent(const std::string&
  * This constructor uses std::stringstream for robustly parsing the comma-separated sequence.
  */
 MacroAction::MacroAction(const std::string& sequence)
-    : _repeats(0), _repeats_on_press(0), _is_macro_running(false), _thread_keep_repeating_flag(false) { // _macro_thread_id entfernt
+    : _repeats(0), _repeats_on_press(0), _is_macro_running(false), _thread_keep_repeating_flag(false), _macro_thread_id(0) {
 
     // Use a stringstream to parse the comma-separated sequence.
     std::stringstream ss(sequence);
@@ -140,13 +140,13 @@ MacroAction::MacroAction(const std::string& sequence)
 /**
  * @brief Destructor for MacroAction.
  *
- * If a macro thread is still running, it signals the thread to stop.
- * The thread pool is responsible for the actual thread cleanup.
+ * If a macro thread is still running, it signals the thread to stop and
+ * waits for it to terminate cleanly to prevent resource leaks.
  */
 MacroAction::~MacroAction() {
     if (_is_macro_running) {
         _thread_keep_repeating_flag = false; // Signal the thread to stop.
-        // ENTFERNT: pthread_join is no longer needed here.
+        pthread_join(_macro_thread_id, nullptr); // Wait for the thread to finish.
     }
     // _events vector is cleaned up automatically by unique_ptr destructors.
 }
@@ -156,7 +156,7 @@ MacroAction::~MacroAction() {
 /**
  * @brief Handles the key-down event for this action.
  *
- * If a macro is not already running, it submits it to the MacroThreadPool for execution.
+ * If a macro is not already running, it starts a new thread to execute it.
  * If a macro is running, pressing the key again will signal it to stop.
  */
 void MacroAction::key_down() {
@@ -171,8 +171,13 @@ void MacroAction::key_down() {
             return; // Nothing to execute.
         }
 
-        // Submit this macro action to the central thread pool for execution.
-        MacroThreadPool::submit(this);
+        _is_macro_running = true;
+        // Create a new thread to run the macro, passing 'this' as the context.
+        if (pthread_create(&_macro_thread_id, nullptr, &MacroAction::run_macro_thread, this) != 0) {
+            // If thread creation fails, log the error and reset the state.
+            perror("pthread_create() error");
+            _is_macro_running = false;
+        }
     }
 }
 

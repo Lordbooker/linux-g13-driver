@@ -12,7 +12,6 @@
 
 #include "G13.h"
 #include "Output.h"
-#include "MacroThreadPool.h" // <-- NEU
 
 // --- Global Variables for Hot-Plug Management ---
 /** @brief Mutex to protect the g13_instances map from concurrent access by multiple threads. */
@@ -113,9 +112,6 @@ int main(int argc, char *argv[]) {
         return 1;
     }
 
-    // <-- NEU: Initialize the macro thread pool with 3 worker threads.
-    MacroThreadPool::initialize(3);
-
     // 2. Register signal handler for clean shutdown.
 	signal(SIGINT, signal_handler);
     signal(SIGTERM, signal_handler);
@@ -156,10 +152,6 @@ int main(int argc, char *argv[]) {
     std::cout << "All handler threads have finished." << std::endl;
 
     // 6. Clean up global resources now that threads are safely terminated.
-    
-    // <-- NEU: Shut down the macro thread pool before closing other resources.
-    MacroThreadPool::shutdown();
-    
     UInput::close_uinput();
     libusb_exit(ctx);
 
