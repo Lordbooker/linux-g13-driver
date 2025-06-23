@@ -34,8 +34,8 @@ public class MacroEditorPanel extends JPanel {
 	private final JTextField nameText = new JTextField();
 	private final JButton addDelayButton = new JButton("Add Delay");
 	private final JCheckBox captureDelays = new JCheckBox("Rec Delays", true);
-	private final JButton editButton = new JButton("Edit");
-	private final JButton deleteButton = new JButton("Delete");
+	private final JButton editButton = new JButton("Edit Delay");
+	private final JButton deleteButton = new JButton("Delete Step");
 	private final JButton recordButton = new JButton("Clear & Record");
 	
 	// --- State Variables ---
