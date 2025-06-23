@@ -79,7 +79,7 @@ or with rightclick on the file in your file-explorer.
 This will bring up the UI and create the initial files needed for your driver.  
 All config files are saved in `$(HOME)/.g13`
 
-![alt text](docs/ConfigTool.jpg)
+![alt text](docs/ConfigTool.png)
 
 The top 4 buttons under the LCD screen select the bindings.
 
