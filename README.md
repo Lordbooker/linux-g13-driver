@@ -56,12 +56,12 @@ The original project is over 10 years old. This fork has been refactored to use 
     ```bash
     make all
     ```
-* Install the driver and UDEV rule for secure access:
+* Install the UDEV rule for secure access:
     ```bash
     make install
     ```
 
-(For cleanup, you can use `make clean` to remove build files and `make uninstall` to remove the driver and the UDEV rule.)
+(For cleanup, you can use `make clean` to remove build files and `make uninstall` to remove the UDEV rule.)
 
 
 ## How to use the driver and the GUI App
