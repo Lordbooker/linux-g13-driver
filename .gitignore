@@ -23,6 +23,9 @@ Thumbs.db
 
 # build-Verzeichnis
 g13-driver/src/build/
+g13-driver/build/
+
+
 
 # Das kompilierte Treiber-Executable
 # Gemäß README.md heißt das Executable "G13-Linux-Driver"

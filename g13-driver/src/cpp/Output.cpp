@@ -107,8 +107,11 @@ bool UInput::create_uinput() {
 
 	// Configure the virtual device.
 	memset(&uinp, 0, sizeof(uinp));
-	char name[] = "G13";
-	strncpy(uinp.name, name, sizeof(name));
+	const char name[] = "G13";
+	// Use snprintf for safe string copying to avoid potential buffer overflows.
+	// This resolves the compiler warning.
+	snprintf(uinp.name, UINPUT_MAX_NAME_SIZE, "%s", name);
+
 	uinp.id.version = 1;
 	uinp.id.bustype = BUS_USB;
 	uinp.id.product = G13_PRODUCT_ID;
