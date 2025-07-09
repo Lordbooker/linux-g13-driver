@@ -66,6 +66,34 @@ The original project is over 10 years old. This fork has been refactored to use 
 
 ## How to use the driver and the GUI App
 
+### Run the driver
+
+* **the easy way**
+
+    If you have set the UDEV Rules, put the folder with the GUI-App and the driver wherever u want 
+    and put the driver to your "Autostart"-Options of your distro.
+    With your next logon, you will see a new tray-icon. Now you can open the config tool via tray-icon.
+
+
+* **else open a command prompt go to the directory where you build the driver**
+
+    ```bash
+    ./G13-Linux-Driver 
+    ```
+
+    or with rightclick on the file in your file-explorer.
+
+    ![alt text](docs/image2.png)
+
+
+
+* **else without UDEV-Rule Installation ('Autostart' is not possible without UDEV-Rule set)**
+
+ `!!! strictly not recommended and only for test purposes !!!`
+ 
+    sudo HOME=$HOME ./G13-Linux-Driver
+
+
 ### Use the config tool
   
 In a command prompt go to the downloaded and unzipped folder and type:
@@ -98,29 +126,6 @@ If you don't want to use the GUI App, you can copy the folder .g13 from the g13-
 
 * Usage Example: To map the G20 key to the letter T, find the event code for T (which is 20). Then, in your bindings-0.properties file, add or edit the line: G20=p,k.20.
 
-
-### Run the driver
-
-* **In a command prompt go to the directory where you build the driver**
-
-* If you have set the UDEV Rules, you now can start the driver with 
-    ```bash
-    ./G13-Linux-Driver 
-    ```
-
-    or with rightclick on the file in your file-explorer.
-
-    ![alt text](docs/image2.png)
-
-* for easier use, put the driver to your 'Autostart' Option in your distro. the driver has hotplug capabilty and its waiting for a new connection in the backround.   
-
-
-
-* else without UDEV-Rule Installation ('Autostart' is not possible without UDEV-Rule set)
-
- `!!! strictly not recommended and only for test purposes !!!`
- 
-    sudo HOME=$HOME ./G13-Linux-Driver
 
 
 ## Notes
