@@ -69,13 +69,13 @@ install:
 	UDEV_SOURCE_FILE=""; \
 	if getent group input >/dev/null; then \
 		echo "Found 'input' group. Using rule for 'input' group access."; \
-		UDEV_SOURCE_FILE="../udev/99-g13-input.rules"; \
+		UDEV_SOURCE_FILE="udev/99-g13-input.rules"; \
 	elif getent group plugdev >/dev/null; then \
 		echo "Found 'plugdev' group. Using rule for 'plugdev' group access."; \
-		UDEV_SOURCE_FILE="../udev/99-g13-plugdev.rules"; \
+		UDEV_SOURCE_FILE="udev/99-g13-plugdev.rules"; \
 	else \
 		echo "Warning: Neither 'input' nor 'plugdev' group found. Defaulting to 'input' rule."; \
-		UDEV_SOURCE_FILE="../udev/99-g13-input.rules"; \
+		UDEV_SOURCE_FILE="udev/99-g13-input.rules"; \
 	fi; \
 	\
 	if [ -f $$UDEV_SOURCE_FILE ]; then \
