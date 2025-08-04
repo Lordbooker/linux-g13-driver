@@ -13,41 +13,13 @@ The original project is over 10 years old. This fork has been refactored to use 
 
 ### Base Requirements
 
-* 'make' has to be installed
+Via your package-manager you have to install the following packages:
 
-### Driver Requirements
+* 'make'
+* 'gtk3_devel'
+* 'libusb-1.0-0' ( in some distros it might be "libusb-1.0-0 & libusb-1.0-0-dev" or "libusb1-devel" )
+* 'Java 17' or higher
 
-* **`libusb-1.0`**: This library is essential for the driver to communicate with the G13 device. (also the development version)
-
-    * **Debian / Ubuntu**
-        ```bash
-        sudo apt-get install libusb-1.0-0 libusb-1.0-0-dev
-        ```
-    * **Arch Linux and other Arch based distros**
-        ```bash
-        sudo pacman -S libusb
-        ```
-    * **Fedora / Nobara / etc.**
-        ```bash
-        sudo dnf install libusb1-devel
-        ```
-
-### GUI Requirements
-
-* **Java 17 (or higher)**: The graphical configuration tool requires a Java Runtime Environment.
-
-    * **Debian / Ubuntu**
-        ```bash
-        sudo apt-get install default-jre
-        ```
-    * **Arch Linux and other Arch based distros**
-        ```bash
-        sudo pacman -S jre-openjdk
-        ```
-    * **Fedora / Nobara / etc.**
-        ```bash
-        sudo dnf install java-latest-openjdk.x86_64
-        ```
 
 ## Build & Installation
 
