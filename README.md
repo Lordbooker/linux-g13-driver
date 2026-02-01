@@ -16,9 +16,7 @@ The original project is over 10 years old. This fork has been refactored to use 
 Via your package-manager you have to install the following packages:
 
 * 'make'
-* 'gtk3_devel'
-* 'libusb-1.0-0' ( in some distros it might be "libusb-1.0-0 & libusb-1.0-0-dev" or "libusb1-devel" )
-* 'Java 17' or higher
+*  all needed dependencies should be loaded via makefile
 
 
 ## Build & Installation
@@ -27,10 +25,6 @@ Via your package-manager you have to install the following packages:
 * Build the driver:
     ```bash
     make all
-    ```
-* Install the UDEV rule for secure access:
-    ```bash
-    make install
     ```
 
 (For cleanup, you can use `make clean` to remove build files and `make uninstall` to remove the UDEV rule.)
@@ -42,15 +36,15 @@ Via your package-manager you have to install the following packages:
 
 * **the easy way**
 
-    If you have set the UDEV Rules, put the folder with the GUI-App and the driver wherever u want 
-    and put the driver to your "Autostart"-Options of your distro.
+    If you have set the UDEV Rules, put the folder with the GUI-App and the driver wherever u want and put the driver to your "Autostart"-Options of your distro.
     With your next logon, you will see a new tray-icon. Now you can open the config tool via tray-icon.
 
 
 * **else open a command prompt go to the directory where you build the driver**
 
     ```bash
-    ./G13-Linux-Driver 
+    cd ~/.g13
+    ./Linux-G13-Driver
     ```
 
     or with rightclick on the file in your file-explorer.
