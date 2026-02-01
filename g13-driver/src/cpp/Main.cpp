@@ -6,10 +6,12 @@
 #include <csignal>
 #include <cstdlib>
 #include <unistd.h>
-#include <pthread.h>
+#include <thread>
+#include <mutex>
 #include <libusb-1.0/libusb.h>
 #include <iomanip>
 #include <libgen.h> // For dirname()
+#include <sys/wait.h> // For waitpid
 
 // Headers for the tray icon functionality
 #include <gtk/gtk.h>
@@ -19,14 +21,14 @@
 #include "Output.h"
 
 // --- Global Variables ---
-pthread_mutex_t g13_map_mutex = PTHREAD_MUTEX_INITIALIZER;
-std::map<uint16_t, pthread_t> g13_instances;
+std::mutex g13_map_mutex;
+std::map<uint16_t, std::thread> g13_instances;
 volatile sig_atomic_t daemon_keep_running = 1;
 
 AppIndicator *indicator = NULL;
 std::string gui_jar_path;
 libusb_context *ctx = nullptr;
-pthread_t device_thread;
+std::thread device_thread;
 
 // --- Forward Declarations ---
 static void quit_driver(GtkMenuItem *item, gpointer user_data);
@@ -47,17 +49,21 @@ uint16_t get_device_key(libusb_device *dev) {
 }
 
 // --- G13 Device Handling ---
-void *executeG13(void *arg) {
-    libusb_device *dev = (libusb_device *)arg;
+void executeG13(libusb_device *dev) {
     uint16_t key = get_device_key(dev);
-    G13 g13(dev);
-    g13.start();
+    
+    // Create G13 instance on stack (RAII)
+    {
+        G13 g13(dev);
+        g13.start(); 
+    } // g13 destructor called here
 
-    pthread_mutex_lock(&g13_map_mutex);
-    g13_instances.erase(key);
-    pthread_mutex_unlock(&g13_map_mutex);
+    // Cleanup after device disconnects
+    std::lock_guard<std::mutex> lock(g13_map_mutex);
+    if (g13_instances.find(key) != g13_instances.end()) {
+        // Thread is managed in the map
+    }
     libusb_unref_device(dev);
-    return nullptr;
 }
 
 void find_and_manage_devices() {
@@ -71,33 +77,54 @@ void find_and_manage_devices() {
 
         if (desc.idVendor == G13_VENDOR_ID && desc.idProduct == G13_PRODUCT_ID) {
             uint16_t key = get_device_key(devs[i]);
-            pthread_mutex_lock(&g13_map_mutex);
+            
+            std::lock_guard<std::mutex> lock(g13_map_mutex);
             if (g13_instances.find(key) == g13_instances.end()) {
                 std::cout << "New G13 device connected (ID: " << std::hex << key << "). Starting handler thread." << std::endl;
-                pthread_t thread;
+                
                 libusb_ref_device(devs[i]);
-                pthread_create(&thread, nullptr, executeG13, devs[i]);
-                g13_instances[key] = thread;
+                // Move semantic for std::thread
+                g13_instances[key] = std::thread(executeG13, devs[i]);
             }
-            pthread_mutex_unlock(&g13_map_mutex);
         }
     }
     libusb_free_device_list(devs, 1);
 }
 
-void* device_management_thread_loop(void* arg) {
+void device_management_thread_loop() {
     while (daemon_keep_running) {
         find_and_manage_devices();
-        sleep(1);
+        std::this_thread::sleep_for(std::chrono::seconds(1));
     }
-    return nullptr;
 }
 
 // --- Tray Icon and Main Application Logic ---
 static void show_gui(GtkMenuItem *item, gpointer user_data) {
-    std::string command = "java -jar \"" + gui_jar_path + "\" &";
-    std::cout << "Executing: " << command << std::endl;
-    system(command.c_str());
+    std::cout << "Attempting to start GUI from path: " << gui_jar_path << std::endl;
+
+    pid_t pid = fork();
+
+    if (pid == -1) {
+        std::cerr << "Failed to fork process for GUI start." << std::endl;
+    } 
+    else if (pid == 0) {
+        // CHILD PROCESS
+        setsid(); // Detach from parent
+
+        // Redirect stdout/stderr to avoid cluttering driver logs
+        freopen("/dev/null", "w", stdout);
+        freopen("/dev/null", "w", stderr);
+
+        // Secure execution without shell
+        execlp("java", "java", "-jar", gui_jar_path.c_str(), (char *)NULL);
+
+        // If we reach here, execlp failed
+        _exit(1); 
+    } 
+    else {
+        // PARENT PROCESS
+        std::cout << "GUI process started with PID: " << pid << std::endl;
+    }
 }
 
 static void create_tray_icon() {
@@ -129,19 +156,19 @@ static void quit_driver(GtkMenuItem *item, gpointer user_data) {
     daemon_keep_running = 0;
     
     // Join the device management thread
-    pthread_join(device_thread, nullptr);
+    if (device_thread.joinable()) {
+        device_thread.join();
+    }
     std::cout << "Device management thread finished." << std::endl;
 
     // Join all active G13 handler threads
-    std::vector<pthread_t> threads_to_join;
-    pthread_mutex_lock(&g13_map_mutex);
-    for (auto const& [key, thread_id] : g13_instances) {
-        threads_to_join.push_back(thread_id);
+    std::lock_guard<std::mutex> lock(g13_map_mutex);
+    for (auto& [key, th] : g13_instances) {
+        if (th.joinable()) {
+            th.join();
+        }
     }
-    pthread_mutex_unlock(&g13_map_mutex);
-    for (pthread_t th : threads_to_join) {
-        pthread_join(th, nullptr);
-    }
+    g13_instances.clear();
     std::cout << "All G13 handler threads have finished." << std::endl;
 
     // Clean up global resources
@@ -186,8 +213,11 @@ extern "C" int main(int argc, char *argv[]) {
     // 5. Create UI and start background threads
     create_tray_icon();
     std::cout << "G13 driver started. Tray icon is active." << std::endl;
-    if (pthread_create(&device_thread, nullptr, device_management_thread_loop, nullptr) != 0) {
-        std::cerr << "Failed to create device management thread. Exiting." << std::endl;
+    
+    try {
+        device_thread = std::thread(device_management_thread_loop);
+    } catch (const std::system_error& e) {
+        std::cerr << "Failed to create device management thread: " << e.what() << std::endl;
         UInput::close_uinput();
         libusb_exit(ctx);
         return 1;

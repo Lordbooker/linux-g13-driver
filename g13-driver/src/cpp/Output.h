@@ -1,23 +1,22 @@
 #ifndef __OUTPUT_H__
 #define __OUTPUT_H__
 
-#include <pthread.h>
+#include <mutex>
 
 /**
  * @class UInput
  * @brief A static utility class for managing a virtual input device via /dev/uinput.
  *
  * This class encapsulates the creation, destruction, and event sending for a
- * virtual keyboard/joystick. It is designed to be used statically, preventing
- * instantiation and ensuring a single point of access to the uinput device.
- * All operations are thread-safe.
+ * virtual keyboard/joystick. It is designed to be used statically.
+ * All operations are thread-safe using std::mutex.
  */
 class UInput {
 private:
     /** The file descriptor for the opened /dev/uinput device. */
     static int file;
     /** A mutex to ensure thread-safe access to the file descriptor. */
-    static pthread_mutex_t plock;
+    static std::mutex plock;
 
 public:
     // Prevent instantiation of this static utility class.
