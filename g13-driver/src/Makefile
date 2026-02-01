@@ -75,7 +75,7 @@ else ifdef HAS_DNF
 endif
 
 # =============================================================================
-# Step 2: Install UDEV Rules
+# Step 2: Install UDEV Rules & Add User to Group
 # =============================================================================
 install-udev:
 	@echo "--- Installing UDEV Rules ---"
@@ -84,15 +84,34 @@ install-udev:
 	elif [ -d /lib/udev/rules.d ]; then UDEV_RULES_DIR="/lib/udev/rules.d"; \
 	else echo "Error: Udev directory not found." >&2; exit 1; fi; \
 	\
+	# Entscheide welche Gruppe wir nutzen (plugdev bevorzugt, sonst input)
+	TARGET_GROUP="input"; \
 	UDEV_FILE="udev/99-g13-input.rules"; \
 	if getent group plugdev >/dev/null; then \
+		TARGET_GROUP="plugdev"; \
 		UDEV_FILE="udev/99-g13-plugdev.rules"; \
-		echo "Using 'plugdev' group rule."; \
+		echo "System has 'plugdev' group. Using it."; \
 	else \
-		echo "Using 'input' group rule."; \
+		echo "System has no 'plugdev' group. Using 'input'."; \
 	fi; \
-	sudo cp $$UDEV_FILE $$UDEV_RULES_DIR/99-g13.rules
-	@echo "Reloading UDEV rules..."
+	\
+	# 1. Regel kopieren
+	sudo cp $$UDEV_FILE $$UDEV_RULES_DIR/99-g13.rules; \
+	\
+	# 2. User zur Gruppe hinzufügen, falls noch nicht drin
+	if ! groups $(REAL_USER) | grep -q "\b$$TARGET_GROUP\b"; then \
+		echo "Adding user '$(REAL_USER)' to group '$$TARGET_GROUP'..."; \
+		sudo usermod -aG $$TARGET_GROUP $(REAL_USER); \
+		echo "--------------------------------------------------------"; \
+		echo " ACHTUNG: Sie wurden der Gruppe '$$TARGET_GROUP' hinzugefügt."; \
+		echo " Sie MÜSSEN sich ab- und wieder anmelden, damit das wirksam wird!"; \
+		echo "--------------------------------------------------------"; \
+	else \
+		echo "User '$(REAL_USER)' is already in group '$$TARGET_GROUP'. Good."; \
+	fi; \
+	\
+	# 3. Regeln neu laden
+	echo "Reloading UDEV rules..."; \
 	sudo udevadm control --reload-rules && sudo udevadm trigger
 
 # =============================================================================
