@@ -1,4 +1,4 @@
-#include <iostream>
+#include <iostream> // Wird noch für std::hex in stream-manipulation genutzt, falls nötig, sonst entfernbar. Hier sicherer drin lassen für stringstreams.
 #include <fstream>
 #include <vector>
 #include <map>
@@ -12,6 +12,7 @@
 #include <iomanip>
 #include <libgen.h> // For dirname()
 #include <sys/wait.h> // For waitpid
+#include <syslog.h> // Logging
 
 // Headers for the tray icon functionality
 #include <gtk/gtk.h>
@@ -80,7 +81,7 @@ void find_and_manage_devices() {
             
             std::lock_guard<std::mutex> lock(g13_map_mutex);
             if (g13_instances.find(key) == g13_instances.end()) {
-                std::cout << "New G13 device connected (ID: " << std::hex << key << "). Starting handler thread." << std::endl;
+                syslog(LOG_INFO, "New G13 device connected (ID: %x). Starting handler thread.", key);
                 
                 libusb_ref_device(devs[i]);
                 // Move semantic for std::thread
@@ -100,12 +101,12 @@ void device_management_thread_loop() {
 
 // --- Tray Icon and Main Application Logic ---
 static void show_gui(GtkMenuItem *item, gpointer user_data) {
-    std::cout << "Attempting to start GUI from path: " << gui_jar_path << std::endl;
+    syslog(LOG_INFO, "Attempting to start GUI from path: %s", gui_jar_path.c_str());
 
     pid_t pid = fork();
 
     if (pid == -1) {
-        std::cerr << "Failed to fork process for GUI start." << std::endl;
+        syslog(LOG_ERR, "Failed to fork process for GUI start.");
     } 
     else if (pid == 0) {
         // CHILD PROCESS
@@ -123,7 +124,7 @@ static void show_gui(GtkMenuItem *item, gpointer user_data) {
     } 
     else {
         // PARENT PROCESS
-        std::cout << "GUI process started with PID: " << pid << std::endl;
+        syslog(LOG_INFO, "GUI process started with PID: %d", pid);
     }
 }
 
@@ -152,14 +153,14 @@ void signal_handler(int signum) {
 static void quit_driver(GtkMenuItem *item, gpointer user_data) {
     if (!daemon_keep_running) return;
 
-    std::cout << "\nShutting down driver..." << std::endl;
+    syslog(LOG_INFO, "Shutting down driver...");
     daemon_keep_running = 0;
     
     // Join the device management thread
     if (device_thread.joinable()) {
         device_thread.join();
     }
-    std::cout << "Device management thread finished." << std::endl;
+    syslog(LOG_INFO, "Device management thread finished.");
 
     // Join all active G13 handler threads
     std::lock_guard<std::mutex> lock(g13_map_mutex);
@@ -169,7 +170,7 @@ static void quit_driver(GtkMenuItem *item, gpointer user_data) {
         }
     }
     g13_instances.clear();
-    std::cout << "All G13 handler threads have finished." << std::endl;
+    syslog(LOG_INFO, "All G13 handler threads have finished.");
 
     // Clean up global resources
     if(indicator) {
@@ -177,12 +178,16 @@ static void quit_driver(GtkMenuItem *item, gpointer user_data) {
     }
     UInput::close_uinput();
     libusb_exit(ctx);
-    std::cout << "Shutdown complete." << std::endl;
+    syslog(LOG_INFO, "Shutdown complete.");
+    closelog(); // Schließt die Verbindung zum Logger sauber
 
     gtk_main_quit();
 }
 
 extern "C" int main(int argc, char *argv[]) {
+    // 0. Initialize Syslog
+    openlog("linux-g13-driver", LOG_PID | LOG_CONS, LOG_USER);
+
     // 1. Initialize GTK
     gtk_init(&argc, &argv);
 
@@ -191,17 +196,17 @@ extern "C" int main(int argc, char *argv[]) {
     for (int i = 1; i < argc; ++i) {
         if (std::string(argv[i]) == "--gui-path" && i + 1 < argc) {
             gui_jar_path = argv[++i];
-            std::cout << "GUI path set from command line: " << gui_jar_path << std::endl;
+            syslog(LOG_INFO, "GUI path set from command line: %s", gui_jar_path.c_str());
         }
     }
 
     // 3. Initialize driver components
     if (!UInput::create_uinput()) {
-        std::cerr << "Failed to initialize uinput. Exiting." << std::endl;
+        syslog(LOG_ERR, "Failed to initialize uinput. Exiting.");
         return 1;
     }
     if (libusb_init(&ctx) < 0) {
-        std::cerr << "Failed to initialize libusb. Exiting." << std::endl;
+        syslog(LOG_ERR, "Failed to initialize libusb. Exiting.");
         UInput::close_uinput();
         return 1;
     }
@@ -212,12 +217,12 @@ extern "C" int main(int argc, char *argv[]) {
 
     // 5. Create UI and start background threads
     create_tray_icon();
-    std::cout << "G13 driver started. Tray icon is active." << std::endl;
+    syslog(LOG_INFO, "G13 driver started. Tray icon is active.");
     
     try {
         device_thread = std::thread(device_management_thread_loop);
     } catch (const std::system_error& e) {
-        std::cerr << "Failed to create device management thread: " << e.what() << std::endl;
+        syslog(LOG_ERR, "Failed to create device management thread: %s", e.what());
         UInput::close_uinput();
         libusb_exit(ctx);
         return 1;

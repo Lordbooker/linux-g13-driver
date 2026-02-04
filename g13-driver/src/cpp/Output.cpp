@@ -1,5 +1,3 @@
-#include <iostream>
-#include <fstream>
 #include <vector>
 #include <sys/stat.h>
 #include <stdio.h>
@@ -12,6 +10,7 @@
 #include <fcntl.h>
 #include <mutex>
 #include <sys/time.h> // for gettimeofday
+#include <syslog.h> //  Logging
 
 #include "Output.h"
 #include "Constants.h"
@@ -77,18 +76,18 @@ bool UInput::create_uinput() {
 			access("/dev/uinput", F_OK) == 0 ? "/dev/uinput" : 0;
 
 	if (!dev_uinput_fname) {
-		cerr << "Could not find an uinput device" << endl;
+		syslog(LOG_ERR, "Could not find an uinput device");
 		return false;
 	}
 
 	if (access(dev_uinput_fname, W_OK) != 0) {
-		cerr << dev_uinput_fname << " doesn't grant write permissions" << endl;
+		syslog(LOG_ERR, "%s doesn't grant write permissions", dev_uinput_fname);
 		return false;
 	}
 
 	file = open(dev_uinput_fname, O_WRONLY | O_NDELAY);
 	if (file < 0) {
-		cerr << "Could not open uinput" << endl;
+		syslog(LOG_ERR, "Could not open uinput");
 		return false;
 	}
 
@@ -121,7 +120,7 @@ bool UInput::create_uinput() {
 	// Write configuration
 	int retcode = write(file, &uinp, sizeof(uinp));
 	if (retcode < 0) {
-		cerr << "Could not write to uinput device (" << retcode << ")" << endl;
+		syslog(LOG_ERR, "Could not write to uinput device (%d)", retcode);
         close(file); file = -1;
 		return false;
 	}
@@ -129,7 +128,7 @@ bool UInput::create_uinput() {
 	// Create device
 	retcode = ioctl(file, UI_DEV_CREATE);
 	if (retcode) {
-		cerr << "Error creating uinput device for G13" << endl;
+		syslog(LOG_ERR, "Error creating uinput device for G13");
         close(file); file = -1;
 		return false;
 	}

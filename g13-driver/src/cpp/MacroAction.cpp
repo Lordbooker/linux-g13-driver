@@ -1,9 +1,9 @@
 #include <string.h>
 #include <vector>
-#include <iostream>
 #include <memory>
 #include <sstream>
 #include <thread>
+#include <syslog.h> // Logging
 
 #include "MacroAction.h"
 
@@ -60,7 +60,7 @@ std::unique_ptr<MacroAction::Event> MacroAction::tokenToEvent(const std::string&
             return std::make_unique<WaitEvent>(std::stoi(token.substr(2)));
         }
     } catch (...) {
-        std::cerr << "MacroAction::tokenToEvent: Error parsing token: " << token << std::endl;
+        syslog(LOG_ERR, "MacroAction::tokenToEvent: Error parsing token: %s", token.c_str());
     }
     return nullptr;
 }

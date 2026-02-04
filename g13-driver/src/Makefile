@@ -1,42 +1,30 @@
 # =============================================================================
-# Modernized Makefile for G13 Driver & GUI Installation
+# Universal Makefile for G13 Driver (Arch, Ubuntu, Fedora)
 # =============================================================================
 
-# --- User Detection (Robust against sudo) ---
-# Erkennt den echten User, auch wenn 'sudo make' ausgeführt wird
+# --- User Detection ---
+# Detects the real user even when running with 'sudo make'
 ifdef SUDO_USER
     REAL_USER := $(SUDO_USER)
-    # Ermittelt das Home-Verzeichnis des echten Users aus /etc/passwd
     USER_HOME := $(shell getent passwd $(SUDO_USER) | cut -d: -f6)
 else
     REAL_USER := $(shell whoami)
     USER_HOME := $(HOME)
 endif
 
-# --- Compiler & Flags ---
-CXX      := g++
-CXXFLAGS := -Wall -std=c++17 `pkg-config --cflags libusb-1.0 appindicator3-0.1` -pthread -Icpp
-LDFLAGS  := `pkg-config --libs libusb-1.0 appindicator3-0.1` -pthread
-
 # --- Directories & Paths ---
-SRC_DIR     := cpp
 BUILD_DIR   := ../build
-TARGET      := ../Linux-G13-Driver
+TARGET_NAME := Linux-G13-Driver
+TARGET_PATH := ../$(TARGET_NAME)
 
-# GUI Paths (Relative to g13-driver/src)
+# GUI Paths
 GUI_ROOT    := ../../g13-config-tool
 GUI_JAR_SRC := $(GUI_ROOT)/target/Linux-G13-GUI.jar
 GUI_JAR_NAME:= Linux-G13-GUI.jar
 
 # Config Paths
 BINDINGS_SRC:= ../bindings/.g13
-
-# Install Destinations (Now uses detected USER_HOME)
 INSTALL_DIR := $(USER_HOME)/.g13
-
-# --- Source Files ---
-SRCS := G13.cpp G13Action.cpp Macro.cpp MacroAction.cpp Main.cpp Output.cpp PassThroughAction.cpp
-OBJS := $(addprefix $(BUILD_DIR)/, $(SRCS:.cpp=.o))
 
 # --- Distro Detection ---
 HAS_PACMAN := $(shell command -v pacman 2> /dev/null)
@@ -50,93 +38,63 @@ HAS_DNF    := $(shell command -v dnf 2> /dev/null)
 # =============================================================================
 all: dependencies install-udev build-driver build-gui deploy clean-build
 	@echo "========================================================"
-	@echo " Installation erfolgreich abgeschlossen!"
-	@echo " Installiert für User: $(REAL_USER)"
-	@echo " Speicherort:          $(INSTALL_DIR)"
-	@echo " Starten Sie den Treiber mit: $(INSTALL_DIR)/Linux-G13-Driver"
+	@echo " Installation Complete!"
+	@echo " Distro Support: Arch, Ubuntu, Fedora detected."
+	@echo "========================================================"
+	@echo " Installed for User:   $(REAL_USER)"
+	@echo " Install Location:     $(INSTALL_DIR)"
+	@echo " Start the driver via: $(INSTALL_DIR)/$(TARGET_NAME)"
 	@echo "========================================================"
 
 # =============================================================================
-# Step 1: Install Dependencies
+# Step 1: Install Dependencies (Distro-Specific)
 # =============================================================================
 dependencies:
 	@echo "--- Checking and Installing Dependencies ---"
 ifdef HAS_PACMAN
 	@echo "Detected Arch Linux (pacman)"
-	# sudo wird nur aufgerufen, wenn wir nicht schon root sind
-	sudo pacman -S --noconfirm base-devel libusb gtk3 libappindicator-gtk3 maven jdk17-openjdk
+	sudo pacman -S --noconfirm base-devel cmake libusb gtk3 libappindicator-gtk3 maven jdk17-openjdk
 else ifdef HAS_APT
 	@echo "Detected Debian/Ubuntu (apt)"
 	sudo apt-get update
-	sudo apt-get install -y build-essential libusb-1.0-0-dev libgtk-3-dev libappindicator3-dev maven openjdk-17-jdk
+	sudo apt-get install -y build-essential cmake libusb-1.0-0-dev libgtk-3-dev libappindicator3-dev maven openjdk-17-jdk
 else ifdef HAS_DNF
 	@echo "Detected Fedora/RHEL (dnf)"
-	sudo dnf install -y make automake gcc gcc-c++ kernel-devel libusb1-devel gtk3-devel libappindicator-gtk3-devel maven java-17-openjdk-devel
+	sudo dnf install -y make automake cmake gcc gcc-c++ kernel-devel libusb1-devel gtk3-devel libappindicator-gtk3-devel maven java-17-openjdk-devel
 endif
 
 # =============================================================================
-# Step 2: Install UDEV Rules & Add User to Group
+# Step 2: Install UDEV Rules (Universal)
 # =============================================================================
 install-udev:
-	@echo "--- Installing UDEV Rules ---"
+	@echo "--- Installing Universal UDEV Rules ---"
+	@# Find correct udev directory
 	@UDEV_RULES_DIR=""; \
 	if [ -d /etc/udev/rules.d ]; then UDEV_RULES_DIR="/etc/udev/rules.d"; \
 	elif [ -d /lib/udev/rules.d ]; then UDEV_RULES_DIR="/lib/udev/rules.d"; \
 	else echo "Error: Udev directory not found." >&2; exit 1; fi; \
 	\
-	# Entscheide welche Gruppe wir nutzen (plugdev bevorzugt, sonst input)
-	TARGET_GROUP="input"; \
-	UDEV_FILE="udev/99-g13-input.rules"; \
-	if getent group plugdev >/dev/null; then \
-		TARGET_GROUP="plugdev"; \
-		UDEV_FILE="udev/99-g13-plugdev.rules"; \
-		echo "System has 'plugdev' group. Using it."; \
-	else \
-		echo "System has no 'plugdev' group. Using 'input'."; \
-	fi; \
+	# Copy rule file
+	sudo cp udev/99-g13.rules $$UDEV_RULES_DIR/99-g13.rules; \
 	\
-	# 1. Regel kopieren
-	sudo cp $$UDEV_FILE $$UDEV_RULES_DIR/99-g13.rules; \
-	\
-	# 2. User zur Gruppe hinzufügen, falls noch nicht drin
-	if ! groups $(REAL_USER) | grep -q "\b$$TARGET_GROUP\b"; then \
-		echo "Adding user '$(REAL_USER)' to group '$$TARGET_GROUP'..."; \
-		sudo usermod -aG $$TARGET_GROUP $(REAL_USER); \
-		echo "--------------------------------------------------------"; \
-		echo " ACHTUNG: Sie wurden der Gruppe '$$TARGET_GROUP' hinzugefügt."; \
-		echo " Sie MÜSSEN sich ab- und wieder anmelden, damit das wirksam wird!"; \
-		echo "--------------------------------------------------------"; \
-	else \
-		echo "User '$(REAL_USER)' is already in group '$$TARGET_GROUP'. Good."; \
-	fi; \
-	\
-	# 3. Regeln neu laden
+	# Reload rules
 	echo "Reloading UDEV rules..."; \
 	sudo udevadm control --reload-rules && sudo udevadm trigger
 
 # =============================================================================
-# Step 3: Build C++ Driver
+# Step 3: Build C++ Driver (Via CMake)
 # =============================================================================
-build-driver: $(TARGET)
-
-$(TARGET): $(OBJS)
-	@echo "Linking executable: $@"
-	$(CXX) $(OBJS) -o $@ $(LDFLAGS)
-
-$(BUILD_DIR)/%.o: $(SRC_DIR)/%.cpp | $(BUILD_DIR)
-	@echo "Compiling $< -> $@"
-	$(CXX) $(CXXFLAGS) -c $< -o $@
-
-$(BUILD_DIR):
-	@mkdir -p $@
+build-driver:
+	@echo "--- Building C++ Driver with CMake ---"
+	mkdir -p $(BUILD_DIR)
+	cd $(BUILD_DIR) && cmake ../src && make
+	cp $(BUILD_DIR)/$(TARGET_NAME) $(TARGET_PATH)
 
 # =============================================================================
 # Step 4: Build Java GUI (Maven)
 # =============================================================================
 build-gui:
 	@echo "--- Building Java GUI with Maven ---"
-	# Maven sollte idealerweise nicht als root laufen, um Cache-Probleme zu vermeiden.
-	# Wir versuchen es als der echte User auszuführen, falls sudo genutzt wird.
 ifdef SUDO_USER
 	cd $(GUI_ROOT) && sudo -u $(REAL_USER) mvn clean package
 else
@@ -144,51 +102,40 @@ else
 endif
 
 # =============================================================================
-# Step 5: Deploy to User Home (~/.g13)
+# Step 5: Deploy
 # =============================================================================
 deploy:
 	@echo "--- Deploying files to $(INSTALL_DIR) ---"
 	mkdir -p $(INSTALL_DIR)
-	
-	# Dateien kopieren
-	cp $(TARGET) $(INSTALL_DIR)/
+	cp $(TARGET_PATH) $(INSTALL_DIR)/
 	cp $(GUI_JAR_SRC) $(INSTALL_DIR)/$(GUI_JAR_NAME)
-	
-	# Configs kopieren (nicht überschreiben, falls vorhanden)
+	# Only copy configs if none exist to avoid overwriting user settings
 	if [ -z "$$(ls -A $(INSTALL_DIR)/*.properties 2>/dev/null)" ]; then \
 		echo "Copying default configs..."; \
 		cp $(BINDINGS_SRC)/*.properties $(INSTALL_DIR)/; \
-	else \
-		echo "Configs exist. Skipping overwrite."; \
 	fi
-	
-	# Executable Bit setzen
-	chmod +x $(INSTALL_DIR)/Linux-G13-Driver
-
-	# WICHTIG: Besitzrechte korrigieren, falls wir als root (sudo) laufen
+	chmod +x $(INSTALL_DIR)/$(TARGET_NAME)
 ifdef SUDO_USER
-	@echo "Fixing ownership for user $(REAL_USER)..."
 	chown -R $(REAL_USER): $(INSTALL_DIR)
 endif
 
 # =============================================================================
-# Step 6: Cleanup Build Artifacts
+# Step 6: Cleanup
 # =============================================================================
 clean-build:
-	@echo "--- Cleaning up build files ---"
 	rm -rf $(BUILD_DIR)
-	rm -f $(TARGET)
+
+clean: clean-build
+	rm -f $(TARGET_PATH)
 ifdef SUDO_USER
 	cd $(GUI_ROOT) && sudo -u $(REAL_USER) mvn clean
 else
 	cd $(GUI_ROOT) && mvn clean
 endif
-
-clean: clean-build
 	@echo "Full clean finished."
 
 uninstall:
 	@echo "Removing UDEV rules..."
 	sudo rm -f /etc/udev/rules.d/99-g13.rules /lib/udev/rules.d/99-g13.rules
 	sudo udevadm control --reload-rules
-	@echo "To remove the application, simply delete $(INSTALL_DIR)"
+	@echo "To remove the application, delete $(INSTALL_DIR)"

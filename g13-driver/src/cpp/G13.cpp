@@ -1,4 +1,4 @@
-#include <iostream>
+#include <iostream> // Behalten für stringstream
 #include <fstream>
 #include <vector>
 #include <sys/stat.h>
@@ -15,6 +15,7 @@
 #include <sstream>
 #include <istream>
 #include <chrono> // For cooldown on checking file
+#include <syslog.h> // Logging
 
 #include "Constants.h"
 #include "G13.h"
@@ -47,22 +48,22 @@ G13::G13(libusb_device *device) {
 	}
 
 	if (libusb_open(device, &handle) != 0) {
-		std::cerr << "Error opening G13 device" << std::endl;
+		syslog(LOG_ERR, "Error opening G13 device");
 		return;
 	}
 
 	if (libusb_kernel_driver_active(handle, 0) == 1) {
 		if (libusb_detach_kernel_driver(handle, 0) == 0) {
-			std::cout << "Kernel driver detached" << std::endl;
+			syslog(LOG_INFO, "Kernel driver detached");
 		}
 	}
 
 	if (libusb_claim_interface(handle, 0) < 0) {
-		std::cerr << "Cannot Claim Interface" << std::endl;
+		syslog(LOG_ERR, "Cannot Claim Interface");
 		return;
 	}
 
-    std::cout << "Initializing G13 display..." << std::endl;
+    syslog(LOG_INFO, "Initializing G13 display...");
     unsigned char lcd_init_payload[] = { 0x01 };
     libusb_control_transfer(handle,
         (LIBUSB_REQUEST_TYPE_CLASS | LIBUSB_RECIPIENT_INTERFACE), 0x09, 0x0300, 0x0000,
@@ -110,7 +111,7 @@ void G13::check_for_config_update() {
     struct stat file_stat;
     if (stat(filename, &file_stat) == 0) {
         if (last_config_mtime != 0 && file_stat.st_mtime > last_config_mtime) {
-            std::cout << "Config file change detected. Reloading..." << std::endl;
+            syslog(LOG_INFO, "Config file change detected. Reloading...");
             loadBindings();
         }
     }
@@ -224,7 +225,7 @@ void G13::loadBindings() {
 
 	std::ifstream file(filename);
 	if (!file.is_open()) {
-		std::cout << "Config file not found: " << filename << ". Loading defaults." << std::endl;
+		syslog(LOG_WARNING, "Config file not found: %s. Loading defaults.", filename);
         const std::string default_bindings = R"RAW(
 # Default G13 Key Bindings
 G19=p,k.42
@@ -268,7 +269,7 @@ G20=p,k.50
         parse_bindings_from_stream(ss);
 	}
     else {
-        std::cout << "Loading config file: " << filename << std::endl;
+        syslog(LOG_INFO, "Loading config file: %s", filename);
         parse_bindings_from_stream(file);
         file.close();
     }
@@ -286,13 +287,13 @@ int G13::read() {
 	int error = libusb_interrupt_transfer(handle, LIBUSB_ENDPOINT_IN | G13_KEY_ENDPOINT, buffer, G13_REPORT_SIZE, &size, 100);
 
     if (error == LIBUSB_ERROR_NO_DEVICE) {
-        std::cerr << "G13 device disconnected." << std::endl;
+        syslog(LOG_ERR, "G13 device disconnected.");
         return -4; 
     }
     
 	if (error && error != LIBUSB_ERROR_TIMEOUT) {
         // Log error only if it's not a timeout (timeout is normal now due to polling)
-		std::cerr << "Error while reading keys: " << libusb_error_name(error) << std::endl;
+		syslog(LOG_ERR, "Error while reading keys: %s", libusb_error_name(error));
 		return -1;
 	}
 
