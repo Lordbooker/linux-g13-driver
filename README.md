@@ -26,8 +26,8 @@ Via your package-manager you have to install the following packages:
     ```bash
     make all
     ```
-
-(For cleanup, you can use `make clean` to remove build files and `make uninstall` to remove the UDEV rule.)
+The Installprocess will cleanup after ending. 
+In other cases you can use `make clean` to remove build files and `make uninstall` to remove the UDEV rule.
 
 
 ## How to use the driver and the GUI App
@@ -61,10 +61,16 @@ Via your package-manager you have to install the following packages:
 
 
 ### Use the config tool
-  
+
+After starting the driver above, you have a new icon in your Taskbar. This will allow you to open config menu or quit the driver.
+
+else: 
 In a command prompt go to the downloaded and unzipped folder and type:
 
+    ```bash
+    cd ~/.g13
     java -jar Linux-G13-GUI.jar
+    ```
 
 or with rightclick on the file in your file-explorer.
 
