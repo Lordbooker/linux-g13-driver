@@ -55,6 +55,9 @@ public:
     void clear_lcd_buffer();
     void set_pixel(int x, int y, bool on);
     void write_lcd();
+	void draw_test_pattern();
+	void write_char(int x, int y, char c);
+    void write_text(int x, int y, const std::string& text);
 };
 
 #endif

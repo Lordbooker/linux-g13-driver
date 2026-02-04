@@ -23,6 +23,7 @@
 #include "PassThroughAction.h"
 #include "MacroAction.h"
 #include "Output.h"
+#include "Font.h"
 
 extern volatile sig_atomic_t daemon_keep_running;
 const int G13_MAX_MACROS = 200;
@@ -82,6 +83,7 @@ G13::~G13() {
 
 void G13::start() {
 	if (!this->loaded) return;
+	draw_test_pattern();
 	loadBindings();
 	keepGoing = 1;
 
@@ -404,11 +406,67 @@ void G13::set_pixel(int x, int y, bool on) {
 
 void G13::write_lcd() {
     if (!this->loaded) return;
+
+    // Header für G13 LCD Report
     unsigned char transfer_buffer[992];
     memset(transfer_buffer, 0, sizeof(transfer_buffer));
-    transfer_buffer[0] = 0x03;
+    transfer_buffer[0] = 0x03; // Report ID
+
+    // Bitmap kopieren (Offset 32 ist korrekt für G13)
     memcpy(transfer_buffer + 32, this->lcd_buffer, G13_LCD_BUFFER_SIZE);
+
     int actual_length;
-    libusb_bulk_transfer(this->handle, (G13_LCD_ENDPOINT | LIBUSB_ENDPOINT_OUT),
-        transfer_buffer, sizeof(transfer_buffer), &actual_length, 1000);
+    // WICHTIG: Interrupt Transfer statt Bulk!
+    int error = libusb_interrupt_transfer(
+        this->handle, 
+        G13_LCD_ENDPOINT | LIBUSB_ENDPOINT_OUT, 
+        transfer_buffer, 
+        sizeof(transfer_buffer), 
+        &actual_length, 
+        1000 // 1s Timeout
+    );
+
+    if (error) {
+        syslog(LOG_ERR, "LCD Write Error: %s", libusb_error_name(error));
+    }
+}
+
+void G13::draw_test_pattern() {
+    clear_lcd_buffer();
+
+    // Rahmen zeichnen
+    for(int x=0; x<160; x++) { set_pixel(x, 0, true); set_pixel(x, 42, true); }
+    for(int y=0; y<43; y++) { set_pixel(0, y, true); set_pixel(159, y, true); }
+
+    // Text ausgeben (Zentriert-ish)
+    write_text(10, 5,  "   LINUX G13 PROJECT");
+    write_text(10, 15, "  POWER of OPENSOURCE");
+
+    write_lcd();
+    syslog(LOG_INFO, "LCD Test Pattern sent.");
+}
+
+// Schreibt ein einzelnes Zeichen an Position x,y (Pixel-Koordinaten)
+void G13::write_char(int x, int y, char c) {
+if (c < 32 || c > 127) c = 32; 
+    
+    int font_index = (c - 32) * 5;
+    
+    for (int col = 0; col < 5; col++) {
+        uint8_t line = font_5x7[font_index + col];
+        for (int row = 0; row < 7; row++) {
+            if (line & (1 << row)) {
+                set_pixel(x + col, y + row, true);
+            }
+        }
+    }
+}
+
+// Schreibt einen ganzen String
+void G13::write_text(int x, int y, const std::string& text) {
+    int cursor_x = x;
+    for (char c : text) {
+        write_char(cursor_x, y, c);
+        cursor_x += 6; // 5 Pixel breit + 1 Pixel Abstand
+    }
 }
