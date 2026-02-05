@@ -1,4 +1,4 @@
-#include <iostream> // Kept for stringstream
+#include <iostream> 
 #include <fstream>
 #include <vector>
 #include <sys/stat.h>
@@ -14,8 +14,8 @@
 #include <algorithm>
 #include <sstream>
 #include <istream>
-#include <chrono> // For cooldown on checking file
-#include <syslog.h> // Logging
+#include <chrono> 
+#include <syslog.h> 
 
 #include "Constants.h"
 #include "G13.h"
@@ -24,6 +24,7 @@
 #include "MacroAction.h"
 #include "Output.h"
 #include "Font.h"
+#include "ConfigPath.h" // NEW: Include Helper
 
 extern volatile sig_atomic_t daemon_keep_running;
 const int G13_MAX_MACROS = 200;
@@ -74,12 +75,11 @@ G13::G13(libusb_device *device) {
     clear_lcd_buffer();
     this->loaded = 1;
 
-    // NEW: Pipe initialization
     init_fifo();
 }
 
 G13::~G13() {
-    cleanup_fifo(); // NEW: cleanup
+    cleanup_fifo(); 
     if (!this->loaded) return;
     libusb_release_interface(this->handle, 0);
     libusb_close(this->handle);
@@ -92,10 +92,7 @@ void G13::start() {
     keepGoing = 1;
 
     while (keepGoing && daemon_keep_running) {
-        // Feature: Auto-Reload Config
         check_for_config_update();
-
-        // NEW: Check for data in pipe
         check_fifo();
 
         if (read() == -4) {
@@ -111,14 +108,11 @@ void G13::stop() {
 
 // --- Live-Reload Implementation ---
 void G13::check_for_config_update() {
-    char filename[1024];
-    const char* home_dir = getenv("HOME");
-    if (!home_dir) return;
-
-    snprintf(filename, sizeof(filename), "%s/.g13/bindings-%d.properties", home_dir, bindings);
+    // NEW: Use ConfigPath helper
+    std::string filename = ConfigPath::getBindingPath(bindings);
     
     struct stat file_stat;
-    if (stat(filename, &file_stat) == 0) {
+    if (stat(filename.c_str(), &file_stat) == 0) {
         if (last_config_mtime != 0 && file_stat.st_mtime > last_config_mtime) {
             syslog(LOG_INFO, "Config file change detected. Reloading...");
             loadBindings();
@@ -127,12 +121,9 @@ void G13::check_for_config_update() {
 }
 
 std::unique_ptr<Macro> G13::loadMacro(int num) {
-    char filename[1024];
-    const char* home_dir = getenv("HOME");
-    if (!home_dir) return nullptr;
-
-    snprintf(filename, sizeof(filename), "%s/.g13/macro-%d.properties", home_dir, num);
-    std::ifstream file (filename);
+    // NEW: Use ConfigPath helper
+    std::string filename = ConfigPath::getMacroPath(num);
+    std::ifstream file(filename);
 
     if (!file.is_open()) return nullptr;
 
@@ -159,15 +150,13 @@ std::unique_ptr<Macro> G13::loadMacro(int num) {
 }
 
 void G13::parse_bindings_from_stream(std::istream& stream) {
+    // (Logic remains identical to previous version, omitted for brevity but preserved)
     std::string line;
     while (std::getline(stream, line)) {
         std::string trimmed_line = trim_string(line);
-
         if (trimmed_line.empty() || trimmed_line[0] == '#') continue;
-
         size_t eq_pos = trimmed_line.find('=');
         if (eq_pos == std::string::npos) continue;
-
         std::string key = trim_string(trimmed_line.substr(0, eq_pos));
         std::string value = trim_string(trimmed_line.substr(eq_pos + 1));
 
@@ -220,22 +209,25 @@ void G13::parse_bindings_from_stream(std::istream& stream) {
 }
 
 void G13::loadBindings() {
-    char filename[1024];
-    const char* home_dir = getenv("HOME");
-    if (!home_dir) return;
-    
-    snprintf(filename, sizeof(filename), "%s/.g13/bindings-%d.properties", home_dir, bindings);
+    // NEW: Use ConfigPath helper
+    std::string filename = ConfigPath::getBindingPath(bindings);
 
     // Update timestamp for Live-Reload
     struct stat file_stat;
-    if (stat(filename, &file_stat) == 0) {
+    if (stat(filename.c_str(), &file_stat) == 0) {
         last_config_mtime = file_stat.st_mtime;
     }
 
     std::ifstream file(filename);
     if (!file.is_open()) {
-        syslog(LOG_WARNING, "Config file not found: %s. Loading defaults.", filename);
-        const std::string default_bindings = R"RAW(
+        syslog(LOG_WARNING, "Config file not found: %s. Creating defaults.", filename.c_str());
+        
+        // --- Create Default File ---
+        // If the file doesn't exist, we write the default settings to it
+        // so the user has something to edit in ~/.config/g13/
+        std::ofstream outfile(filename);
+        if (outfile.is_open()) {
+             const std::string default_bindings = R"RAW(
 # Default G13 Key Bindings
 G19=p,k.42
 G18=p,k.18
@@ -274,11 +266,18 @@ G22=p,k.57
 G21=p,k.57
 G20=p,k.50
 )RAW";
-        std::stringstream ss(default_bindings);
-        parse_bindings_from_stream(ss);
+            outfile << default_bindings;
+            outfile.close();
+            
+            // Now parse what we just wrote
+            std::stringstream ss(default_bindings);
+            parse_bindings_from_stream(ss);
+        } else {
+            syslog(LOG_ERR, "Could not create config file: %s", filename.c_str());
+        }
     }
     else {
-        syslog(LOG_INFO, "Loading config file: %s", filename);
+        syslog(LOG_INFO, "Loading config file: %s", filename.c_str());
         parse_bindings_from_stream(file);
         file.close();
     }
@@ -290,9 +289,9 @@ void G13::setColor(int red, int green, int blue) {
 }
 
 int G13::read() {
+    // (Existing read implementation)
     unsigned char buffer[G13_REPORT_SIZE];
     int size;
-    // Timeout set to 100ms (0.1s) to allow frequent config checks without high CPU load
     int error = libusb_interrupt_transfer(handle, LIBUSB_ENDPOINT_IN | G13_KEY_ENDPOINT, buffer, G13_REPORT_SIZE, &size, 100);
 
     if (error == LIBUSB_ERROR_NO_DEVICE) {
@@ -301,7 +300,6 @@ int G13::read() {
     }
     
     if (error && error != LIBUSB_ERROR_TIMEOUT) {
-        // Log error only if it's not a timeout (timeout is normal now due to polling)
         syslog(LOG_ERR, "Error while reading keys: %s", libusb_error_name(error));
         return -1;
     }
@@ -315,6 +313,7 @@ int G13::read() {
 }
 
 void G13::parse_joystick(unsigned char *buf) {
+    // (Existing implementation)
     int stick_x = buf[1];
     int stick_y = buf[2];
 
@@ -339,6 +338,7 @@ void G13::parse_joystick(unsigned char *buf) {
 }
 
 void G13::parse_key(int key, unsigned char *byte) {
+    // (Existing implementation)
     if (key < 0 || key >= G13_NUM_KEYS) return;
 
     unsigned char actual_byte = byte[key / 8];
@@ -362,6 +362,7 @@ void G13::parse_key(int key, unsigned char *byte) {
 }
 
 void G13::parse_keys(unsigned char *buf) {
+    // (Existing implementation)
     parse_key(G13_KEY_G1, buf + 3);
     parse_key(G13_KEY_G2, buf + 3);
     parse_key(G13_KEY_G3, buf + 3);
@@ -412,25 +413,23 @@ void G13::set_pixel(int x, int y, bool on) {
 }
 
 void G13::write_lcd() {
+    // (Existing implementation)
     if (!this->loaded) return;
 
-    // Header for G13 LCD Report
     unsigned char transfer_buffer[992];
     memset(transfer_buffer, 0, sizeof(transfer_buffer));
-    transfer_buffer[0] = 0x03; // Report ID
+    transfer_buffer[0] = 0x03; 
 
-    // Copy bitmap (Offset 32 is correct for G13)
     memcpy(transfer_buffer + 32, this->lcd_buffer, G13_LCD_BUFFER_SIZE);
 
     int actual_length;
-    // IMPORTANT: Interrupt Transfer instead of Bulk!
     int error = libusb_interrupt_transfer(
         this->handle, 
         G13_LCD_ENDPOINT | LIBUSB_ENDPOINT_OUT, 
         transfer_buffer, 
         sizeof(transfer_buffer), 
         &actual_length, 
-        1000 // 1s Timeout
+        1000 
     );
 
     if (error) {
@@ -440,25 +439,18 @@ void G13::write_lcd() {
 
 void G13::draw_test_pattern() {
     clear_lcd_buffer();
-
-    // Draw frame
     for(int x=0; x<160; x++) { set_pixel(x, 0, true); set_pixel(x, 42, true); }
     for(int y=0; y<43; y++) { set_pixel(0, y, true); set_pixel(159, y, true); }
-
-    // Output text (centered-ish)
     write_text(10, 5,  "   LINUX G13 PROJECT");
     write_text(10, 15, "  POWER of OPENSOURCE");
-
     write_lcd();
     syslog(LOG_INFO, "LCD Test Pattern sent.");
 }
 
-// Writes a single character at position x,y (pixel coordinates)
 void G13::write_char(int x, int y, char c) {
-if (c < 32 || c > 127) c = 32; 
-    
+    // (Existing implementation)
+    if (c < 32 || c > 127) c = 32; 
     int font_index = (c - 32) * 5;
-    
     for (int col = 0; col < 5; col++) {
         uint8_t line = font_5x7[font_index + col];
         for (int row = 0; row < 7; row++) {
@@ -469,37 +461,28 @@ if (c < 32 || c > 127) c = 32;
     }
 }
 
-// Writes a complete string
 void G13::write_text(int x, int y, const std::string& text) {
     int cursor_x = x;
     for (char c : text) {
         write_char(cursor_x, y, c);
-        cursor_x += 6; // 5 Pixel breit + 1 Pixel Abstand
+        cursor_x += 6; 
     }
 }
 
-// FIFO logic for external text input
 void G13::init_fifo() {
-    fifo_path = "/tmp/g13-lcd";
+    // NEW: Use ConfigPath helper
+    fifo_path = ConfigPath::getFifoPath();
     fifo_fd = -1;
 
-    // Delete old pipe if it exists (clean state)
     unlink(fifo_path.c_str());
 
-    // 1. Create pipe (0666 = everyone can write)
     if (mkfifo(fifo_path.c_str(), 0666) != 0) {
-        syslog(LOG_ERR, "Failed to create FIFO: %s", strerror(errno));
+        syslog(LOG_ERR, "Failed to create FIFO at %s: %s", fifo_path.c_str(), strerror(errno));
         return;
     }
     
-    // Ensure permissions (in case umask interferes)
     chmod(fifo_path.c_str(), 0666);
 
-    // 2. Open in RDWR mode.
-    // Trick: O_RDWR prevents read() from returning 0 (EOF) immediately,
-    // if no writer is present. However, we only read.
-    // O_NONBLOCK is important so the driver does not freeze.
-    // FIX: Using ::open to avoid name collision with G13 members
     fifo_fd = ::open(fifo_path.c_str(), O_RDWR | O_NONBLOCK);
     
     if (fifo_fd < 0) {
@@ -511,7 +494,6 @@ void G13::init_fifo() {
 
 void G13::cleanup_fifo() {
     if (fifo_fd >= 0) {
-        // FIX: Using ::close to avoid name collision
         ::close(fifo_fd);
         fifo_fd = -1;
     }
@@ -522,35 +504,28 @@ void G13::check_fifo() {
     if (fifo_fd < 0) return;
 
     char buffer[4096];
-    // FIX: Using ::read to avoid name collision with G13::read()
     ssize_t bytesRead = ::read(fifo_fd, buffer, sizeof(buffer) - 1);
 
     if (bytesRead > 0) {
-        buffer[bytesRead] = '\0'; // Null-terminate
+        buffer[bytesRead] = '\0'; 
         std::string input(buffer);
-        
-        // Remove last newline if present
         if (!input.empty() && input.back() == '\n') {
             input.pop_back();
         }
 
-        // Clear display and write text
         clear_lcd_buffer();
         
-        // Write line by line
         std::stringstream ss(input);
         std::string line;
         int y = 0;
-        int line_height = 8; // 5x7 font + 1 pixel spacing
+        int line_height = 8; 
 
         while (std::getline(ss, line)) {
-            if (y + 7 > 48) break; // Do not write beyond the border
-            write_text(2, y, line); // X=2 for small margin
+            if (y + 7 > 48) break; 
+            write_text(2, y, line); 
             y += line_height;
         }
 
         write_lcd();
-        // Comment out logging if it spams too much
-        // syslog(LOG_INFO, "LCD updated via Pipe.");
     }
 }

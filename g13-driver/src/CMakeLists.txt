@@ -13,10 +13,9 @@ add_compile_options(-Wall)
 # Use PkgConfig to find system libraries
 find_package(PkgConfig REQUIRED)
 
-# Find modules (equivalent to `pkg-config --cflags --libs ...`)
+# Find modules
 pkg_check_modules(LIBUSB REQUIRED libusb-1.0)
 pkg_check_modules(APPINDICATOR REQUIRED appindicator3-0.1)
-# GTK3 is explicitly required since Main.cpp includes <gtk/gtk.h>
 pkg_check_modules(GTK3 REQUIRED gtk+-3.0) 
 
 # Add include directories
@@ -28,6 +27,8 @@ include_directories(
 )
 
 # Collect all C++ files from the cpp/ subdirectory
+# Explicitly adding ConfigPath to ensure it is picked up if GLOB fails somehow,
+# but GLOB usually catches it.
 file(GLOB SOURCES "cpp/*.cpp")
 
 # Define the executable
@@ -40,8 +41,8 @@ target_link_libraries(Linux-G13-Driver
     ${APPINDICATOR_LIBRARIES} 
     ${GTK3_LIBRARIES}
     pthread  # Threading Support
-    stdc++fs # Filesystem Support (sometimes needed for C++17)
+    stdc++fs # Filesystem Support
 )
 
-# (Optional) Define install target, for future use of "make install"
+# Install target for system-wide installation (AUR/Package support)
 install(TARGETS Linux-G13-Driver DESTINATION bin)

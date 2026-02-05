@@ -1,0 +1,16 @@
+[Unit]
+Description=Logitech G13 User Space Driver
+After=graphical-session.target
+
+[Service]
+Type=simple
+# Standard-Pfad für Paket-Installationen.
+# Wird bei "make install-user" via sed automatisch angepasst.
+ExecStart=/usr/bin/linux-g13-driver
+Restart=on-failure
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=default.target
