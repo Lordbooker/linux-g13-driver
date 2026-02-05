@@ -43,28 +43,58 @@ chmod +x install_deps.sh
     ```
 
 The installation process will clean up automatically after finishing.
-You can use `make clean` to remove build files manually and `make uninstall` to remove the UDEV rules if needed.
+
+## Choose your Installation Method
+
+### Option A: System-Wide Installation (Standard)
+This is the recommended method for standard usage. It installs binaries to /usr/bin and resources to /usr/share/.
+
+```bash
+sudo make install
+```
+Note: As per standard Linux security practices, the installation does not auto-start user services. You must enable the driver for your user manually once:
+
+```bash
+systemctl --user enable --now g13
+```
+
+#### Option B: User-Local Installation (Developer Mode)
+This method installs everything to your home directory (~/.local/bin). It is intended for development, testing, or users without root access. Automatically creates and starts the Systemd service.
+
+```bash
+make install-user
+```
+Driver: Installed to ~/.local/bin/linux-g13-driver
+
+Service: Automatically enabled and started immediately.
+
+Note on Permissions: Both methods install a UDEV rule (/etc/udev/rules.d/99-g13.rules) to allow access to the G13 without sudo. You might need to unplug and replug your device once after installation if it's not detected immediately.
 
 ## How to use the Driver and GUI
 
 ### Run the driver
 
-**The easy way:**
-The installation routine creates a new folder `.g13` in your user directory (home).
+### Controlling the Driver
+The driver runs in the background via Systemd.
+
+Check Status:
 
 ```bash
-cd ~/.g13
-./Linux-G13-Driver
+systemctl --user status g13
 ```
 
-**Alternative method:**
-Open a command prompt and go to the directory where you built the driver.
+View Logs:
 
 ```bash
-./Linux-G13-Driver
+journalctl --user -u g13 -f
 ```
 
-> **Note:** If you start the driver via `sudo`, it might not find the config files in `~/.g13`. After properly setting the UDEV rules (which `make all` does), you should **not** need `sudo`.
+Restart Driver:
+
+```bash
+systemctl --user restart g13
+```
+
 
 ### Use the Config Tool
 
@@ -73,11 +103,16 @@ After starting the driver, you will see a new icon in your system tray/taskbar. 
 Alternatively, run it from the terminal:
 
 ```bash
-cd ~/.g13
-java -jar Linux-G13-GUI.jar
+g13-gui
 ```
 
-This will bring up the UI and create the initial files needed for your driver if they don't exist. All config files are saved in `~/.g13`.
+This will bring up the UI.
+
+Profiles: The top 4 buttons under the LCD (M1, M2, M3, MR) switch between binding profiles.
+
+Save: Changes are saved automatically to `~/.config/g13/bindings-*.properties`.
+
+Live Reload: The driver automatically detects file changes and reloads the config immediately.
 
 ![Config Tool Screenshot](docs/ConfigTool.png)
 
@@ -93,22 +128,45 @@ The driver now includes a fixed default mapping. This means the GUI is not stric
 
 ### Manually create your own Mapping Set
 
-If you don't want to use the GUI App, you can copy the `.g13` folder from `g13-driver/bindings/` to your home directory (`~/`) and edit the files manually.
+If you don't want to use the GUI App, you can edit the files manually in `~/.config/g13/`.
 
 * **Usage Example:** To map the **G20** key to the letter **T**, find the event code for T (which is 20). Then, in your `bindings-0.properties` file, add or edit the line:
     ```ini
     G20=p,k.20
     ```
 
-### Using the Display
+### Using the Display (scripting)
 
 You can write text to the display using a simple pipe command:
 
+The driver creates a Named Pipe (FIFO) to receive text for the LCD.
+
+Location: `/run/user/$UID/g13-lcd` (Check `/tmp/g13-lcd` as fallback if `/run` is unavailable).
+
 ```bash
-echo "Hello World!" > /tmp/g13-lcd
+# Find your pipe path (usually based on your user ID, e.g., 1000)
+PIPE="/run/user/$(id -u)/g13-lcd"
+
+# Send simple text
+echo "Hello World!" > $PIPE
+
+# Send multi-line text (CPU/RAM stats)
+echo -e "CPU: 50%\nRAM: 4GB" > $PIPE
 ```
 
 Currently, only one font size is implemented. There is an example script for system monitoring in the `scripts` folder. Feel free to try it out, modify it, or share your own scripts!
+
+
+### Uninstallation
+
+To remove the driver and all installed files:
+
+```bash
+make uninstall
+```
+
+(Note: This removes the binaries, UDEV rules, and service files, but keeps your configuration in ~/.config/g13 to prevent data loss.)
+
 
 ## Notes
 
