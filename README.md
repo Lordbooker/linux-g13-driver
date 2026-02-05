@@ -56,6 +56,7 @@ Note: As per standard Linux security practices, the installation does not auto-s
 
 ```bash
 systemctl --user enable --now g13
+systemctl --user start g13
 ```
 
 #### Option B: User-Local Installation (Developer Mode)
