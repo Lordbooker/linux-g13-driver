@@ -1,120 +1,127 @@
-# Makefile for the G13 C++ Driver Component
-# Corrected version assuming this Makefile resides in the 'src' directory.
+# =============================================================================
+# Universal Makefile for G13 Driver
+# Delegates dependency handling to scripts/install_deps.sh
+# =============================================================================
 
-# --- Variables ---
-CXX = g++
-# The final executable will be placed in the parent directory (the g13-driver root).
-TARGET = ../Linux-G13-Driver
+# --- User Detection ---
+ifdef SUDO_USER
+    REAL_USER := $(SUDO_USER)
+    USER_HOME := $(shell getent passwd $(SUDO_USER) | cut -d: -f6)
+else
+    REAL_USER := $(shell whoami)
+    USER_HOME := $(HOME)
+endif
 
-# --- Directories ---
-# The source directory is 'cpp', relative to this Makefile in 'src'.
-SRC_DIR = cpp
-# The build directory for object files will be created in the parent directory.
-BUILD_DIR = ../build
+# --- Directories & Paths ---
+BUILD_DIR   := ../build
+TARGET_NAME := Linux-G13-Driver
+TARGET_PATH := ../$(TARGET_NAME)
+SCRIPT_DIR  := ./scripts
 
-# --- Flags ---
-# CXXFLAGS are for the compiler.
-# -Icpp tells the compiler to look for header files in the 'cpp' directory.
-CXXFLAGS = -Wall -std=c++17 `pkg-config --cflags libusb-1.0 appindicator3-0.1` -pthread -I$(SRC_DIR)
-# LDFLAGS are for the linker.
-LDFLAGS = `pkg-config --libs libusb-1.0 appindicator3-0.1` -pthread
+# GUI Paths
+GUI_ROOT    := ../../g13-config-tool
+GUI_JAR_SRC := $(GUI_ROOT)/target/Linux-G13-GUI.jar
+GUI_JAR_NAME:= Linux-G13-GUI.jar
 
-# --- Source and Object Files ---
-# List of source files.
-SRCS = \
-	G13.cpp \
-	G13Action.cpp \
-	Macro.cpp \
-	MacroAction.cpp \
-	Main.cpp \
-	Output.cpp \
-	PassThroughAction.cpp
+# Config Paths
+BINDINGS_SRC:= ../bindings/.g13
+INSTALL_DIR := $(USER_HOME)/.g13
 
-# Generate the full path for each object file in the build directory.
-OBJS = $(addprefix $(BUILD_DIR)/, $(SRCS:.cpp=.o))
+.PHONY: all dependencies install-udev build-driver build-gui deploy clean uninstall
 
-# --- Build Targets ---
-.PHONY: all clean install uninstall
+# =============================================================================
+# Main Workflow
+# =============================================================================
+all: dependencies install-udev build-driver build-gui deploy clean-build
+	@echo "========================================================"
+	@echo " Installation Complete!"
+	@echo "========================================================"
+	@echo " Installed for User:   $(REAL_USER)"
+	@echo " Install Location:     $(INSTALL_DIR)"
+	@echo " Start the driver via: $(INSTALL_DIR)/$(TARGET_NAME)"
+	@echo "========================================================"
 
-# Default target executed when 'make' is run.
-all: $(TARGET)
+# =============================================================================
+# Step 1: Install Dependencies (External Script)
+# =============================================================================
+dependencies:
+	@echo "--- Checking and Installing Dependencies ---"
+	@chmod +x $(SCRIPT_DIR)/install_deps.sh
+	@$(SCRIPT_DIR)/install_deps.sh
 
-# Rule to link the final executable.
-# It depends on all object files being created first.
-$(TARGET): $(OBJS)
-	@echo "Linking executable: $@"
-	$(CXX) $(OBJS) -o $@ $(LDFLAGS)
-
-# This is the single pattern rule to compile any .cpp file.
-# It creates the object file in the BUILD_DIR from a source file in the SRC_DIR.
-$(BUILD_DIR)/%.o: $(SRC_DIR)/%.cpp | $(BUILD_DIR)
-	@echo "Compiling $< -> $@"
-	$(CXX) $(CXXFLAGS) -c $< -o $@
-
-# Rule to create the build directory.
-$(BUILD_DIR):
-	@mkdir -p $@
-
-# --- Installation and Cleanup Targets ---
-
-# Target to install the udev rule for device permissions.
-# The path to the udev rules is now relative to the parent directory.
-install:
+# =============================================================================
+# Step 2: Install UDEV Rules (Universal)
+# =============================================================================
+install-udev:
+	@echo "--- Installing Universal UDEV Rules ---"
+	@# Find correct udev directory
 	@UDEV_RULES_DIR=""; \
 	if [ -d /etc/udev/rules.d ]; then UDEV_RULES_DIR="/etc/udev/rules.d"; \
 	elif [ -d /lib/udev/rules.d ]; then UDEV_RULES_DIR="/lib/udev/rules.d"; \
-	else echo "Error: Udev rules directory not found." >&2; exit 1; fi; \
-	echo "Using udev directory: $$UDEV_RULES_DIR"; \
+	else echo "Error: Udev directory not found." >&2; exit 1; fi; \
 	\
-	UDEV_SOURCE_FILE=""; \
-	if getent group input >/dev/null; then \
-		echo "Found 'input' group. Using rule for 'input' group access."; \
-		UDEV_SOURCE_FILE="udev/99-g13-input.rules"; \
-	elif getent group plugdev >/dev/null; then \
-		echo "Found 'plugdev' group. Using rule for 'plugdev' group access."; \
-		UDEV_SOURCE_FILE="udev/99-g13-plugdev.rules"; \
-	else \
-		echo "Warning: Neither 'input' nor 'plugdev' group found. Defaulting to 'input' rule."; \
-		UDEV_SOURCE_FILE="udev/99-g13-input.rules"; \
-	fi; \
+	# Copy rule file
+	sudo cp udev/99-g13.rules $$UDEV_RULES_DIR/99-g13.rules; \
 	\
-	if [ -f $$UDEV_SOURCE_FILE ]; then \
-		echo "Installing $$UDEV_SOURCE_FILE to $$UDEV_RULES_DIR/99-g13.rules"; \
-		sudo cp $$UDEV_SOURCE_FILE $$UDEV_RULES_DIR/99-g13.rules; \
-		echo "Reloading udev rules..."; \
-		sudo udevadm control --reload-rules && sudo udevadm trigger; \
-		echo "UDEV rule installed. Please re-plug your G13 device."; \
-	else \
-		echo "Error: Source udev rule file $$UDEV_SOURCE_FILE not found." >&2; exit 1; \
+	# Reload rules
+	echo "Reloading UDEV rules..."; \
+	sudo udevadm control --reload-rules && sudo udevadm trigger
+
+# =============================================================================
+# Step 3: Build C++ Driver (Via CMake)
+# =============================================================================
+build-driver:
+	@echo "--- Building C++ Driver with CMake ---"
+	mkdir -p $(BUILD_DIR)
+	cd $(BUILD_DIR) && cmake ../src && make
+	cp $(BUILD_DIR)/$(TARGET_NAME) $(TARGET_PATH)
+
+# =============================================================================
+# Step 4: Build Java GUI (Maven)
+# =============================================================================
+build-gui:
+	@echo "--- Building Java GUI with Maven ---"
+ifdef SUDO_USER
+	cd $(GUI_ROOT) && sudo -u $(REAL_USER) mvn clean package
+else
+	cd $(GUI_ROOT) && mvn clean package
+endif
+
+# =============================================================================
+# Step 5: Deploy
+# =============================================================================
+deploy:
+	@echo "--- Deploying files to $(INSTALL_DIR) ---"
+	mkdir -p $(INSTALL_DIR)
+	cp $(TARGET_PATH) $(INSTALL_DIR)/
+	cp $(GUI_JAR_SRC) $(INSTALL_DIR)/$(GUI_JAR_NAME)
+	# Only copy configs if none exist to avoid overwriting user settings
+	if [ -z "$$(ls -A $(INSTALL_DIR)/*.properties 2>/dev/null)" ]; then \
+		echo "Copying default configs..."; \
+		cp $(BINDINGS_SRC)/*.properties $(INSTALL_DIR)/; \
 	fi
+	chmod +x $(INSTALL_DIR)/$(TARGET_NAME)
+ifdef SUDO_USER
+	chown -R $(REAL_USER): $(INSTALL_DIR)
+endif
 
-# Target to remove the udev rule.
+# =============================================================================
+# Step 6: Cleanup
+# =============================================================================
+clean-build:
+	rm -rf $(BUILD_DIR)
+
+clean: clean-build
+	rm -f $(TARGET_PATH)
+ifdef SUDO_USER
+	cd $(GUI_ROOT) && sudo -u $(REAL_USER) mvn clean
+else
+	cd $(GUI_ROOT) && mvn clean
+endif
+	@echo "Full clean finished."
+
 uninstall:
-	@echo "Removing udev rule..."
-	@UDEV_FILE_1="/etc/udev/rules.d/99-g13.rules"; \
-	UDEV_FILE_2="/lib/udev/rules.d/99-g13.rules"; \
-	REMOVED=false; \
-	if [ -f $$UDEV_FILE_1 ]; then \
-		echo "Removing $$UDEV_FILE_1"; \
-		sudo rm -f $$UDEV_FILE_1; \
-		REMOVED=true; \
-	fi; \
-	if [ -f $$UDEV_FILE_2 ]; then \
-		echo "Removing $$UDEV_FILE_2"; \
-		sudo rm -f $$UDEV_FILE_2; \
-		REMOVED=true; \
-	fi; \
-	if [ "$$REMOVED" = true ]; then \
-		echo "Reloading udev rules..."; \
-		sudo udevadm control --reload-rules; \
-	else \
-		echo "No udev rule found to remove."; \
-	fi; \
-	echo "Uninstallation complete."
-
-# Target to clean up all build artifacts.
-clean:
-	@echo "Cleaning up build directory and executable..."
-	@rm -rf $(BUILD_DIR)
-	@rm -f $(TARGET)
-	@echo "Cleanup complete."
+	@echo "Removing UDEV rules..."
+	sudo rm -f /etc/udev/rules.d/99-g13.rules /lib/udev/rules.d/99-g13.rules
+	sudo udevadm control --reload-rules
+	@echo "To remove the application, delete $(INSTALL_DIR)"

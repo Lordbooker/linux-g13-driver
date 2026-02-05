@@ -1,5 +1,0 @@
-# Kombinierte Regel für G13 USB-Gerät (uaccess als primär, Gruppe 'input' als Fallback)
-SUBSYSTEM=="usb", ATTR{idVendor}=="046d", ATTR{idProduct}=="c21c", MODE="0660", GROUP="input", TAG+="uaccess"
-
-# Kombinierte Regel für uinput (uaccess als primär, Gruppe 'input' als Fallback)
-KERNEL=="uinput", SUBSYSTEM=="misc", MODE="0660", GROUP="input", TAG+="uaccess"
