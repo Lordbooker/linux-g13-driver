@@ -1,4 +1,4 @@
-#include <iostream> // Wird noch für std::hex in stream-manipulation genutzt, falls nötig, sonst entfernbar. Hier sicherer drin lassen für stringstreams.
+#include <iostream> 
 #include <fstream>
 #include <vector>
 #include <map>
@@ -10,9 +10,9 @@
 #include <mutex>
 #include <libusb-1.0/libusb.h>
 #include <iomanip>
-#include <libgen.h> // For dirname()
-#include <sys/wait.h> // For waitpid
-#include <syslog.h> // Logging
+#include <libgen.h> 
+#include <sys/wait.h> 
+#include <syslog.h> 
 
 // Headers for the tray icon functionality
 #include <gtk/gtk.h>
@@ -27,7 +27,6 @@ std::map<uint16_t, std::thread> g13_instances;
 volatile sig_atomic_t daemon_keep_running = 1;
 
 AppIndicator *indicator = NULL;
-std::string gui_jar_path;
 libusb_context *ctx = nullptr;
 std::thread device_thread;
 
@@ -35,16 +34,6 @@ std::thread device_thread;
 static void quit_driver(GtkMenuItem *item, gpointer user_data);
 
 // --- Helper Functions ---
-std::string get_executable_directory() {
-    char result[1024];
-    ssize_t count = readlink("/proc/self/exe", result, sizeof(result) - 1);
-    if (count != -1) {
-        result[count] = '\0';
-        return std::string(dirname(result));
-    }
-    return ".";
-}
-
 uint16_t get_device_key(libusb_device *dev) {
     return (libusb_get_bus_number(dev) << 8) | libusb_get_device_address(dev);
 }
@@ -101,7 +90,7 @@ void device_management_thread_loop() {
 
 // --- Tray Icon and Main Application Logic ---
 static void show_gui(GtkMenuItem *item, gpointer user_data) {
-    syslog(LOG_INFO, "Attempting to start GUI from path: %s", gui_jar_path.c_str());
+    syslog(LOG_INFO, "Attempting to start GUI via global command: g13-gui");
 
     pid_t pid = fork();
 
@@ -113,13 +102,18 @@ static void show_gui(GtkMenuItem *item, gpointer user_data) {
         setsid(); // Detach from parent
 
         // Redirect stdout/stderr to avoid cluttering driver logs
-        freopen("/dev/null", "w", stdout);
-        freopen("/dev/null", "w", stderr);
+        // Using strict checking to silence compiler warnings
+        if (freopen("/dev/null", "w", stdout) == NULL) {}
+        if (freopen("/dev/null", "w", stderr) == NULL) {}
 
-        // Secure execution without shell
-        execlp("java", "java", "-jar", gui_jar_path.c_str(), (char *)NULL);
+        // --- CHANGE START ---
+        // We now use the wrapper script 'g13-gui' which is in the system PATH (/usr/bin)
+        // This decouples the driver from knowing the JAR location.
+        execlp("g13-gui", "g13-gui", (char *)NULL);
+        // --- CHANGE END ---
 
-        // If we reach here, execlp failed
+        // If we reach here, execlp failed (e.g. g13-gui not in PATH)
+        syslog(LOG_ERR, "Failed to execute 'g13-gui'. Is it installed in /usr/bin?");
         _exit(1); 
     } 
     else {
@@ -179,7 +173,7 @@ static void quit_driver(GtkMenuItem *item, gpointer user_data) {
     UInput::close_uinput();
     libusb_exit(ctx);
     syslog(LOG_INFO, "Shutdown complete.");
-    closelog(); // Schließt die Verbindung zum Logger sauber
+    closelog(); 
 
     gtk_main_quit();
 }
@@ -191,14 +185,8 @@ extern "C" int main(int argc, char *argv[]) {
     // 1. Initialize GTK
     gtk_init(&argc, &argv);
 
-    // 2. Determine paths and parse arguments
-    gui_jar_path = get_executable_directory() + "/Linux-G13-GUI.jar";
-    for (int i = 1; i < argc; ++i) {
-        if (std::string(argv[i]) == "--gui-path" && i + 1 < argc) {
-            gui_jar_path = argv[++i];
-            syslog(LOG_INFO, "GUI path set from command line: %s", gui_jar_path.c_str());
-        }
-    }
+    // 2. Determine paths (Not strictly needed for GUI anymore, but kept for logging/future use if needed)
+    // removed the complex JAR path logic since we use the wrapper script now.
 
     // 3. Initialize driver components
     if (!UInput::create_uinput()) {
