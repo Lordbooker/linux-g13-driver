@@ -1,9 +1,9 @@
 # =============================================================================
-# Universal Makefile for G13 Driver (Arch, Ubuntu, Fedora)
+# Universal Makefile for G13 Driver
+# Delegates dependency handling to scripts/install_deps.sh
 # =============================================================================
 
 # --- User Detection ---
-# Detects the real user even when running with 'sudo make'
 ifdef SUDO_USER
     REAL_USER := $(SUDO_USER)
     USER_HOME := $(shell getent passwd $(SUDO_USER) | cut -d: -f6)
@@ -16,6 +16,7 @@ endif
 BUILD_DIR   := ../build
 TARGET_NAME := Linux-G13-Driver
 TARGET_PATH := ../$(TARGET_NAME)
+SCRIPT_DIR  := ./scripts
 
 # GUI Paths
 GUI_ROOT    := ../../g13-config-tool
@@ -26,11 +27,6 @@ GUI_JAR_NAME:= Linux-G13-GUI.jar
 BINDINGS_SRC:= ../bindings/.g13
 INSTALL_DIR := $(USER_HOME)/.g13
 
-# --- Distro Detection ---
-HAS_PACMAN := $(shell command -v pacman 2> /dev/null)
-HAS_APT    := $(shell command -v apt-get 2> /dev/null)
-HAS_DNF    := $(shell command -v dnf 2> /dev/null)
-
 .PHONY: all dependencies install-udev build-driver build-gui deploy clean uninstall
 
 # =============================================================================
@@ -39,7 +35,6 @@ HAS_DNF    := $(shell command -v dnf 2> /dev/null)
 all: dependencies install-udev build-driver build-gui deploy clean-build
 	@echo "========================================================"
 	@echo " Installation Complete!"
-	@echo " Distro Support: Arch, Ubuntu, Fedora detected."
 	@echo "========================================================"
 	@echo " Installed for User:   $(REAL_USER)"
 	@echo " Install Location:     $(INSTALL_DIR)"
@@ -47,21 +42,12 @@ all: dependencies install-udev build-driver build-gui deploy clean-build
 	@echo "========================================================"
 
 # =============================================================================
-# Step 1: Install Dependencies (Distro-Specific)
+# Step 1: Install Dependencies (External Script)
 # =============================================================================
 dependencies:
 	@echo "--- Checking and Installing Dependencies ---"
-ifdef HAS_PACMAN
-	@echo "Detected Arch Linux (pacman)"
-	sudo pacman -S --noconfirm base-devel cmake libusb gtk3 libappindicator-gtk3 maven jdk17-openjdk
-else ifdef HAS_APT
-	@echo "Detected Debian/Ubuntu (apt)"
-	sudo apt-get update
-	sudo apt-get install -y build-essential cmake libusb-1.0-0-dev libgtk-3-dev libappindicator3-dev maven openjdk-17-jdk
-else ifdef HAS_DNF
-	@echo "Detected Fedora/RHEL (dnf)"
-	sudo dnf install -y make automake cmake gcc gcc-c++ kernel-devel libusb1-devel gtk3-devel libappindicator-gtk3-devel maven java-17-openjdk-devel
-endif
+	@chmod +x $(SCRIPT_DIR)/install_deps.sh
+	@$(SCRIPT_DIR)/install_deps.sh
 
 # =============================================================================
 # Step 2: Install UDEV Rules (Universal)
