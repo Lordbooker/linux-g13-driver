@@ -30,21 +30,25 @@ BINDINGS_SRC:= ../bindings/.g13
 # =============================================================================
 # Main Workflow
 # =============================================================================
+# "all" is for the human user -> checks deps + builds everything
 all: dependencies build-driver build-gui
 	@echo "Build complete."
 	@echo " -> Run 'sudo make install' to install system-wide (Package Mode)."
 	@echo " -> Run 'make install-user' to install for current user (Dev Mode)."
 
+# Helper to install packages (requires sudo / user interaction)
 dependencies:
 	@chmod +x $(SCRIPT_DIR)/install_deps.sh
 	@$(SCRIPT_DIR)/install_deps.sh
 
+# STANDALONE TARGET (For AUR/Packaging) - NO dependency on 'dependencies'
 build-driver:
 	@echo "--- Building C++ Driver ---"
 	mkdir -p $(BUILD_DIR)
 	cd $(BUILD_DIR) && cmake ../src && make
 	cp $(BUILD_DIR)/$(TARGET_NAME) $(TARGET_PATH)
 
+# STANDALONE TARGET (For AUR/Packaging) - NO dependency on 'dependencies'
 build-gui:
 	@echo "--- Building Java GUI ---"
 	cd $(GUI_ROOT) && mvn clean package -DskipTests
