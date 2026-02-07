@@ -5,8 +5,7 @@ The original project is over 10 years old. This fork has been refactored to use 
 
 ## Features
 
-* **Modern C++ Driver:** The core driver has been updated for better performance and compatibility.
-* **Java GUI:** The configuration utility is built with Java 17 and Maven, ensuring it runs on modern systems.
+* **Modern C++ Driver and new Qt6 Config-Tool:** The core driver has been updated for better performance and compatibility.
 * **Flexible Configuration:** Offers multiple ways to configure your G13: via the user-friendly GUI, manual file editing, or using the driver's fixed mapping with external tools.
 
 ## Requirements
@@ -20,7 +19,6 @@ You need to install the following packages via your package manager:
 * `gtk3` / `gtk3-devel`
 * `libusb-1.0-0` (on some distros named `libusb-1.0-0-dev` or `libusb1-devel`)
 * `libappindicator-gtk3` (or similar)
-* `Java 17` or higher
 * `python-psutil` (for the monitor script)
 
 ### Automated Dependency Installation

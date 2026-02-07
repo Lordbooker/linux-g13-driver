@@ -13,16 +13,88 @@
   <property name="windowTitle">
    <string>G13 Configuration Tool</string>
   </property>
-  
-  <widget class="QWidget" name="centralwidget"/>
-  
+  <widget class="QWidget" name="centralwidget">
+   <layout class="QHBoxLayout" name="horizontalLayout" stretch="0,1">
+    <property name="leftMargin">
+     <number>0</number>
+    </property>
+    <property name="topMargin">
+     <number>0</number>
+    </property>
+    <property name="rightMargin">
+     <number>0</number>
+    </property>
+    <property name="bottomMargin">
+     <number>0</number>
+    </property>
+    <item>
+     <widget class="G13Visualizer" name="visualizer" native="true">
+      <property name="minimumSize">
+       <size>
+        <width>500</width>
+        <height>600</height>
+       </size>
+      </property>
+      <property name="baseSize">
+       <size>
+        <width>500</width>
+        <height>600</height>
+       </size>
+      </property>
+      <widget class="QWidget" name="widget" native="true">
+       <property name="geometry">
+        <rect>
+         <x>50</x>
+         <y>40</y>
+         <width>391</width>
+         <height>511</height>
+        </rect>
+       </property>
+      </widget>
+     </widget>
+    </item>
+    <item>
+     <widget class="QTabWidget" name="tabWidget">
+      <property name="currentIndex">
+       <number>0</number>
+      </property>
+      <widget class="BindingEditor" name="editor">
+       <attribute name="title">
+        <string>Key Bindings</string>
+       </attribute>
+       <widget class="QWidget" name="horizontalLayoutWidget">
+        <property name="geometry">
+         <rect>
+          <x>130</x>
+          <y>170</y>
+          <width>160</width>
+          <height>80</height>
+         </rect>
+        </property>
+        <layout class="QHBoxLayout" name="horizontalLayout_2"/>
+       </widget>
+      </widget>
+      <widget class="ColorSelector" name="colorSelector">
+       <attribute name="title">
+        <string>Backlight Color</string>
+       </attribute>
+      </widget>
+      <widget class="MacroRecorder" name="macroRecorder">
+       <attribute name="title">
+        <string>Macro Recorder</string>
+       </attribute>
+      </widget>
+     </widget>
+    </item>
+   </layout>
+  </widget>
   <widget class="QMenuBar" name="menubar">
    <property name="geometry">
     <rect>
      <x>0</x>
      <y>0</y>
      <width>1100</width>
-     <height>22</height>
+     <height>30</height>
     </rect>
    </property>
    <widget class="QMenu" name="menuFile">
@@ -42,9 +114,7 @@
    <addaction name="menuFile"/>
    <addaction name="menuHelp"/>
   </widget>
-  
   <widget class="QStatusBar" name="statusbar"/>
-  
   <action name="actionSave_Profile">
    <property name="text">
     <string>Save Profile</string>
@@ -67,6 +137,32 @@
    </property>
   </action>
  </widget>
+ <customwidgets>
+  <customwidget>
+   <class>G13Visualizer</class>
+   <extends>QWidget</extends>
+   <header location="global">G13Visualizer.h</header>
+   <container>1</container>
+  </customwidget>
+  <customwidget>
+   <class>BindingEditor</class>
+   <extends>QWidget</extends>
+   <header>BindingEditor.h</header>
+   <container>1</container>
+  </customwidget>
+  <customwidget>
+   <class>ColorSelector</class>
+   <extends>QWidget</extends>
+   <header>ColorSelector.h</header>
+   <container>1</container>
+  </customwidget>
+  <customwidget>
+   <class>MacroRecorder</class>
+   <extends>QWidget</extends>
+   <header>MacroRecorder.h</header>
+   <container>1</container>
+  </customwidget>
+ </customwidgets>
  <resources>
   <include location="../resources.qrc"/>
  </resources>
