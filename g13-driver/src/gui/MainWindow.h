@@ -2,22 +2,18 @@
 #define MAINWINDOW_H
 
 #include <QMainWindow>
-#include <QLabel>
-#include <QPushButton>
-#include <QVBoxLayout>
 
-class MainWindow : public QMainWindow
-{
-    Q_OBJECT // Wichtig für Qt Signale & Slots!
+namespace Ui { class MainWindow; }
+
+class MainWindow : public QMainWindow {
+    Q_OBJECT
 
 public:
     MainWindow(QWidget *parent = nullptr);
     ~MainWindow();
 
 private:
-    QWidget *centralWidget;
-    QLabel *statusLabel;
-    QPushButton *saveButton;
+    Ui::MainWindow *ui;
 };
 
 #endif // MAINWINDOW_H

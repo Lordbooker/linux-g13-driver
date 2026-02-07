@@ -6,65 +6,82 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 # --- Dependencies ---
-# 1. Treiber Abhängigkeiten
 find_package(libusb-1.0 REQUIRED)
 find_package(PkgConfig REQUIRED)
 pkg_check_modules(GTK3 REQUIRED gtk+-3.0)
 pkg_check_modules(APPIND REQUIRED appindicator3-0.1)
 
-# 2. GUI Abhängigkeiten (Qt6)
+# Qt6 for the GUI
 find_package(Qt6 REQUIRED COMPONENTS Widgets Core Gui)
 
-# --- Konfiguration für Qt ---
-set(CMAKE_AUTOMOC ON) # Automatische Meta-Object Compilation
-set(CMAKE_AUTORCC ON) # Ressourcen
-set(CMAKE_AUTOUIC ON) # UI Files (.ui) in C++ Header wandeln
+# --- Configuration ---
+set(CMAKE_AUTOMOC ON) # Handle Meta-Object Compilation
+set(CMAKE_AUTORCC ON) # Handle Resources
+set(CMAKE_AUTOUIC ON) # Handle UI Files
 
 # =========================================================
-# TARGET 1: Der Treiber (Daemon)
+# TARGET 1: The Driver (Daemon)
 # =========================================================
-# (Liste hier deine bestehenden .cpp Dateien auf. Pfade evtl. anpassen!)
 add_executable(linux-g13-driver
-    driver/Main.cpp
-    driver/G13.cpp
-    driver/G13Action.cpp
-    driver/Macro.cpp
-    driver/MacroAction.cpp
-    driver/ConfigPath.cpp
-    driver/PassThroughAction.cpp
-    driver/Output.cpp
+    src/driver/Main.cpp
+    src/driver/G13.cpp
+    src/driver/G13Action.cpp
+    src/driver/Macro.cpp
+    src/driver/MacroAction.cpp
+    src/driver/ConfigPath.cpp
+    src/driver/PassThroughAction.cpp
+    src/driver/Output.cpp
 )
 
-# Header Pfade für den Treiber
-target_include_directories(linux-g13-driver PRIVATE driver)
+# Header paths for the driver
+target_include_directories(linux-g13-driver PRIVATE src/driver)
 
-# Linken der Treiber-Libraries
+# Link driver libraries
 target_link_libraries(linux-g13-driver PRIVATE
     libusb-1.0::libusb-1.0
     ${GTK3_LIBRARIES}
     ${APPIND_LIBRARIES}
 )
 
-# C-Flags für GTK (wichtig!)
+# C-Flags for GTK
 target_compile_options(linux-g13-driver PRIVATE ${GTK3_CFLAGS_OTHER} ${APPIND_CFLAGS_OTHER})
 target_include_directories(linux-g13-driver PRIVATE ${GTK3_INCLUDE_DIRS} ${APPIND_INCLUDE_DIRS})
 
 
 # =========================================================
-# TARGET 2: Die GUI (Config Tool)
+# TARGET 2: The GUI (Config Tool)
 # =========================================================
+
+# Define Resource File
+set(GUI_RESOURCES src/resources.qrc)
+
 add_executable(g13-gui
-    gui/main.cpp
-    gui/MainWindow.cpp
-    gui/MainWindow.h
-    # gui/MainWindow.ui  <-- Sobald du eins hast, hier einkommentieren
+    # Core Files
+    src/gui/main.cpp
+    src/gui/MainWindow.cpp
+    src/gui/MainWindow.h
+    src/gui/MainWindow.ui
+    
+    # Components (Frames)
+    src/gui/G13Visualizer.cpp
+    src/gui/G13Visualizer.h
+    src/gui/BindingEditor.cpp
+    src/gui/BindingEditor.h
+    src/gui/ColorSelector.cpp
+    src/gui/ColorSelector.h
+    src/gui/MacroRecorder.cpp
+    src/gui/MacroRecorder.h
+
+    # Resources
+    ${GUI_RESOURCES}
 )
 
-# Linken der Qt-Libraries
+# Include Directories for GUI
+target_include_directories(g13-gui PRIVATE src/gui)
+
+# Link Qt libraries
 target_link_libraries(g13-gui PRIVATE
     Qt6::Widgets
     Qt6::Core
     Qt6::Gui
 )
-
-# Da wir "g13-gui" als Binary bauen, brauchen wir kein Wrapper-Skript mehr!
