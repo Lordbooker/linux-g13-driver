@@ -1,0 +1,6 @@
+<!DOCTYPE RCC>
+<RCC version="1.0">
+    <qresource prefix="/">
+        <file alias="g13_bg">resources/g13.gif</file>
+    </qresource>
+</RCC>
