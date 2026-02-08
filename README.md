@@ -1,7 +1,7 @@
 # G13 Linux Driver & GUI (Modernized Fork)
 
 This is a modernized fork of the G13 driver for Linux.
-The original project is over 10 years old. This fork has been refactored to use modern C++ standards for the driver and modern Java standards (Java 17 with Maven) for the configuration GUI.
+The original project is over 10 years old. This fork has been refactored to use modern C++ standards for the driver and GUI
 
 ## Features
 
