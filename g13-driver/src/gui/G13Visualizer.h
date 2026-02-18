@@ -8,11 +8,13 @@ class G13Visualizer : public QWidget {
 public:
     explicit G13Visualizer(QWidget *parent = nullptr);
 
+public slots:
+    void setProfile(int profile);
+
 signals:
-    // Emitted when a virtual key is clicked
     void keySelected(QString keyName);
 
 private:
-    void createButton(const QString &name, const QRect &geometry);
+    void createButton(const QString &name, const QRect &rect);
     QMap<QString, QPushButton*> m_buttons;
 };
