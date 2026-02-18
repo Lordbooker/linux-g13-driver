@@ -1,26 +1,43 @@
-cmake_minimum_required(VERSION 3.16)
+cmake_minimum_required(VERSION 3.20)
 
 project(Linux-G13-Driver VERSION 2.0.0 LANGUAGES CXX)
 
-set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON)  # fuer clang-tidy
 
-# --- Dependencies ---
-find_package(libusb-1.0 REQUIRED)
+# --- Build Options ---
+option(BUILD_CONFIG_TOOL "Build the Qt6 config tool" ON)
+option(BUILD_TESTS       "Build unit and integration tests" ON)
+option(ENABLE_SANITIZERS "Enable ASan/UBSan in debug builds" OFF)
+
+# --- Dependencies (Daemon) ---
 find_package(PkgConfig REQUIRED)
-pkg_check_modules(GTK3 REQUIRED gtk+-3.0)
-pkg_check_modules(APPIND REQUIRED appindicator3-0.1)
+pkg_check_modules(LIBUSB  REQUIRED libusb-1.0)
+pkg_check_modules(LIBUDEV REQUIRED libudev)
 
-# Qt6 for the GUI
-find_package(Qt6 REQUIRED COMPONENTS Widgets Core Gui)
+# --- Dependencies (GUI) ---
+if(BUILD_CONFIG_TOOL)
+    find_package(Qt6 REQUIRED COMPONENTS Widgets Core Gui)
+    set(CMAKE_AUTOMOC ON)
+    set(CMAKE_AUTORCC ON)
+    set(CMAKE_AUTOUIC ON)
+endif()
 
-# --- Configuration ---
-set(CMAKE_AUTOMOC ON) # Handle Meta-Object Compilation
-set(CMAKE_AUTORCC ON) # Handle Resources
-set(CMAKE_AUTOUIC ON) # Handle UI Files
+# --- Dependencies (Tests) ---
+if(BUILD_TESTS)
+    enable_testing()
+    find_package(GTest REQUIRED)
+endif()
+
+# --- Sanitizer-Support (nur Debug) ---
+if(ENABLE_SANITIZERS AND CMAKE_BUILD_TYPE STREQUAL "Debug")
+    add_compile_options(-fsanitize=address,undefined -fno-omit-frame-pointer)
+    add_link_options(-fsanitize=address,undefined)
+endif()
 
 # =========================================================
-# TARGET 1: The Driver (Daemon)
+# TARGET 1: Treiber-Daemon (kein GUI-Link)
 # =========================================================
 add_executable(linux-g13-driver
     src/driver/Main.cpp
@@ -33,55 +50,66 @@ add_executable(linux-g13-driver
     src/driver/Output.cpp
 )
 
-# Header paths for the driver
-target_include_directories(linux-g13-driver PRIVATE src/driver)
+target_include_directories(linux-g13-driver PRIVATE
+    src/driver
+    ${LIBUSB_INCLUDE_DIRS}
+    ${LIBUDEV_INCLUDE_DIRS}
+)
 
-# Link driver libraries
 target_link_libraries(linux-g13-driver PRIVATE
-    libusb-1.0::libusb-1.0
-    ${GTK3_LIBRARIES}
-    ${APPIND_LIBRARIES}
+    ${LIBUSB_LIBRARIES}
+    ${LIBUDEV_LIBRARIES}
 )
 
-# C-Flags for GTK
-target_compile_options(linux-g13-driver PRIVATE ${GTK3_CFLAGS_OTHER} ${APPIND_CFLAGS_OTHER})
-target_include_directories(linux-g13-driver PRIVATE ${GTK3_INCLUDE_DIRS} ${APPIND_INCLUDE_DIRS})
-
-
-# =========================================================
-# TARGET 2: The GUI (Config Tool)
-# =========================================================
-
-# Define Resource File
-set(GUI_RESOURCES src/resources.qrc)
-
-add_executable(g13-gui
-    # Core Files
-    src/gui/main.cpp
-    src/gui/MainWindow.cpp
-    src/gui/MainWindow.h
-    src/gui/MainWindow.ui
-    
-    # Components (Frames)
-    src/gui/G13Visualizer.cpp
-    src/gui/G13Visualizer.h
-    src/gui/BindingEditor.cpp
-    src/gui/BindingEditor.h
-    src/gui/ColorSelector.cpp
-    src/gui/ColorSelector.h
-    src/gui/MacroRecorder.cpp
-    src/gui/MacroRecorder.h
-
-    # Resources
-    ${GUI_RESOURCES}
+target_compile_options(linux-g13-driver PRIVATE
+    ${LIBUSB_CFLAGS_OTHER}
+    ${LIBUDEV_CFLAGS_OTHER}
 )
 
-# Include Directories for GUI
-target_include_directories(g13-gui PRIVATE src/gui)
+# =========================================================
+# TARGET 2: Qt6 Config-Tool (nur wenn BUILD_CONFIG_TOOL)
+# =========================================================
+if(BUILD_CONFIG_TOOL)
+    add_executable(g13-gui
+        src/gui/main.cpp
+        src/gui/MainWindow.cpp
+        src/gui/MainWindow.h
+        src/gui/MainWindow.ui
+        src/gui/G13Visualizer.cpp
+        src/gui/G13Visualizer.h
+        src/gui/BindingEditor.cpp
+        src/gui/BindingEditor.h
+        src/gui/ColorSelector.cpp
+        src/gui/ColorSelector.h
+        src/gui/MacroRecorder.cpp
+        src/gui/MacroRecorder.h
+        src/resources.qrc
+    )
 
-# Link Qt libraries
-target_link_libraries(g13-gui PRIVATE
-    Qt6::Widgets
-    Qt6::Core
-    Qt6::Gui
+    target_include_directories(g13-gui PRIVATE src/gui)
+
+    target_link_libraries(g13-gui PRIVATE
+        Qt6::Widgets
+        Qt6::Core
+        Qt6::Gui
+    )
+endif()
+
+# =========================================================
+# Install
+# =========================================================
+include(GNUInstallDirs)
+install(TARGETS linux-g13-driver
+    RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
+)
+if(BUILD_CONFIG_TOOL)
+    install(TARGETS g13-gui
+        RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
+    )
+endif()
+install(FILES src/udev/99-g13.rules
+    DESTINATION ${CMAKE_INSTALL_PREFIX}/lib/udev/rules.d
+)
+install(FILES src/systemd/g13.service
+    DESTINATION ${CMAKE_INSTALL_PREFIX}/lib/systemd/user
 )
