@@ -191,7 +191,7 @@ public class MacroEditorPanel extends JPanel {
      * @param enabled The desired enabled state.
      */
     private void setComponentStates(boolean enabled) {
-        final JComponent[] components = { macroSelectionBox, macroList, nameText, addDelayButton, captureDelays, editButton, deleteButton };
+        final JComponent[] components = { macroList, nameText, addDelayButton, captureDelays, editButton, deleteButton };
         for (JComponent c : components) {
             c.setEnabled(enabled);
         }
