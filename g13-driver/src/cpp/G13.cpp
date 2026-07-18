@@ -22,6 +22,7 @@
 #include "G13Action.h"
 #include "PassThroughAction.h"
 #include "MacroAction.h"
+#include "MouseMoveAction.h"
 #include "Output.h"
 #include "Font.h"
 #include "ConfigPath.h" // NEW: Include Helper
@@ -201,6 +202,19 @@ void G13::parse_bindings_from_stream(std::istream& stream) {
                             actions[gKey] = std::make_unique<MacroAction>(macro->getSequence());
                             static_cast<MacroAction*>(actions[gKey].get())->setRepeats(repeats);
                         }
+                    }
+                }
+                else if (type == "mp") {
+                    std::string dx_str, dy_str, hold_str;
+                    if (!std::getline(ss, dx_str, ',') || !std::getline(ss, dy_str, ',')) continue;
+                    int mdx = std::stoi(trim_string(dx_str));
+                    int mdy = std::stoi(trim_string(dy_str));
+                    std::vector<int> hold = {BTN_MIDDLE};
+                    if (std::getline(ss, hold_str, ',')) {
+                        hold = parse_plus_list(trim_string(hold_str));
+                    }
+                    if (gKey >= 0 && gKey < G13_NUM_KEYS) {
+                        actions[gKey] = std::make_unique<MouseMoveAction>(mdx, mdy, hold);
                     }
                 }
             } catch (...) {}
