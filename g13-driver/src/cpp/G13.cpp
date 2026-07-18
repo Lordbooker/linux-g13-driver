@@ -47,6 +47,9 @@ G13::G13(libusb_device *device) {
     this->stick_engaged = false;
     this->stick_last_x = 128;
     this->stick_last_y = 128;
+    this->stick_center_x = 128;
+    this->stick_center_y = 128;
+    this->stick_centered = false;
     this->last_config_mtime = 0;
 
     actions.resize(G13_NUM_KEYS);
@@ -385,6 +388,15 @@ void G13::parse_joystick(unsigned char *buf) {
     stick_last_x = stick_x;
     stick_last_y = stick_y;
 
+    // The stick rarely rests at exactly (128,128); treat the first report's
+    // position as the neutral point so mouse mode doesn't drift.
+    if (!stick_centered) {
+        stick_center_x = stick_x;
+        stick_center_y = stick_y;
+        stick_centered = true;
+        syslog(LOG_INFO, "Stick neutral calibrated at (%d,%d)", stick_x, stick_y);
+    }
+
     if (stick_mode == STICK_MOUSE) {
         return; // Motion is emitted by stick_mouse_tick() from the main loop.
     }
@@ -412,9 +424,11 @@ void G13::parse_joystick(unsigned char *buf) {
 void G13::stick_mouse_tick() {
     if (stick_mode != STICK_MOUSE) return;
 
+    if (!stick_centered) return;
+
     const int DEAD_ZONE = 15;
-    int dx = stick_last_x - 128;
-    int dy = stick_last_y - 128;
+    int dx = stick_last_x - stick_center_x;
+    int dy = stick_last_y - stick_center_y;
 
     if (abs(dx) <= DEAD_ZONE && abs(dy) <= DEAD_ZONE) {
         stick_mouse_disengage();

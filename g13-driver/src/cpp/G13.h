@@ -31,6 +31,9 @@ private:
     bool                  stick_engaged;
     int                   stick_last_x;
     int                   stick_last_y;
+    int                   stick_center_x;
+    int                   stick_center_y;
+    bool                  stick_centered;
     std::string           profile_name;
     int                   bindings;
 
