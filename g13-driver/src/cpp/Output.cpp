@@ -124,6 +124,11 @@ bool UInput::create_uinput() {
 	ioctl(file, UI_SET_EVBIT, EV_REL);
 	ioctl(file, UI_SET_RELBIT, REL_X);
 	ioctl(file, UI_SET_RELBIT, REL_Y);
+	// Advertise wheels so libinput treats this as a normal mouse; without
+	// them it enables middle-button scroll emulation on wheel-less mice,
+	// turning MMB-held stick motion into scroll events instead of a drag.
+	ioctl(file, UI_SET_RELBIT, REL_WHEEL);
+	ioctl(file, UI_SET_RELBIT, REL_HWHEEL);
 
 	// Write configuration
 	int retcode = write(file, &uinp, sizeof(uinp));
