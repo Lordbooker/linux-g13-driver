@@ -333,6 +333,18 @@ G20=p,k.50
         write_text(2, 28, profile_name);
         write_lcd();
     }
+
+    // Publish the active softkey number so external tools (e.g. the LCD
+    // monitor) can display which profile is loaded.
+    std::string runtime_dir = std::getenv("XDG_RUNTIME_DIR") ? std::getenv("XDG_RUNTIME_DIR") : "/tmp";
+    std::string profile_state_path = runtime_dir + "/g13-profile";
+    std::ofstream profile_state_file(profile_state_path, std::ios::trunc);
+    if (profile_state_file.is_open()) {
+        profile_state_file << (this->bindings + 1);
+        profile_state_file.close();
+    } else {
+        syslog(LOG_WARNING, "Could not write profile state file: %s", profile_state_path.c_str());
+    }
 }
 
 void G13::setColor(int red, int green, int blue) {
