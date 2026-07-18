@@ -50,6 +50,8 @@ G13::G13(libusb_device *device) {
     this->stick_center_x = 128;
     this->stick_center_y = 128;
     this->stick_centered = false;
+    this->stick_acc_x = 0;
+    this->stick_acc_y = 0;
     this->last_config_mtime = 0;
 
     actions.resize(G13_NUM_KEYS);
@@ -443,8 +445,14 @@ void G13::stick_mouse_tick() {
         stick_engaged = true;
     }
 
-    int rel_x = (dx * stick_speed) / 64;
-    int rel_y = (dy * stick_speed) / 64;
+    // Carry the sub-pixel remainder between ticks so low speeds produce
+    // slow smooth motion instead of nothing until ~full deflection.
+    int sum_x = dx * stick_speed + stick_acc_x;
+    int sum_y = dy * stick_speed + stick_acc_y;
+    int rel_x = sum_x / 64;
+    int rel_y = sum_y / 64;
+    stick_acc_x = sum_x % 64;
+    stick_acc_y = sum_y % 64;
     if (rel_x == 0 && rel_y == 0) return;
 
     UInput::send_event(EV_REL, REL_X, rel_x);
@@ -459,6 +467,8 @@ void G13::stick_mouse_disengage() {
     }
     UInput::send_event(EV_SYN, SYN_REPORT, 0);
     stick_engaged = false;
+    stick_acc_x = 0;
+    stick_acc_y = 0;
 }
 
 void G13::parse_key(int key, unsigned char *byte) {

@@ -34,6 +34,8 @@ private:
     int                   stick_center_x;
     int                   stick_center_y;
     bool                  stick_centered;
+    int                   stick_acc_x;
+    int                   stick_acc_y;
     std::string           profile_name;
     int                   bindings;
 
