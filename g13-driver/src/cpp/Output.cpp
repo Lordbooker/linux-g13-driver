@@ -117,6 +117,14 @@ bool UInput::create_uinput() {
 		ioctl(file, UI_SET_KEYBIT, i);
 	ioctl(file, UI_SET_KEYBIT, BTN_THUMB);
 
+	// Mouse capability: buttons + relative motion (orbit/pan emulation)
+	ioctl(file, UI_SET_KEYBIT, BTN_LEFT);
+	ioctl(file, UI_SET_KEYBIT, BTN_RIGHT);
+	ioctl(file, UI_SET_KEYBIT, BTN_MIDDLE);
+	ioctl(file, UI_SET_EVBIT, EV_REL);
+	ioctl(file, UI_SET_RELBIT, REL_X);
+	ioctl(file, UI_SET_RELBIT, REL_Y);
+
 	// Write configuration
 	int retcode = write(file, &uinp, sizeof(uinp));
 	if (retcode < 0) {
