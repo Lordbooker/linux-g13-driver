@@ -244,6 +244,10 @@ void G13::parse_bindings_from_stream(std::istream& stream) {
 }
 
 void G13::loadBindings() {
+    // Release anything held before rebinding, so no key survives a profile switch pressed.
+    for (auto& action : actions) {
+        if (action) action->set(0);
+    }
     stick_mouse_disengage();
     stick_mode = STICK_KEYS;
     stick_speed = 8;
