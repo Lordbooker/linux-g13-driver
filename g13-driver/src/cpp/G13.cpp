@@ -43,6 +43,10 @@ G13::G13(libusb_device *device) {
     this->loaded = 0;
     this->bindings = 0;
     this->stick_mode = STICK_KEYS;
+    this->stick_speed = 8;
+    this->stick_engaged = false;
+    this->stick_last_x = 128;
+    this->stick_last_y = 128;
     this->last_config_mtime = 0;
 
     actions.resize(G13_NUM_KEYS);
@@ -95,6 +99,7 @@ void G13::start() {
     while (keepGoing && daemon_keep_running) {
         check_for_config_update();
         check_fifo();
+        stick_mouse_tick();
 
         if (read() == -4) {
             break; 
@@ -171,6 +176,22 @@ void G13::parse_bindings_from_stream(std::istream& stream) {
                 if (r <= 255 && g <= 255 && b <= 255) setColor(r, g, b);
             }
         }
+        else if (key == "stick_mode") {
+            if (value == "mouse") stick_mode = STICK_MOUSE;
+            else if (value == "keys") stick_mode = STICK_KEYS;
+            else syslog(LOG_WARNING, "Unknown stick_mode '%s', keeping keys mode", value.c_str());
+        }
+        else if (key == "stick_speed") {
+            try { stick_speed = std::stoi(value); } catch (...) {
+                syslog(LOG_WARNING, "Invalid stick_speed '%s'", value.c_str());
+            }
+        }
+        else if (key == "stick_hold") {
+            stick_hold = parse_plus_list(value);
+        }
+        else if (key == "name") {
+            profile_name = value;
+        }
         else if (!key.empty() && key.rfind("G", 0) == 0) {
             try {
                 int gKey = std::stoi(key.substr(1));
@@ -223,6 +244,12 @@ void G13::parse_bindings_from_stream(std::istream& stream) {
 }
 
 void G13::loadBindings() {
+    stick_mouse_disengage();
+    stick_mode = STICK_KEYS;
+    stick_speed = 8;
+    stick_hold.clear();
+    profile_name.clear();
+
     // NEW: Use ConfigPath helper
     std::string filename = ConfigPath::getBindingPath(bindings);
 
@@ -306,7 +333,8 @@ int G13::read() {
     // (Existing read implementation)
     unsigned char buffer[G13_REPORT_SIZE];
     int size;
-    int error = libusb_interrupt_transfer(handle, LIBUSB_ENDPOINT_IN | G13_KEY_ENDPOINT, buffer, G13_REPORT_SIZE, &size, 100);
+    int timeout_ms = (stick_mode == STICK_MOUSE) ? 10 : 100;
+    int error = libusb_interrupt_transfer(handle, LIBUSB_ENDPOINT_IN | G13_KEY_ENDPOINT, buffer, G13_REPORT_SIZE, &size, timeout_ms);
 
     if (error == LIBUSB_ERROR_NO_DEVICE) {
         syslog(LOG_ERR, "G13 device disconnected.");
@@ -331,6 +359,13 @@ void G13::parse_joystick(unsigned char *buf) {
     int stick_x = buf[1];
     int stick_y = buf[2];
 
+    stick_last_x = stick_x;
+    stick_last_y = stick_y;
+
+    if (stick_mode == STICK_MOUSE) {
+        return; // Motion is emitted by stick_mouse_tick() from the main loop.
+    }
+
     if (stick_mode == STICK_ABSOLUTE) {
         UInput::send_event(EV_ABS, ABS_X, stick_x);
         UInput::send_event(EV_ABS, ABS_Y, stick_y);
@@ -349,6 +384,44 @@ void G13::parse_joystick(unsigned char *buf) {
             if (actions[codes[i]]) actions[codes[i]]->set(pressed[i]);
         }
     }
+}
+
+void G13::stick_mouse_tick() {
+    if (stick_mode != STICK_MOUSE) return;
+
+    const int DEAD_ZONE = 15;
+    int dx = stick_last_x - 128;
+    int dy = stick_last_y - 128;
+
+    if (abs(dx) <= DEAD_ZONE && abs(dy) <= DEAD_ZONE) {
+        stick_mouse_disengage();
+        return;
+    }
+
+    if (!stick_engaged) {
+        for (int code : stick_hold) {
+            UInput::send_event(EV_KEY, code, 1);
+        }
+        UInput::send_event(EV_SYN, SYN_REPORT, 0);
+        stick_engaged = true;
+    }
+
+    int rel_x = (dx * stick_speed) / 64;
+    int rel_y = (dy * stick_speed) / 64;
+    if (rel_x == 0 && rel_y == 0) return;
+
+    UInput::send_event(EV_REL, REL_X, rel_x);
+    UInput::send_event(EV_REL, REL_Y, rel_y);
+    UInput::send_event(EV_SYN, SYN_REPORT, 0);
+}
+
+void G13::stick_mouse_disengage() {
+    if (!stick_engaged) return;
+    for (auto it = stick_hold.rbegin(); it != stick_hold.rend(); ++it) {
+        UInput::send_event(EV_KEY, *it, 0);
+    }
+    UInput::send_event(EV_SYN, SYN_REPORT, 0);
+    stick_engaged = false;
 }
 
 void G13::parse_key(int key, unsigned char *byte) {

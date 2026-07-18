@@ -24,9 +24,18 @@ private:
     int                   loaded;        
     volatile int          keepGoing;     
 
-    stick_mode_t          stick_mode;    
-    int                   stick_keys[4];   
-    int                   bindings;      
+    stick_mode_t          stick_mode;
+    int                   stick_keys[4];
+    int                   stick_speed;
+    std::vector<int>      stick_hold;
+    bool                  stick_engaged;
+    int                   stick_last_x;
+    int                   stick_last_y;
+    std::string           profile_name;
+    int                   bindings;
+
+    void stick_mouse_tick();
+    void stick_mouse_disengage();
 
     unsigned char lcd_buffer[G13_LCD_BUFFER_SIZE];
 

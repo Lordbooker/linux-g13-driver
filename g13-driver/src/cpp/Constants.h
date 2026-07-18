@@ -19,7 +19,7 @@
 enum stick_mode_t {
     STICK_KEYS = 0,   // Joystick movement emulates key presses (e.g., W, A, S, D).
     STICK_ABSOLUTE,   // Joystick provides absolute position values (like a gamepad).
-    /*STICK_RELATIVE,*/ // A possible future mode for relative mouse movement.
+    STICK_MOUSE,      // Joystick emits relative mouse motion with optional held keys/buttons.
 };
 
 /**
