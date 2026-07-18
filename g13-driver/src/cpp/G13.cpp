@@ -326,6 +326,13 @@ G20=p,k.50
         parse_bindings_from_stream(file);
         file.close();
     }
+
+    if (!profile_name.empty()) {
+        clear_lcd_buffer();
+        write_text(2, 16, "Profile:");
+        write_text(2, 28, profile_name);
+        write_lcd();
+    }
 }
 
 void G13::setColor(int red, int green, int blue) {
