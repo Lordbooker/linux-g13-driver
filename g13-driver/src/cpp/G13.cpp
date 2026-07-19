@@ -21,6 +21,7 @@
 #include "G13.h"
 #include "G13Action.h"
 #include "PassThroughAction.h"
+#include "ComboPassThroughAction.h"
 #include "MacroAction.h"
 #include "MouseMoveAction.h"
 #include "Output.h"
@@ -205,14 +206,22 @@ void G13::parse_bindings_from_stream(std::istream& stream) {
                 if (!std::getline(ss, type, ',')) continue;
                 type = trim_string(type);
 
-                if (type == "p") { 
+                if (type == "p") {
                     std::string keytype_str;
                     if (!std::getline(ss, keytype_str, ',')) continue;
                     keytype_str = trim_string(keytype_str);
                     if (keytype_str.rfind("k.", 0) == 0) {
-                        int keycode = std::stoi(keytype_str.substr(2));
-                        if (gKey >= 0 && gKey < G13_NUM_KEYS) {
-                             actions[gKey] = std::make_unique<PassThroughAction>(keycode);
+                        std::string codes_str = keytype_str.substr(2);
+                        if (gKey < 0 || gKey >= G13_NUM_KEYS) continue;
+                        if (codes_str.find('+') != std::string::npos) {
+                            std::vector<int> codes = parse_plus_list(codes_str);
+                            if (codes.size() > 1) {
+                                actions[gKey] = std::make_unique<ComboPassThroughAction>(codes);
+                            } else if (codes.size() == 1) {
+                                actions[gKey] = std::make_unique<PassThroughAction>(codes[0]);
+                            }
+                        } else {
+                            actions[gKey] = std::make_unique<PassThroughAction>(std::stoi(codes_str));
                         }
                     }
                 }
