@@ -1,172 +1,244 @@
-# G13 Linux Driver & GUI (Modernized Fork)
+# G13 Linux Driver & Config Tool (Modernized Fork)
 
-This is a modernized fork of the G13 driver for Linux.
-The original project is over 10 years old. This fork has been refactored to use modern C++ standards for the driver and GUI
+A user-space driver and configuration tool for the **Logitech G13** gameboard on Linux.
 
-## Features
+The original project is over 10 years old. This fork modernizes it:
 
-* **Modern C++ Driver and new Qt6 Config-Tool:** The core driver has been updated for better performance and compatibility.
-* **Flexible Configuration:** Offers multiple ways to configure your G13: via the user-friendly GUI, manual file editing, or using the driver's fixed mapping with external tools.
+* **`linux-g13-driver`** – a C++23 background daemon. It talks to the G13 via `libusb`,
+  passes key presses to the system through `uinput`, drives the LCD and the backlight.
+  It runs as a systemd user service and needs **no GUI toolkit**.
+* **`g13-gui`** – a new **Qt6** configuration tool with its own tray icon.
+  It replaces the former Java/Swing config tool and the GTK/AppIndicator tray icon of the daemon.
+
+> **Status:** The Qt6 config tool is under active development on the `refactoring` branch.
+> Existing configuration files in `~/.config/g13/` keep the same format and remain usable.
 
 ## Requirements
 
-### Base Requirements
+* C++ compiler with C++23 support, `make`, `pkg-config`
+* CMake >= 3.20
+* `libusb-1.0` (development headers)
+* Qt6 Base (Widgets, Core, Gui) – only needed for the config tool
+* Optional: Python 3 with `psutil` for the example LCD monitor script
 
-You need to install the following packages via your package manager:
-
-* `make`
-* `cmake`
-* `gtk3` / `gtk3-devel`
-* `libusb-1.0-0` (on some distros named `libusb-1.0-0-dev` or `libusb1-devel`)
-* `libappindicator-gtk3` (or similar)
-* `python-psutil` (for the monitor script)
+GTK3, AppIndicator and Java are **no longer required**.
 
 ### Automated Dependency Installation
 
-Alternatively, all needed dependencies can be installed via the `install_deps.sh` script located in the scripts folder.
+`install_deps.sh` detects the package manager (pacman, apt-get, dnf, zypper) and installs the
+build dependencies:
 
 ```bash
-cd src/scripts
-chmod +x install_deps.sh
-./install_deps.sh
+cd g13-driver
+./scripts/install_deps.sh
 ```
 
-## Build & Installation
+The package lists for Fedora and openSUSE have not been tested yet.
 
-1.  Open a terminal and navigate to the project directory.
-2.  Build the driver:
+## Build
 
-    ```bash
-    make all
-    ```
+```bash
+cd g13-driver
+make
+```
 
-The installation process will clean up automatically after finishing.
+`make` installs the dependencies (via `install_deps.sh`, requires sudo) and builds both the
+daemon and the config tool into `g13-driver/build/`.
 
-## Choose your Installation Method
+To build **without** touching system packages (e.g. for packaging):
 
-### Option A: System-Wide Installation (Standard)
-This is the recommended method for standard usage. It installs binaries to /usr/bin and resources to /usr/share/.
+```bash
+make build-driver
+```
+
+Alternatively with CMake directly (use `build` as directory if you want to use `make install` afterwards):
+
+```bash
+cmake -S . -B build
+cmake --build build
+```
+
+CMake options:
+
+| Option | Default | Meaning |
+|---|---|---|
+| `BUILD_CONFIG_TOOL` | `ON` | Build the Qt6 config tool `g13-gui` |
+| `BUILD_TESTS` | `OFF` | Build tests (requires GoogleTest; no tests exist yet) |
+| `ENABLE_SANITIZERS` | `OFF` | ASan/UBSan, only for `CMAKE_BUILD_TYPE=Debug` |
+
+## Installation
 
 ```bash
 sudo make install
 ```
-Note: As per standard Linux security practices, the installation does not auto-start user services. You must enable the driver for your user manually once:
+
+This installs:
+
+| File | Target |
+|---|---|
+| Daemon | `/usr/bin/linux-g13-driver` |
+| Config tool | `/usr/bin/g13-gui` |
+| udev rule | `/usr/lib/udev/rules.d/99-g13.rules` |
+| systemd user service | `/usr/lib/systemd/user/g13.service` |
+
+`PREFIX` and `DESTDIR` can be overridden for packaging, e.g. `make install DESTDIR=pkgdir`.
+
+The udev rule gives the logged-in user access to the G13 and to `uinput` without root.
+Reload the rules once (or unplug and replug the G13):
+
+```bash
+sudo udevadm control --reload-rules
+sudo udevadm trigger
+```
+
+The service is not started automatically. Enable it once for your user:
 
 ```bash
 systemctl --user enable --now g13
-systemctl --user start g13
 ```
 
-#### Option B: User-Local Installation (Developer Mode)
-This method installs everything to your home directory (~/.local/bin). It is intended for development, testing, or users without root access. Automatically creates and starts the Systemd service.
+A user-local installation (`make install-user`) is not supported in this version.
+
+## Controlling the Driver
 
 ```bash
-make install-user
-```
-Driver: Installed to ~/.local/bin/linux-g13-driver
-
-Service: Automatically enabled and started immediately.
-
-Note on Permissions: Both methods install a UDEV rule (/etc/udev/rules.d/99-g13.rules) to allow access to the G13 without sudo. You might need to unplug and replug your device once after installation if it's not detected immediately.
-
-## How to use the Driver and GUI
-
-### Run the driver
-
-### Controlling the Driver
-The driver runs in the background via Systemd.
-
-Check Status:
-
-```bash
-systemctl --user status g13
+systemctl --user status g13      # status
+journalctl --user -u g13 -f      # live log
+systemctl --user restart g13     # restart
 ```
 
-View Logs:
+## Using the Config Tool
 
-```bash
-journalctl --user -u g13 -f
-```
-
-Restart Driver:
-
-```bash
-systemctl --user restart g13
-```
-
-
-### Use the Config Tool
-
-After starting the driver, you will see a new icon in your system tray/taskbar. This allows you to open the config menu or quit the driver.
-
-Alternatively, run it from the terminal:
+Start it from your application menu or a terminal:
 
 ```bash
 g13-gui
 ```
 
-This will bring up the UI.
+Select the profile to edit in the toolbar (**M1–M4** correspond to `bindings-0.properties` …
+`bindings-3.properties`). All changes are written directly to `~/.config/g13/`.
 
-Profiles: The top 4 buttons under the LCD (M1, M2, M3, MR) switch between binding profiles.
+* **Key Bindings** – click a key in the G13 image, then choose:
+  * *Tastencode (Pass-Through)*: the key sends a normal keyboard key,
+  * *Makro*: the key runs a macro (macro ID and repeat mode),
+  * *Keine Aktion*: the key is unbound.
 
-Save: Changes are saved automatically to `~/.config/g13/bindings-*.properties`.
+  Then click *Speichern*.
+* **Backlight Color** – choose the RGB color of the profile.
+* **Macro Recorder** – create macros:
+  * *Aufnahme starten*: records key presses including their timing. The window must be in the
+    foreground; shortcuts handled by your desktop (e.g. Alt+Tab) cannot be recorded.
+  * The macro is shown as a list of steps (press, release, wait). Steps can be moved, removed
+    or inserted manually.
+  * *Auf alle anwenden* replaces all recorded delays with a fixed value.
+  * *Speichern* warns if a key is pressed but never released.
 
-Live Reload: The driver automatically detects file changes and reloads the config immediately.
+Closing the window keeps the tool running in the system tray (if your desktop provides one);
+quit it via the tray menu (*Beenden*).
 
-![Config Tool Screenshot](docs/ConfigTool.png)
+### When do changes take effect?
 
-The top 4 buttons under the LCD screen select the bindings (M1-M3, MR).
+The daemon watches the bindings file of the **active** profile and reloads it automatically
+when it changes. Macro files are read whenever the bindings are (re)loaded – a changed macro
+becomes active after the next change of the profile's bindings file, a profile switch, or a
+restart of the driver.
 
-> **Important:** If you configure the application while the driver is running, the driver will not pick up changes unless you select a different binding set or restart the driver.
+## Profiles on the Device
 
-### Use the built-in Mapping Set (for external tools)
+The four profile buttons (M1–M3, MR) switch between `bindings-0` … `bindings-3`.
+These buttons cannot be bound to other actions.
 
-The driver now includes a fixed default mapping. This means the GUI is not strictly necessary if you prefer other tools. You can map the keys using software like **Input Remapper**.
+## Configuration Files (manual editing)
 
-*(Note: The quick profile change via the four small buttons under the display only works when using the G13 GUI tool.)*
+All files are located in `~/.config/g13/` (or `$XDG_CONFIG_HOME/g13/`).
+If a bindings file is missing, the driver creates it with a default mapping on first use.
 
-### Manually create your own Mapping Set
+### `bindings-<0..3>.properties`
 
-If you don't want to use the GUI App, you can edit the files manually in `~/.config/g13/`.
-
-* **Usage Example:** To map the **G20** key to the letter **T**, find the event code for T (which is 20). Then, in your `bindings-0.properties` file, add or edit the line:
-    ```ini
-    G20=p,k.20
-    ```
-
-### Using the Display (scripting)
-
-You can write text to the display using a simple pipe command:
-
-The driver creates a Named Pipe (FIFO) to receive text for the LCD.
-
-Location: `/run/user/$UID/g13-lcd` (Check `/tmp/g13-lcd` as fallback if `/run` is unavailable).
-
-```bash
-# Find your pipe path (usually based on your user ID, e.g., 1000)
-PIPE="/run/user/$(id -u)/g13-lcd"
-
-# Send simple text
-echo "Hello World!" > $PIPE
-
-# Send multi-line text (CPU/RAM stats)
-echo -e "CPU: 50%\nRAM: 4GB" > $PIPE
+```ini
+color=0,0,255        # backlight R,G,B (0-255)
+G19=p,k.20           # pass-through: send Linux key code 20 (T)
+G4=m,3,0             # macro 3, repeat mode 0
 ```
 
-Currently, only one font size is implemented. There is an example script for system monitoring in the `scripts` folder. Feel free to try it out, modify it, or share your own scripts!
+**Key numbering in the file is zero-based**: the file key `G0` is the physical key **G1**,
+`G21` is **G22**. Further keys (bit positions as defined in `Constants.h`):
 
+| File key | Physical key |
+|---|---|
+| `G0` … `G21` | G1 … G22 |
+| `G33`, `G34`, `G35` | thumb keys LEFT, DOWN, TOP (stick press) |
+| `G36`, `G37`, `G38`, `G39` | joystick up, left, right, down |
 
-### Uninstallation
+The joystick directions cannot be set in the GUI yet; edit them in the file
+(default: W, A, D, S).
 
-To remove the driver and all installed files:
+Key codes are Linux input event codes, see `docs/Eventcodes_for_Mapping.pdf` or
+`/usr/include/linux/input-event-codes.h` (e.g. `KEY_T` = 20).
 
-```bash
-make uninstall
+**Macro repeat mode** (`m,<macroId>,<repeats>`):
+
+| Value | Behaviour |
+|---|---|
+| `0` | run once |
+| `1` | repeat while the key is held |
+| `>1` | run the given number of times |
+
+Pressing the key again while a macro is running stops it.
+
+### `macro-<0..199>.properties`
+
+```ini
+name=Copy
+id=3
+sequence=kd.29,d.40,kd.46,d.60,ku.46,d.30,ku.29
 ```
 
-(Note: This removes the binaries, UDEV rules, and service files, but keeps your configuration in ~/.config/g13 to prevent data loss.)
+| Token | Meaning |
+|---|---|
+| `kd.<code>` | press key |
+| `ku.<code>` | release key |
+| `d.<ms>` | wait (milliseconds) |
 
+Tokens are separated by commas without spaces.
+
+## Use with External Tools
+
+The driver works without the config tool: it creates a default mapping if no configuration
+exists. You can then remap the keys with tools like **Input Remapper**.
+
+## LCD Scripting
+
+The driver creates a named pipe (FIFO); text written to it is shown on the LCD:
+
+* `$XDG_RUNTIME_DIR/g13-lcd` – usually `/run/user/<uid>/g13-lcd`
+* `/tmp/g13-lcd` – only if `XDG_RUNTIME_DIR` is not set
+
+```bash
+PIPE="$XDG_RUNTIME_DIR/g13-lcd"
+
+echo "Hello World!" > "$PIPE"
+echo -e "CPU: 50%\nRAM: 4GB" > "$PIPE"
+```
+
+Only one font (5×7) is implemented. An example monitor script is located in
+`g13-driver/scripts/g13_monitor.py`.
+
+> **Known limitation:** `g13_monitor.py` currently writes to `/tmp/g13-lcd` only and therefore
+> does not find the pipe when `XDG_RUNTIME_DIR` is set (the normal case).
+
+## Uninstallation
+
+```bash
+systemctl --user disable --now g13
+cd g13-driver
+sudo make uninstall
+```
+
+This removes the daemon, the config tool, the udev rule and the service file.
+Your configuration in `~/.config/g13` is kept.
 
 ## Notes
 
-* Tested on 64-bit Arch Linux.
+* Developed on 64-bit Arch Linux.
+* Planned next steps are described in [ROADMAP.md](ROADMAP.md).

@@ -67,5 +67,16 @@ install-user:
 	@echo "--- User Local Install not fully supported in this version ---"
 	@echo "Please use 'sudo make install' or build an Arch Package."
 
+# Removes exactly the files installed by 'install'.
+# The user configuration in ~/.config/g13 is kept.
+uninstall:
+	@echo "--- Removing installed files from $(DESTDIR)$(PREFIX) ---"
+	rm -f $(DESTDIR)$(BINDIR)/linux-g13-driver
+	rm -f $(DESTDIR)$(BINDIR)/g13-gui
+	rm -f $(DESTDIR)$(UDEVDIR)/99-g13.rules
+	rm -f $(DESTDIR)$(SYSTEMDDIR)/g13.service
+	@echo "Uninstall done. Your configuration in ~/.config/g13 was kept."
+	@echo "If the service was enabled, run: systemctl --user disable --now g13"
+
 clean:
 	rm -rf $(BUILD_DIR)
