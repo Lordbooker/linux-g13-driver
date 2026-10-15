@@ -30,6 +30,13 @@
 extern volatile sig_atomic_t daemon_keep_running;
 const int G13_MAX_MACROS = 200;
 
+// bmRequestType fuer HID-Class-Requests an das Interface (LCD-Init, Farbe).
+// Explizit als uint8_t gebildet: die direkte Verknuepfung zweier libusb-Enums
+// unterschiedlichen Typs ist seit C++20 veraltet (-Wdeprecated-enum-enum-conversion).
+constexpr uint8_t G13_HID_CLASS_REQUEST =
+    static_cast<uint8_t>(LIBUSB_REQUEST_TYPE_CLASS) |
+    static_cast<uint8_t>(LIBUSB_RECIPIENT_INTERFACE);
+
 // Nach so vielen aufeinanderfolgenden USB-Lesefehlern (je ca. 100 ms Pause)
 // wird das Geraet freigegeben; der Geraete-Thread oeffnet es danach neu.
 const int G13_MAX_CONSECUTIVE_READ_ERRORS = 50;
@@ -75,7 +82,7 @@ G13::G13(libusb_device *device) {
     syslog(LOG_INFO, "Initializing G13 display...");
     unsigned char lcd_init_payload[] = { 0x01 };
     libusb_control_transfer(handle,
-        (LIBUSB_REQUEST_TYPE_CLASS | LIBUSB_RECIPIENT_INTERFACE), 0x09, 0x0300, 0x0000,
+        G13_HID_CLASS_REQUEST, 0x09, 0x0300, 0x0000,
         lcd_init_payload, sizeof(lcd_init_payload), 1000);
 
     setColor(128, 128, 128);
@@ -326,7 +333,7 @@ G20=p,k.50
 
 void G13::setColor(int red, int green, int blue) {
     unsigned char usb_data[] = { 5, (unsigned char)red, (unsigned char)green, (unsigned char)blue, 0 };
-    libusb_control_transfer(handle, LIBUSB_REQUEST_TYPE_CLASS | LIBUSB_RECIPIENT_INTERFACE, 9, 0x307, 0, usb_data, 5, 1000);
+    libusb_control_transfer(handle, G13_HID_CLASS_REQUEST, 9, 0x307, 0, usb_data, 5, 1000);
 }
 
 int G13::read() {
