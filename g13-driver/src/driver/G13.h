@@ -17,16 +17,24 @@ class G13 {
 private:
     std::vector<std::unique_ptr<G13Action>> actions;
 
-    libusb_device        *device;       
-    libusb_device_handle *handle;        
+    libusb_device        *device = nullptr;
+    libusb_device_handle *handle = nullptr;
     int                   uinput_file;   
 
-    int                   loaded;        
-    volatile int          keepGoing;     
+    int                   loaded = 0;
+    volatile int          keepGoing = 0;
 
     stick_mode_t          stick_mode;    
     int                   stick_keys[4];   
     int                   bindings;      
+
+    // Profiltasten L1-L4: vorheriger Zustand, damit nur beim Druecken
+    // (Flanke) umgeschaltet wird und nicht bei jedem USB-Report.
+    bool profile_key_down[4] = {false, false, false, false};
+
+    // Aufeinanderfolgende USB-Lesefehler (ohne Timeout)
+    int read_error_count = 0;
+    int last_read_error  = 0;
 
     unsigned char lcd_buffer[G13_LCD_BUFFER_SIZE];
 
@@ -37,13 +45,14 @@ private:
     // --- Private Methods ---
     std::unique_ptr<Macro> loadMacro(int id);
     void parse_bindings_from_stream(std::istream& stream);
+    void reset_actions();
     int  read();
     void parse_joystick(unsigned char *buf);
     void parse_key(int key, unsigned char *byte);
     void parse_keys(unsigned char *buf);
 
     // FIFO / Pipe for external input
-    int fifo_fd;             // File Descriptor for the pipe
+    int fifo_fd = -1;        // File Descriptor for the pipe
     std::string fifo_path;   // Path to pipe (default: /tmp/g13-lcd)
     
     void init_fifo();        // Create pipe
@@ -56,6 +65,7 @@ public:
     ~G13();
 
     void start();
+    bool isLoaded() const { return loaded != 0; }
     void stop();
     void loadBindings();
     void setColor(int r, int g, int b);

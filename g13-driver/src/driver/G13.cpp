@@ -15,6 +15,7 @@
 #include <sstream>
 #include <istream>
 #include <chrono> 
+#include <thread>
 #include <syslog.h> 
 
 #include "Constants.h"
@@ -28,6 +29,10 @@
 
 extern volatile sig_atomic_t daemon_keep_running;
 const int G13_MAX_MACROS = 200;
+
+// Nach so vielen aufeinanderfolgenden USB-Lesefehlern (je ca. 100 ms Pause)
+// wird das Geraet freigegeben; der Geraete-Thread oeffnet es danach neu.
+const int G13_MAX_CONSECUTIVE_READ_ERRORS = 50;
 
 std::string trim_string(const std::string& str) {
     const std::string whitespace = " \t\n\r\f\v";
@@ -62,6 +67,8 @@ G13::G13(libusb_device *device) {
 
     if (libusb_claim_interface(handle, 0) < 0) {
         syslog(LOG_ERR, "Cannot Claim Interface");
+        libusb_close(handle);
+        handle = nullptr;
         return;
     }
 
@@ -161,13 +168,30 @@ void G13::parse_bindings_from_stream(std::istream& stream) {
         std::string value = trim_string(trimmed_line.substr(eq_pos + 1));
 
         if (key == "color") {
-            std::stringstream ss(value);
-            std::string segment;
-            int r, g, b;
-            if (std::getline(ss, segment, ',') && (r = std::stoi(segment)) >= 0 &&
-                std::getline(ss, segment, ',') && (g = std::stoi(segment)) >= 0 &&
-                std::getline(ss, segment, ',') && (b = std::stoi(segment)) >= 0) {
-                if (r <= 255 && g <= 255 && b <= 255) setColor(r, g, b);
+            // Ungueltige Werte werden ignoriert (frueher: std::stoi warf eine
+            // Exception ausserhalb des try und beendete den Daemon).
+            try {
+                std::stringstream ss(value);
+                std::string segment;
+                int rgb[3];
+                int count = 0;
+                while (count < 3 && std::getline(ss, segment, ',')) {
+                    size_t used = 0;
+                    const std::string s = trim_string(segment);
+                    rgb[count] = std::stoi(s, &used);
+                    if (used != s.size()) throw std::invalid_argument("color");
+                    ++count;
+                }
+                if (count == 3 &&
+                    rgb[0] >= 0 && rgb[0] <= 255 &&
+                    rgb[1] >= 0 && rgb[1] <= 255 &&
+                    rgb[2] >= 0 && rgb[2] <= 255) {
+                    setColor(rgb[0], rgb[1], rgb[2]);
+                } else {
+                    syslog(LOG_WARNING, "Invalid color value ignored: %s", value.c_str());
+                }
+            } catch (...) {
+                syslog(LOG_WARNING, "Invalid color value ignored: %s", value.c_str());
             }
         }
         else if (!key.empty() && key.rfind("G", 0) == 0) {
@@ -208,7 +232,24 @@ void G13::parse_bindings_from_stream(std::istream& stream) {
     }
 }
 
+// Laesst alle gedrueckten Tasten los und entfernt alle Belegungen.
+// Wird vor jedem Laden aufgerufen:
+//  - Tasten, die im (neuen) Profil nicht eingetragen sind, haben keine Funktion
+//    (vorher behielten sie die Belegung des vorherigen Profils bzw. einer
+//    aus der Datei entfernten Zeile).
+//  - Gedrueckte Tasten werden losgelassen, damit sie im System nicht haengen.
+//  - Laufende Makros werden beim Ersetzen gestoppt (MacroAction-Destruktor).
+void G13::reset_actions() {
+    for (auto &action : actions) {
+        if (action && action->isPressed())
+            action->set(0);
+        action = std::make_unique<G13Action>();
+    }
+}
+
 void G13::loadBindings() {
+    reset_actions();
+
     // NEW: Use ConfigPath helper
     std::string filename = ConfigPath::getBindingPath(bindings);
 
@@ -291,7 +332,7 @@ void G13::setColor(int red, int green, int blue) {
 int G13::read() {
     // (Existing read implementation)
     unsigned char buffer[G13_REPORT_SIZE];
-    int size;
+    int size = 0;
     int error = libusb_interrupt_transfer(handle, LIBUSB_ENDPOINT_IN | G13_KEY_ENDPOINT, buffer, G13_REPORT_SIZE, &size, 100);
 
     if (error == LIBUSB_ERROR_NO_DEVICE) {
@@ -300,8 +341,29 @@ int G13::read() {
     }
     
     if (error && error != LIBUSB_ERROR_TIMEOUT) {
-        syslog(LOG_ERR, "Error while reading keys: %s", libusb_error_name(error));
+        ++read_error_count;
+        // Nur den ersten Fehler einer Serie bzw. einen neuen Fehlertyp loggen.
+        if (read_error_count == 1 || error != last_read_error) {
+            syslog(LOG_ERR, "Error while reading keys: %s", libusb_error_name(error));
+        }
+        last_read_error = error;
+
+        if (read_error_count >= G13_MAX_CONSECUTIVE_READ_ERRORS) {
+            syslog(LOG_ERR, "%d consecutive read errors, releasing device (will be reopened).",
+                   read_error_count);
+            read_error_count = 0;
+            last_read_error = 0;
+            return -4;
+        }
+        // Kurze Pause statt sofortiger Wiederholung (sonst Volllast + Log-Flut).
+        std::this_thread::sleep_for(std::chrono::milliseconds(100));
         return -1;
+    }
+
+    if (read_error_count > 0) {
+        syslog(LOG_INFO, "Reading keys works again after %d error(s).", read_error_count);
+        read_error_count = 0;
+        last_read_error = 0;
     }
 
     if (size == G13_REPORT_SIZE) {
@@ -346,12 +408,18 @@ void G13::parse_key(int key, unsigned char *byte) {
     int pressed = actual_byte & mask;
 
     switch (key) {
-    case 25: case 26: case 27: case 28:
-        if (pressed) {
-            bindings = key - 25; 
+    case 25: case 26: case 27: case 28: {
+        // Nur beim Druecken (Flanke) umschalten. Vorher wurde bei jedem
+        // USB-Report neu geladen, solange die Taste gehalten wurde.
+        const int index = key - 25;
+        const bool down = pressed != 0;
+        if (down && !profile_key_down[index]) {
+            bindings = index;
             loadBindings();
         }
+        profile_key_down[index] = down;
         return;
+    }
     case 36: case 37: case 38: case 39:
         return;
     }
@@ -449,7 +517,7 @@ void G13::draw_test_pattern() {
 
 void G13::write_char(int x, int y, char c) {
     // (Existing implementation)
-    if (c < 32 || c > 127) c = 32; 
+    if (c < 32 || c > 126) c = 32; // font_5x7 enthaelt die Zeichen 32..126
     int font_index = (c - 32) * 5;
     for (int col = 0; col < 5; col++) {
         uint8_t line = font_5x7[font_index + col];
@@ -497,7 +565,10 @@ void G13::cleanup_fifo() {
         ::close(fifo_fd);
         fifo_fd = -1;
     }
-    unlink(fifo_path.c_str());
+    // fifo_path ist leer, wenn der Konstruktor vor init_fifo() abgebrochen hat.
+    if (!fifo_path.empty()) {
+        unlink(fifo_path.c_str());
+    }
 }
 
 void G13::check_fifo() {

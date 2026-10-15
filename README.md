@@ -203,6 +203,9 @@ G19=p,k.20           # pass-through: send Linux key code 20 (T)
 G4=m,3,0             # macro 3, repeat mode 0
 ```
 
+Keys without an entry have **no function** in that profile (they do not keep the binding of
+the previously active profile).
+
 **Key numbering in the file is zero-based**: the file key `G0` is the physical key **G1**,
 `G21` is **G22**. Further keys (bit positions as defined in `Constants.h`):
 

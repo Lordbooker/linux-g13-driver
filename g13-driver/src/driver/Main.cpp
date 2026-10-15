@@ -6,6 +6,8 @@
 #include <thread>
 #include <mutex>
 #include <chrono>
+#include <atomic>
+#include <memory>
 #include <libusb-1.0/libusb.h>
 #include <syslog.h>
 
@@ -13,8 +15,22 @@
 #include "Output.h"
 
 // --- Globale Zustandsvariablen ---
+
+// Zustand eines Geraete-Threads.
+enum class HandlerState { Running, Finished, OpenFailed };
+
+struct DeviceHandler {
+    std::thread thread;
+    std::shared_ptr<std::atomic<HandlerState>> state;
+};
+
+// Wartezeit, bevor ein Geraet nach fehlgeschlagenem Oeffnen erneut versucht wird
+// (z. B. weil die udev-Rechte beim Einstecken noch nicht gesetzt waren).
+static constexpr auto OpenRetryDelay = std::chrono::seconds(5);
+
 static std::mutex              g13_map_mutex;
-static std::map<uint16_t, std::thread> g13_instances;
+static std::map<uint16_t, DeviceHandler> g13_instances;
+static std::map<uint16_t, std::chrono::steady_clock::time_point> retry_after;
 // Nicht static: wird in G13.cpp per extern abgefragt.
 volatile sig_atomic_t         daemon_keep_running = 1;
 static libusb_context        *ctx = nullptr;
@@ -28,14 +44,42 @@ static uint16_t get_device_key(libusb_device *dev) {
 }
 
 // --- G13-Geraet-Handler (laeuft in eigenem Thread) ---
-static void executeG13(libusb_device *dev) {
+static void executeG13(libusb_device *dev,
+                       std::shared_ptr<std::atomic<HandlerState>> state) {
+    bool opened = false;
     {
         G13 g13(dev);
+        opened = g13.isLoaded();
         g13.start();
     } // RAII: G13-Destruktor gibt USB-Ressourcen frei
 
-    std::lock_guard<std::mutex> lock(g13_map_mutex);
     libusb_unref_device(dev);
+    // Als letzte Aktion: der Management-Thread raeumt den Eintrag danach ab.
+    state->store(opened ? HandlerState::Finished : HandlerState::OpenFailed);
+}
+
+// Beendete Geraete-Threads joinen und aus der Liste entfernen, damit ein
+// wieder eingestecktes oder zuvor fehlgeschlagenes Geraet erneut erkannt wird.
+// Muss mit gehaltenem g13_map_mutex aufgerufen werden.
+static void reap_finished_handlers() {
+    for (auto it = g13_instances.begin(); it != g13_instances.end(); ) {
+        const HandlerState s = it->second.state->load();
+        if (s == HandlerState::Running) {
+            ++it;
+            continue;
+        }
+        if (it->second.thread.joinable())
+            it->second.thread.join();
+        if (s == HandlerState::OpenFailed) {
+            retry_after[it->first] = std::chrono::steady_clock::now() + OpenRetryDelay;
+            syslog(LOG_WARNING, "G13-Geraet (ID: %x) konnte nicht geoeffnet werden. "
+                                "Neuer Versuch in %lld s.", it->first,
+                   static_cast<long long>(OpenRetryDelay.count()));
+        } else {
+            syslog(LOG_INFO, "Handler fuer G13-Geraet (ID: %x) beendet.", it->first);
+        }
+        it = g13_instances.erase(it);
+    }
 }
 
 // --- Geraete-Erkennung ---
@@ -44,6 +88,10 @@ static void find_and_manage_devices() {
     ssize_t count = libusb_get_device_list(ctx, &devs);
     if (count < 0) return;
 
+    std::lock_guard<std::mutex> lock(g13_map_mutex);
+    reap_finished_handlers();
+    const auto now = std::chrono::steady_clock::now();
+
     for (ssize_t i = 0; i < count; ++i) {
         libusb_device_descriptor desc{};
         if (libusb_get_device_descriptor(devs[i], &desc) < 0) continue;
@@ -51,12 +99,18 @@ static void find_and_manage_devices() {
         if (desc.idVendor == G13_VENDOR_ID && desc.idProduct == G13_PRODUCT_ID) {
             uint16_t key = get_device_key(devs[i]);
 
-            std::lock_guard<std::mutex> lock(g13_map_mutex);
-            if (!g13_instances.contains(key)) {
-                syslog(LOG_INFO, "Neues G13-Geraet gefunden (ID: %x). Starte Handler.", key);
-                libusb_ref_device(devs[i]);
-                g13_instances[key] = std::thread(executeG13, devs[i]);
+            if (g13_instances.contains(key))
+                continue;
+            if (auto r = retry_after.find(key); r != retry_after.end()) {
+                if (now < r->second)
+                    continue;                  // Wartezeit nach Fehlschlag laeuft noch
+                retry_after.erase(r);
             }
+
+            syslog(LOG_INFO, "Neues G13-Geraet gefunden (ID: %x). Starte Handler.", key);
+            libusb_ref_device(devs[i]);
+            auto state = std::make_shared<std::atomic<HandlerState>>(HandlerState::Running);
+            g13_instances[key] = DeviceHandler{std::thread(executeG13, devs[i], state), state};
         }
     }
     libusb_free_device_list(devs, 1);
@@ -76,16 +130,15 @@ static void device_management_thread_loop() {
 static void shutdown_driver() {
     syslog(LOG_INFO, "Fahre Treiber herunter...");
 
-    // Threads unter Lock aus der Map nehmen, aber ausserhalb des Locks joinen:
-    // executeG13() sperrt g13_map_mutex beim Beenden selbst (sonst Deadlock).
-    std::map<uint16_t, std::thread> threads;
+    // Threads unter Lock aus der Map nehmen, aber ausserhalb des Locks joinen.
+    std::map<uint16_t, DeviceHandler> handlers;
     {
         std::lock_guard<std::mutex> lock(g13_map_mutex);
-        threads.swap(g13_instances);
+        handlers.swap(g13_instances);
     }
-    for (auto &[key, th] : threads) {
-        if (th.joinable())
-            th.join();
+    for (auto &[key, handler] : handlers) {
+        if (handler.thread.joinable())
+            handler.thread.join();
     }
 
     UInput::close_uinput();
