@@ -15,7 +15,8 @@
 // --- Globale Zustandsvariablen ---
 static std::mutex              g13_map_mutex;
 static std::map<uint16_t, std::thread> g13_instances;
-static volatile sig_atomic_t  daemon_keep_running = 1;
+// Nicht static: wird in G13.cpp per extern abgefragt.
+volatile sig_atomic_t         daemon_keep_running = 1;
 static libusb_context        *ctx = nullptr;
 static std::thread             device_thread;
 
@@ -55,7 +56,6 @@ static void find_and_manage_devices() {
                 syslog(LOG_INFO, "Neues G13-Geraet gefunden (ID: %x). Starte Handler.", key);
                 libusb_ref_device(devs[i]);
                 g13_instances[key] = std::thread(executeG13, devs[i]);
-                g13_instances[key].detach();
             }
         }
     }
@@ -71,18 +71,21 @@ static void device_management_thread_loop() {
 }
 
 // --- Sauberes Herunterfahren ---
+// Laeuft im Haupt-Thread, nachdem der Geraete-Management-Thread beendet ist.
+// Alle Geraete-Threads werden gejoint, bevor uinput und libusb freigegeben werden.
 static void shutdown_driver() {
-    if (!daemon_keep_running) return;
-
     syslog(LOG_INFO, "Fahre Treiber herunter...");
-    daemon_keep_running = 0;
 
-    if (device_thread.joinable())
-        device_thread.join();
-
+    // Threads unter Lock aus der Map nehmen, aber ausserhalb des Locks joinen:
+    // executeG13() sperrt g13_map_mutex beim Beenden selbst (sonst Deadlock).
+    std::map<uint16_t, std::thread> threads;
     {
         std::lock_guard<std::mutex> lock(g13_map_mutex);
-        g13_instances.clear();
+        threads.swap(g13_instances);
+    }
+    for (auto &[key, th] : threads) {
+        if (th.joinable())
+            th.join();
     }
 
     UInput::close_uinput();
@@ -91,8 +94,10 @@ static void shutdown_driver() {
     closelog();
 }
 
+// Signal-Handler setzt nur das Flag (async-signal-safe).
+// Das eigentliche Herunterfahren erfolgt in main().
 static void signal_handler(int /*signum*/) {
-    shutdown_driver();
+    daemon_keep_running = 0;
 }
 
 // --- Einstiegspunkt ---
@@ -128,5 +133,6 @@ int main(int /*argc*/, char * /*argv*/[]) {
     if (device_thread.joinable())
         device_thread.join();
 
+    shutdown_driver();
     return 0;
 }

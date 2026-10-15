@@ -18,7 +18,7 @@ bis hin zu einer stabilen, vollstaendig paketisierten Open-Source-Loesung.
 | LCD-Grundfunktionen (Buffer, Pixel, Text) | Fertig |
 | Vier Binding-Profile (M1–M4) mit Live-Reload | Fertig |
 | Makro-Unterstuetzung | Fertig |
-| LCD-FIFO-Schnittstelle (`/tmp/g13-lcd`) | Fertig |
+| LCD-FIFO-Schnittstelle (`$XDG_RUNTIME_DIR/g13-lcd`, Fallback `/tmp/g13-lcd`) | Fertig |
 | `systemd`-Unit + `udev`-Regel | Fertig |
 
 ---
@@ -34,7 +34,6 @@ bis hin zu einer stabilen, vollstaendig paketisierten Open-Source-Loesung.
 | **GTK3 / AppIndicator vollstaendig entfernt** aus Daemon | Fertig |
 | Daemon laeuft als reiner POSIX-Hintergrunddienst | Fertig |
 | `BUILD_CONFIG_TOOL`, `BUILD_TESTS`, `ENABLE_SANITIZERS` Build-Optionen | Fertig |
-| `libudev` als explizite Abhaengigkeit erkaert | Fertig |
 | `GNUInstallDirs` fuer saubere Install-Pfade | Fertig |
 | `CMAKE_EXPORT_COMPILE_COMMANDS` fuer Tooling (clang-tidy) | Fertig |
 | Alle Globals in `Main.cpp` als `static` deklariert | Fertig |

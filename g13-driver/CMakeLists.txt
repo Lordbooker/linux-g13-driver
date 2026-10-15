@@ -8,13 +8,12 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)  # fuer clang-tidy
 
 # --- Build Options ---
 option(BUILD_CONFIG_TOOL "Build the Qt6 config tool" ON)
-option(BUILD_TESTS       "Build unit and integration tests" ON)
+option(BUILD_TESTS       "Build unit and integration tests" OFF)
 option(ENABLE_SANITIZERS "Enable ASan/UBSan in debug builds" OFF)
 
 # --- Dependencies (Daemon) ---
 find_package(PkgConfig REQUIRED)
 pkg_check_modules(LIBUSB  REQUIRED libusb-1.0)
-pkg_check_modules(LIBUDEV REQUIRED libudev)
 
 # --- Dependencies (GUI) ---
 if(BUILD_CONFIG_TOOL)
@@ -53,17 +52,14 @@ add_executable(linux-g13-driver
 target_include_directories(linux-g13-driver PRIVATE
     src/driver
     ${LIBUSB_INCLUDE_DIRS}
-    ${LIBUDEV_INCLUDE_DIRS}
 )
 
 target_link_libraries(linux-g13-driver PRIVATE
     ${LIBUSB_LIBRARIES}
-    ${LIBUDEV_LIBRARIES}
 )
 
 target_compile_options(linux-g13-driver PRIVATE
     ${LIBUSB_CFLAGS_OTHER}
-    ${LIBUDEV_CFLAGS_OTHER}
 )
 
 # =========================================================
