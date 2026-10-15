@@ -79,6 +79,10 @@ if(BUILD_CONFIG_TOOL)
         src/gui/ColorSelector.h
         src/gui/MacroRecorder.cpp
         src/gui/MacroRecorder.h
+        src/gui/MacroSequence.cpp
+        src/gui/MacroSequence.h
+        src/gui/KeyNames.cpp
+        src/gui/KeyNames.h
         src/resources.qrc
     )
 
