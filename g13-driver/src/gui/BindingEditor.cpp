@@ -95,11 +95,26 @@ BindingEditor::BindingEditor(QWidget *parent) : QWidget(parent)
     auto *pageMacroLayout = new QFormLayout(pageMacro);
     spnMacroId = new QSpinBox(pageMacro);
     spnMacroId->setRange(0, 199);
+    // Wiederholungsmodus wie im Treiber (MacroAction):
+    //   0 = einmal ausfuehren, 1 = wiederholen solange gedrueckt, n>1 = n-mal
+    cmbRepeatMode = new QComboBox(pageMacro);
+    cmbRepeatMode->addItem("Einmal ausführen");
+    cmbRepeatMode->addItem("Wiederholen, solange gedrückt");
+    cmbRepeatMode->addItem("Mehrmals ausführen");
     spnRepeats = new QSpinBox(pageMacro);
-    spnRepeats->setRange(1, 100);
-    spnRepeats->setValue(1);
-    pageMacroLayout->addRow("Makro-ID:",       spnMacroId);
-    pageMacroLayout->addRow("Wiederholungen:", spnRepeats);
+    spnRepeats->setRange(2, 100);
+    spnRepeats->setValue(2);
+    spnRepeats->setSuffix(" ×");
+    spnRepeats->setEnabled(false);
+    connect(cmbRepeatMode, &QComboBox::currentIndexChanged, spnRepeats,
+            [this](int mode) { spnRepeats->setEnabled(mode == 2); });
+    pageMacroLayout->addRow("Makro-ID:",   spnMacroId);
+    pageMacroLayout->addRow("Ausführung:", cmbRepeatMode);
+    pageMacroLayout->addRow("Anzahl:",     spnRepeats);
+    auto *lblRepeatHint = new QLabel(
+        "Erneuter Tastendruck während eines laufenden Makros stoppt es.", pageMacro);
+    lblRepeatHint->setWordWrap(true);
+    pageMacroLayout->addRow(lblRepeatHint);
     stack->addWidget(pageMacro);
 
     // Seite 2 – Keine Aktion (Platzhalter)
@@ -195,7 +210,15 @@ void BindingEditor::loadFromFile()
         cmbType->setCurrentIndex(0);
     } else if (type == "m" && parts.size() >= 3) {
         spnMacroId->setValue(parts[1].trimmed().toInt());
-        spnRepeats->setValue(parts[2].trimmed().toInt());
+        const int repeats = parts[2].trimmed().toInt();
+        if (repeats <= 0) {
+            cmbRepeatMode->setCurrentIndex(0);
+        } else if (repeats == 1) {
+            cmbRepeatMode->setCurrentIndex(1);
+        } else {
+            cmbRepeatMode->setCurrentIndex(2);
+            spnRepeats->setValue(repeats);
+        }
         cmbType->setCurrentIndex(1);
     } else {
         cmbType->setCurrentIndex(2);
@@ -214,9 +237,12 @@ void BindingEditor::saveToFile()
     case 0:
         props[fileKey] = QString("p,k.%1").arg(cmbKeyName->currentData().toInt());
         break;
-    case 1:
-        props[fileKey] = QString("m,%1,%2").arg(spnMacroId->value()).arg(spnRepeats->value());
+    case 1: {
+        const int mode = cmbRepeatMode->currentIndex();
+        const int repeats = mode == 2 ? spnRepeats->value() : mode;   // 0 bzw. 1
+        props[fileKey] = QString("m,%1,%2").arg(spnMacroId->value()).arg(repeats);
         break;
+    }
     case 2:
         props.remove(fileKey);
         break;

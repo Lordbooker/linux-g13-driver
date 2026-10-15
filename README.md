@@ -19,7 +19,7 @@ The original project is over 10 years old. This fork modernizes it:
 * C++ compiler with C++23 support, `make`, `pkg-config`
 * CMake >= 3.20
 * `libusb-1.0` (development headers)
-* Qt6 Base (Widgets, Core, Gui) – only needed for the config tool
+* Qt6 Base (Widgets, Core, Gui, Network) – only needed for the config tool
 * Optional: Python 3 with `psutil` for the example LCD monitor script
 
 GTK3, AppIndicator and Java are **no longer required**.
@@ -171,7 +171,8 @@ The driver itself runs independently of the tray icon as a systemd user service.
 Without a tray, `g13-gui --tray` exits quietly after 30 seconds; start the config tool from the
 application menu instead.
 
-**Disable the autostart:** turn off "G13 Tray-Symbol" in your desktop's autostart settings, or
+**Disable the autostart:** turn off "G13 Tray Icon" ("G13 Tray-Symbol" on German desktops) in
+your desktop's autostart settings, or
 create `~/.config/autostart/g13-gui-tray.desktop` containing:
 
 ```ini
@@ -195,9 +196,11 @@ Select the profile to edit in the toolbar (**Profil 1–4**, selected on the dev
 L key is highlighted in the image). All changes are written directly to `~/.config/g13/`.
 
 * **Key Bindings** – click a key in the G13 image (keys with a green dot are bound in the
-  active profile; dashed outlines mark profile/LCD keys that cannot be bound), then choose:
+  active profile; dashed outlines mark the profile keys L1–L4, which cannot be bound), then
+  choose:
   * *Tastencode (Pass-Through)*: the key sends a normal keyboard key,
-  * *Makro*: the key runs a macro (macro ID and repeat mode),
+  * *Makro*: the key runs a macro – choose the macro ID and *Ausführung*: *Einmal ausführen*,
+    *Wiederholen, solange gedrückt* or *Mehrmals ausführen* (with a count),
   * *Keine Aktion*: the key is unbound.
 
   Then click *Speichern*.
@@ -211,7 +214,7 @@ L key is highlighted in the image). All changes are written directly to `~/.conf
   * *Speichern* warns if a key is pressed but never released.
 
 Closing the window keeps the tool running in the system tray (if your desktop provides one).
-*Datei → Beenden* or *Tray-Symbol beenden* closes it completely; the driver keeps running.
+*File → Quit* or *Tray-Symbol beenden* closes it completely; the driver keeps running.
 
 ### When do changes take effect?
 
@@ -236,10 +239,16 @@ If a bindings file is missing, the driver creates it with a default mapping on f
 ### `bindings-<0..3>.properties`
 
 ```ini
-color=0,0,255        # backlight R,G,B (0-255)
-G19=p,k.20           # pass-through: send Linux key code 20 (T)
-G4=m,3,0             # macro 3, repeat mode 0
+# backlight R,G,B (0-255)
+color=0,0,255
+# pass-through: physical key G20 sends Linux key code 20 (T)
+G19=p,k.20
+# physical key G5 runs macro 3 once (repeat mode 0)
+G4=m,3,0
 ```
+
+Comments must be on their own line starting with `#`. A comment at the end of a line is read
+as part of the value and makes the line invalid.
 
 Keys without an entry have **no function** in that profile (they do not keep the binding of
 the previously active profile).
@@ -250,6 +259,7 @@ the previously active profile).
 | File key | Physical key |
 |---|---|
 | `G0` … `G21` | G1 … G22 |
+| `G24` | BD (round button left below the display) |
 | `G29`, `G30`, `G31`, `G32` | M1, M2, M3, MR |
 | `G33`, `G34`, `G35` | thumb keys LEFT, DOWN, TOP (stick press) |
 | `G36`, `G37`, `G38`, `G39` | joystick up, left, right, down |

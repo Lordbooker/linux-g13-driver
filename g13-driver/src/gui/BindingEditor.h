@@ -36,7 +36,8 @@ private:
     QComboBox      *cmbKeyName;
     // Seite 1: Makro
     QSpinBox       *spnMacroId;
-    QSpinBox       *spnRepeats;
+    QComboBox      *cmbRepeatMode;   // 0=einmal  1=solange gedrueckt  2=Anzahl
+    QSpinBox       *spnRepeats;      // Anzahl bei Modus 2 (>= 2)
     // (Seite 2 ist eine leere QWidget fuer "Keine Aktion")
     QPushButton    *btnSave;
     QLabel         *lblStatus;

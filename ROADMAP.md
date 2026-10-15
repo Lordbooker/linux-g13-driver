@@ -1,138 +1,146 @@
 # Linux G13 Driver – Entwicklungs-Roadmap
 
-Diese Roadmap beschreibt den geplanten Entwicklungsweg vom urspruenglichen Prototypen
-bis hin zu einer stabilen, vollstaendig paketisierten Open-Source-Loesung.
+Diese Roadmap beschreibt den Entwicklungsweg vom ursprünglichen Prototypen bis zu einer stabilen,
+paketierten Open-Source-Lösung. Stand: Version 2.0.
 
 ---
 
 ## Phase 1 – Kern-Treiber (abgeschlossen)
 
-**Ziel:** Funktionsfaehiger Daemon, der G13-Tasten per `uinput` an den Kernel weiterreicht.
+**Ziel:** Funktionsfähiger Daemon, der G13-Tasten per `uinput` an das System weiterreicht.
 
 | Aufgabe | Status |
 |---|---|
 | USB-Kommunikation via `libusb-1.0` | Fertig |
 | Virtuelle Tastatur via `uinput` | Fertig |
 | Binding-Dateien lesen (`.properties`) | Fertig |
-| Joystick-Emulation | Fertig |
+| Joystick-Emulation (Tasten-Modus) | Fertig |
 | LCD-Grundfunktionen (Buffer, Pixel, Text) | Fertig |
 | Vier Binding-Profile (Umschaltung per L1–L4) mit Live-Reload | Fertig |
-| Makro-Unterstuetzung | Fertig |
+| Makro-Unterstützung | Fertig |
 | LCD-FIFO-Schnittstelle (`$XDG_RUNTIME_DIR/g13-lcd`, Fallback `/tmp/g13-lcd`) | Fertig |
-| `systemd`-Unit + `udev`-Regel | Fertig |
+| `systemd`-User-Unit + `udev`-Regel | Fertig |
 
 ---
 
-## Phase 2 – Refactoring & Architektur-Bereinigung (abgeschlossen)
+## Phase 2 – Refactoring & Robustheit (abgeschlossen)
 
-**Ziel:** Saubere Trennung von Daemon und GUI, Modernisierung des Build-Systems.
+**Ziel:** Daemon ohne GUI-Toolkit, modernes Build-System, stabiles Verhalten im Fehlerfall.
 
 | Aufgabe | Status |
 |---|---|
-| C++-Standard auf **C++23** angehoben | Fertig |
-| CMake auf **3.20+** aktualisiert | Fertig |
-| **GTK3 / AppIndicator vollstaendig entfernt** aus Daemon | Fertig |
-| Daemon laeuft als reiner POSIX-Hintergrunddienst | Fertig |
-| `BUILD_CONFIG_TOOL`, `BUILD_TESTS`, `ENABLE_SANITIZERS` Build-Optionen | Fertig |
-| `GNUInstallDirs` fuer saubere Install-Pfade | Fertig |
-| `CMAKE_EXPORT_COMPILE_COMMANDS` fuer Tooling (clang-tidy) | Fertig |
-| Alle Globals in `Main.cpp` als `static` deklariert | Fertig |
-| `std::map::contains` (C++20/23) statt `find() != end()` | Fertig |
-| GTK-Callback-Signaturen (C-ABI) durch saubere C++-Signale ersetzt | Fertig |
+| C++-Standard auf **C++23**, CMake **3.20+** | Fertig |
+| **GTK3 / AppIndicator aus dem Daemon entfernt** – reiner Hintergrunddienst | Fertig |
+| Build-Optionen `BUILD_CONFIG_TOOL`, `BUILD_TESTS`, `ENABLE_SANITIZERS`; `GNUInstallDirs` | Fertig |
+| Warnungsfreier Build (`-Wall -Wextra`) | Fertig |
+| Sauberes Herunterfahren: Signal-Handler setzt nur ein Flag, alle Geräte-Threads werden gejoint | Fertig |
+| Belegungen werden vor jedem Laden zurückgesetzt (nicht eingetragene Tasten ohne Funktion) | Fertig |
+| Keine hängenden Tasten bei Profilwechsel/Live-Reload; Profilwechsel nur bei Tastendruck | Fertig |
+| Neuversuch nach fehlgeschlagenem Öffnen; beendete Geräte-Threads werden aufgeräumt | Fertig |
+| USB-Lesefehler: Pause, gedrosseltes Logging, Freigabe und Neuöffnen nach Fehlerserie | Fertig |
+| Ungültige `color`-Werte, Init-Fehler und LCD-Zeichen 127 führen nicht mehr zu Absturz/UB | Fertig |
 
 ---
 
-## Phase 3 – Qt6 Config-Tool (naechster Schritt)
+## Phase 3 – Qt6 Config-Tool (abgeschlossen, v2.0)
 
-**Ziel:** Vollstaendige grafische Konfigurationsoberflaeche auf Basis von **Qt6** –
-kein GTK, kein Java, keine externen Skripte.
+**Ziel:** Grafische Konfiguration auf Basis von **Qt6** als Ersatz für das Java-Tool.
 
 ### 3.1 Architektur
 
 ```
-linux-g13-driver  (Daemon, kein GUI-Toolkit)
+linux-g13-driver  (systemd-User-Dienst, kein GUI-Toolkit)
+        ^
+        |  Konfigurationsdateien ~/.config/g13/*.properties
+        |  (Treiber: Live-Reload der Bindings-Datei des aktiven Profils)
         |
-        | IPC: Unix-Domain-Socket / D-Bus
-        |
-g13-gui           (Qt6-Anwendung)
-   ├── MainWindow      – Hauptfenster
-   ├── G13Visualizer   – G13-Tastaturansicht (klickbar)
+g13-gui           (Qt6-Anwendung, Tray-Symbol per XDG-Autostart)
+   ├── MainWindow      – Hauptfenster, Tray-Menü, Einzelinstanz
+   ├── G13Visualizer   – klickbares G13-Bild
    ├── BindingEditor   – Tastenbelegung pro Profil
-   ├── ColorSelector   – Hintergrundbeleuchtung (RGB-Picker)
-   └── MacroRecorder   – Makro aufzeichnen & abspielen
+   ├── ColorSelector   – Hintergrundbeleuchtung (RGB)
+   └── MacroRecorder   – Makros aufnehmen und bearbeiten
 ```
 
-### 3.2 Geplante Aufgaben
+GUI und Treiber kommunizieren ausschließlich über die Konfigurationsdateien; eine direkte
+Schnittstelle (IPC) gibt es nicht. Das Tray-Menü steuert den Treiber über `systemctl --user`.
 
-| Aufgabe | Prioritaet |
+### 3.2 Umgesetzt
+
+| Aufgabe | Status |
 |---|---|
-| `QSystemTrayIcon` statt AppIndicator im GUI (nicht im Daemon) | Hoch |
-| G13-Visualizer als `QWidget` mit SVG-Overlay | Hoch |
-| Binding-Editor: Profil-Auswahl, Keycode-Mapping per Dropdown | Hoch |
-| Farb-Picker via `QColorDialog` | Mittel |
-| Makro-Recorder: Aufnahme per `libevdev` / `uinput` Replay | Mittel |
-| Live-Vorschau: Aenderungen sofort an Daemon senden | Mittel |
-| Qt6-Uebersetzungen (`Qt6LinguistTools`, `.ts`-Dateien) | Niedrig |
-
-### 3.3 Abhaengigkeiten (GUI-only)
-
-```cmake
-find_package(Qt6 REQUIRED COMPONENTS Widgets Core Gui)
-# Optional fuer D-Bus-IPC:
-# find_package(Qt6 OPTIONAL_COMPONENTS DBus)
-```
-
-Der Daemon **benoetigt kein GUI-Toolkit** – er kommuniziert ueber IPC.
+| Klickbares G13-Bild (unverzerrt, skalierend) inkl. M1–M3/MR, BD, Daumentasten, Joystick-Richtungen | Fertig |
+| Markierung belegter Tasten und des aktiven Profils (L1–L4) | Fertig |
+| Binding-Editor: Tastencode, Makro (einmal / solange gedrückt / n-mal), keine Aktion | Fertig |
+| Farbwahl pro Profil | Fertig |
+| Makro-Editor: Aufnahme mit Zeitabständen, Ereignisliste, manuelles Einfügen, feste Verzögerung | Fertig |
+| Tray-Symbol: Konfiguration öffnen, Treiber starten/stoppen/neu starten, Status | Fertig |
+| XDG-Autostart des Tray-Symbols, Menüeintrag, eigenes App-Icon | Fertig |
+| Einzelinstanz: erneuter Start öffnet das vorhandene Fenster | Fertig |
 
 ---
 
-## Phase 4 – Erweiterte Funktionen
+## Phase 4 – Offene Punkte und erweiterte Funktionen
 
-**Ziel:** Funktionsumfang auf Augenpunkt mit kommerziellen Logitech-Tools bringen.
+### 4.1 Bekannte Einschränkungen
+
+| Punkt | Beschreibung |
+|---|---|
+| Makros blockieren beim Stoppen | Wird ein laufendes Makro gestoppt oder ersetzt, wartet der Lese-Thread bis zum Ende des aktuellen Warteschritts (`d.<ms>`). |
+| Zugriffsrechte | udev-Regel setzt zusätzlich zu `uaccess` `MODE="0666"`; die LCD-Pipe wird mit 0666 angelegt (kritisch nur im `/tmp`-Fallback). |
+| Mehrere G13 | Mehrere Geräte teilen sich eine LCD-Pipe und dieselben Konfigurationsdateien. |
+| Default-Bindings | Die eingebauten Standardbelegungen enthalten `G22`/`G23`, die keiner Taste entsprechen. |
+| Makro-Dateien | Änderungen an `macro-*.properties` wirken erst beim nächsten Laden der Bindings. |
+| `g13_monitor.py` | Schreibt nur nach `/tmp/g13-lcd` und findet die Pipe unter `$XDG_RUNTIME_DIR` nicht. |
+| Kleinigkeiten | Veralteter `install-user`-Kommentar in `g13.service`; Log-Meldungen gemischt Deutsch/Englisch. |
+
+### 4.2 Ideen
 
 | Aufgabe | Beschreibung |
 |---|---|
-| Hotplugging via `libudev` | Geraete ohne Neustart des Daemons erkennen |
-| LCD-Plugins | Uhr, CPU-Auslastung, jetzt-spielend etc. ueber FIFO |
-| Profilwechsel per D-Bus | GUI und andere Apps koennen Profile umschalten |
-| Mehrere G13-Geraete | N gleichzeitige Geraete mit je eigenem Konfigurationsset |
-| Per-App-Profile | Automatischer Profilwechsel anhand des aktiven Fensters |
+| Hotplug ohne Polling | Geräteerkennung per libusb-Hotplug statt 1-Sekunden-Abfrage |
+| Joystick-Absolutmodus | Im Treiber vorhanden, aber nicht konfigurierbar |
+| LCD-Plugins | Uhr, Systemlast, „jetzt läuft“ usw. über die FIFO |
+| Profilwechsel von außen | z. B. per D-Bus durch GUI oder andere Programme |
+| Per-App-Profile | Automatischer Profilwechsel je nach aktivem Fenster |
 
 ---
 
-## Phase 5 – Tests & Qualitaetssicherung
+## Phase 5 – Tests & Qualitätssicherung (offen)
+
+Im Repository gibt es bisher keine automatisierten Tests.
 
 | Aufgabe | Werkzeug |
 |---|---|
-| Unit-Tests fuer Binding-Parser | GoogleTest |
-| Unit-Tests fuer Makro-Engine | GoogleTest |
-| Integrationstests (simuliertes USB-Geraet) | usbip + GoogleTest |
+| Unit-Tests für Binding-Parser und Makro-Engine | GoogleTest |
+| Treibertests gegen ein simuliertes G13 (libusb-/uinput-Attrappe) | GoogleTest |
 | Statische Analyse | `clang-tidy`, `cppcheck` |
 | Speicher-Sanitizer | `-fsanitize=address,undefined` (via `ENABLE_SANITIZERS`) |
-| CI-Pipeline | GitHub Actions: Build + Test auf Ubuntu 22.04 / 24.04 |
+| CI-Pipeline | GitHub Actions: Build und Tests bei jedem Push |
 
 ---
 
 ## Phase 6 – Paketierung & Release
 
-| Aufgabe | Werkzeug |
+| Aufgabe | Status |
 |---|---|
-| Debian/Ubuntu-Paket (`.deb`) | `CPack` + `dh_make` |
-| Arch Linux – AUR-Paket (`PKGBUILD`) | manuell |
-| RPM-Paket (Fedora/openSUSE) | `CPack` |
-| GitHub Release mit Changelogs | `gh release create` |
-| Dokumentation (Nutzerhandbuch) | Markdown + MkDocs |
+| Arch Linux – AUR-Paket `linux-g13-driver-git` | Fertig |
+| Versions-Tags (`v1.0.0` Java-Stand, `v2.0.0` Qt6) | Fertig |
+| `make remove-legacy` zum Entfernen alter Installationen | Fertig |
+| Debian/Ubuntu-Paket (`.deb`), RPM (Fedora/openSUSE) | Offen |
+| GitHub-Release mit Changelog | Offen |
+| Lizenzdatei (`LICENSE`) | Offen |
 
 ---
 
-## Technologie-Stack (Uebersicht)
+## Technologie-Stack (Übersicht)
 
-| Schicht | Technologie | Begruendung |
-|---|---|---|
-| Sprache | **C++23** | `std::expected`, `ranges`, Coroutinen |
-| Build | **CMake 3.20+** | `GNUInstallDirs`, `EXPORT_COMPILE_COMMANDS` |
-| USB | **libusb-1.0** | Stabile, portable HID-Kommunikation |
-| Kernel-Events | **uinput / linux/input.h** | Virtuelle Tastatur ohne Kernel-Modul |
-| Hotplug | **libudev** | Geraeteerkennung ohne Polling |
-| GUI | **Qt6** | Nativ, schnell, kein GTK-Toolkit-Overhead |
-| Tests | **GoogleTest** | Standard im C++-Oekosystem |
+| Schicht | Technologie |
+|---|---|
+| Sprache | C++23 |
+| Build | CMake 3.20+ (`GNUInstallDirs`), Makefile als Komfort-Wrapper |
+| USB | libusb-1.0 |
+| Tastatur-Ereignisse | uinput / `linux/input.h` |
+| Geräteerkennung | Polling über libusb (1 s) |
+| GUI | Qt6 (Widgets, Network für die Einzelinstanz) |
+| Dienst | systemd-User-Unit, udev-Regel mit `uaccess` |
