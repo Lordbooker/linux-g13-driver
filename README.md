@@ -14,6 +14,39 @@ The original project is over 10 years old. This fork modernizes it:
 > Since version 2.0 the Qt6 config tool replaces the Java tool. Existing configuration files in
 > `~/.config/g13/` keep the same format and remain usable.
 
+## Installation from Packages (recommended)
+
+Ready-made packages are attached to every [GitHub release](https://github.com/Lordbooker/linux-g13-driver/releases):
+
+| System | Package |
+|---|---|
+| Debian 12 / 13 | `linux-g13-driver_<version>~debian12_amd64.deb` / `~debian13` |
+| Ubuntu 22.04 / 24.04 / 26.04 and derivatives (Linux Mint, Pop!_OS, …) | `linux-g13-driver_<version>~ubuntu<release>_amd64.deb` |
+| Fedora 43 / 44 and derivatives (Nobara, …) | `linux-g13-driver-<version>.fc43.x86_64.rpm` / `.fc44` |
+| Arch Linux and derivatives | AUR: [`linux-g13-driver-git`](https://aur.archlinux.org/packages/linux-g13-driver-git) |
+
+Pick the package matching your system (derivatives use the package of their base release,
+e.g. Linux Mint 22 → Ubuntu 24.04), then:
+
+```bash
+# Debian / Ubuntu
+sudo apt install ./linux-g13-driver_<version>~<system>_amd64.deb
+
+# Fedora
+sudo dnf install ./linux-g13-driver-<version>.fc<NN>.x86_64.rpm
+
+# then, as your normal user:
+systemctl --user enable --now g13
+```
+
+On immutable Fedora variants (e.g. Bazzite, Silverblue) the RPM has to be layered with
+`rpm-ostree install`.
+
+When upgrading from version 1.x, see
+[Upgrading from the old Version](#upgrading-from-the-old-version-gtk-tray--java-config-tool) first.
+
+The rest of this section describes building from source.
+
 ## Requirements
 
 * C++ compiler with C++23 support, `make`, `pkg-config`
@@ -34,7 +67,7 @@ cd g13-driver
 ./scripts/install_deps.sh
 ```
 
-The package lists for Fedora and openSUSE have not been tested yet.
+The package lists for Debian/Ubuntu and Fedora are tested; the Arch and openSUSE lists are untested.
 
 ## Build
 
@@ -58,6 +91,20 @@ Alternatively with CMake directly (use `build` as directory if you want to use `
 cmake -S . -B build
 cmake --build build
 ```
+
+### Building packages yourself
+
+`g13-driver/packaging/build-package.sh` builds a `.deb` or `.rpm` for the system it runs on
+(intended for a fresh container of the target distribution), e.g.:
+
+```bash
+docker run --rm -v "$PWD:/src" -w /src debian:13 g13-driver/packaging/build-package.sh dist
+```
+
+Releases are built automatically by GitHub Actions (`.github/workflows/release.yml`): pushing
+a tag such as `v2.1.0` builds the packages for all supported systems and publishes them as a
+GitHub release with a list of changes. The workflow can also be started manually from the
+*Actions* tab to build test packages without publishing a release.
 
 CMake options:
 
@@ -337,3 +384,14 @@ Your configuration in `~/.config/g13` is kept.
 
 * Developed on 64-bit Arch Linux.
 * Planned next steps are described in [ROADMAP.md](ROADMAP.md).
+
+## License and Credits
+
+This project is licensed under the **GNU General Public License, version 2 only**
+(GPL-2.0-only) – see [LICENSE](LICENSE).
+
+It is a fork of [linux-g13-driver](https://code.google.com/archive/p/linux-g13-driver) by
+**Jim Gupta** (2011), which was published under the GNU GPL v2. According to its project
+description, parts of the original driver code were based on
+[ecraven/g13](https://github.com/ecraven/g13). Further contributors are listed in
+[AUTHORS](AUTHORS) and in the git history.

@@ -2,6 +2,27 @@ cmake_minimum_required(VERSION 3.20)
 
 project(Linux-G13-Driver VERSION 2.0.0 LANGUAGES CXX)
 
+# --- Versionsangabe -----------------------------------------------------------
+# G13_VERSION: Anzeige-Version (Treiber-Log, GUI). Standard: "git describe" ohne
+# fuehrendes "v" (z. B. 2.0.0 oder 2.0.0-3-gd1568bb), sonst PROJECT_VERSION.
+if(NOT DEFINED G13_VERSION)
+    find_package(Git QUIET)
+    if(GIT_FOUND)
+        execute_process(
+            COMMAND ${GIT_EXECUTABLE} describe --tags --match "v[0-9]*"
+            WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
+            OUTPUT_VARIABLE G13_GIT_DESCRIBE
+            OUTPUT_STRIP_TRAILING_WHITESPACE
+            ERROR_QUIET)
+    endif()
+    if(G13_GIT_DESCRIBE)
+        string(REGEX REPLACE "^v" "" G13_VERSION "${G13_GIT_DESCRIBE}")
+    else()
+        set(G13_VERSION "${PROJECT_VERSION}")
+    endif()
+endif()
+message(STATUS "linux-g13-driver version: ${G13_VERSION}")
+
 set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)  # fuer clang-tidy
@@ -61,6 +82,7 @@ target_link_libraries(linux-g13-driver PRIVATE
 target_compile_options(linux-g13-driver PRIVATE
     ${LIBUSB_CFLAGS_OTHER}
 )
+target_compile_definitions(linux-g13-driver PRIVATE G13_VERSION="${G13_VERSION}")
 
 # =========================================================
 # TARGET 2: Qt6 Config-Tool (nur wenn BUILD_CONFIG_TOOL)
@@ -96,6 +118,7 @@ if(BUILD_CONFIG_TOOL)
         Qt6::Gui
         Qt6::Network    # QLocalServer/QLocalSocket fuer die Einzelinstanz
     )
+    target_compile_definitions(g13-gui PRIVATE G13_VERSION="${G13_VERSION}")
 endif()
 
 # =========================================================
@@ -128,9 +151,20 @@ if(BUILD_CONFIG_TOOL)
         )
     endforeach()
 endif()
+# Relative Ziele (= <prefix>/lib/...): absolute Pfade wuerden von CPack/RPM
+# automatisch als %config markiert, was fuer Dateien unter /usr/lib falsch ist.
 install(FILES src/udev/99-g13.rules
-    DESTINATION ${CMAKE_INSTALL_PREFIX}/lib/udev/rules.d
+    DESTINATION lib/udev/rules.d
 )
 install(FILES src/systemd/g13.service
-    DESTINATION ${CMAKE_INSTALL_PREFIX}/lib/systemd/user
+    DESTINATION lib/systemd/user
 )
+# Dokumentation und Lizenz
+install(FILES ../README.md ../LICENSE ../AUTHORS
+    DESTINATION ${CMAKE_INSTALL_DATADIR}/doc/linux-g13-driver
+)
+
+# =========================================================
+# Pakete (.deb / .rpm) – siehe cmake/Packaging.cmake
+# =========================================================
+include(cmake/Packaging.cmake)

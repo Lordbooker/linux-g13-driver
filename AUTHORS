@@ -1,0 +1,18 @@
+linux-g13-driver – Authors and Origin
+=====================================
+
+Original project
+  linux-g13-driver by Jim Gupta (2011), published on Google Code
+  (code.google.com/p/linux-g13-driver) under the GNU GPL v2.
+  According to the original project description, parts of the driver
+  code were based on ecraven/g13 (https://github.com/ecraven/g13).
+
+Contributors (from the git history)
+  Jim Gupta      – original driver and Java configuration tool (2011)
+  Tetz95         – contributions (2015)
+  Jason Herrlich – contributions (2021)
+  Lordbooker     – modernized fork: C++ driver, Qt6 configuration tool,
+                   packaging (2025–2026)
+
+All contributions are distributed under the GNU General Public License,
+version 2 only (GPL-2.0-only). See the file LICENSE.

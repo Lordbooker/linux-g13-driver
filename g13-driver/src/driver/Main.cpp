@@ -156,7 +156,7 @@ static void signal_handler(int /*signum*/) {
 // --- Einstiegspunkt ---
 int main(int /*argc*/, char * /*argv*/[]) {
     openlog("linux-g13-driver", LOG_PID | LOG_CONS, LOG_USER);
-    syslog(LOG_INFO, "G13-Treiber startet (Version 2.0)...");
+    syslog(LOG_INFO, "G13-Treiber startet (Version %s)...", G13_VERSION);
 
     if (!UInput::create_uinput()) {
         syslog(LOG_ERR, "uinput konnte nicht initialisiert werden. Beende.");

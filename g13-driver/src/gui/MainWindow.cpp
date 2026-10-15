@@ -225,7 +225,8 @@ void MainWindow::onAbout()
 {
     QMessageBox::about(this, "Über G13 Config Tool",
         "<h2>Linux G13 Driver</h2>"
-        "<p>Version 2.0 – Phase 3: Qt6 Config Tool</p>"
+        "<p>Version " G13_VERSION "</p>"
+        "<p>Lizenz: GNU GPL v2. Basiert auf linux-g13-driver von Jim Gupta.</p>"
         "<p>Änderungen werden direkt in <code>~/.config/g13/</code> gespeichert.<br>"
         "Der Daemon erkennt Dateiänderungen per Live-Reload automatisch.</p>"
     );

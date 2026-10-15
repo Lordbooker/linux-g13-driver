@@ -1,0 +1,11 @@
+# udev-Regel fuer G13 und uinput aktivieren (in Containern ggf. ohne udev)
+if command -v udevadm >/dev/null 2>&1; then
+    udevadm control --reload-rules 2>/dev/null || :
+    udevadm trigger --subsystem-match=usb --attr-match=idVendor=046d --attr-match=idProduct=c21c 2>/dev/null || :
+    udevadm trigger --subsystem-match=misc --sysname-match=uinput 2>/dev/null || :
+fi
+if [ "$1" -eq 1 ]; then
+    echo "linux-g13-driver: enable the driver for your user with:  systemctl --user enable --now g13"
+    echo "linux-g13-driver: the tray icon starts at the next login (or now: g13-gui --tray &)"
+fi
+:

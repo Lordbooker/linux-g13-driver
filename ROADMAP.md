@@ -127,9 +127,10 @@ Im Repository gibt es bisher keine automatisierten Tests.
 | Arch Linux – AUR-Paket `linux-g13-driver-git` | Fertig |
 | Versions-Tags (`v1.0.0` Java-Stand, `v2.0.0` Qt6) | Fertig |
 | `make remove-legacy` zum Entfernen alter Installationen | Fertig |
-| Debian/Ubuntu-Paket (`.deb`), RPM (Fedora/openSUSE) | Offen |
-| GitHub-Release mit Changelog | Offen |
-| Lizenzdatei (`LICENSE`) | Offen |
+| `.deb`-Pakete für Debian 12/13 und Ubuntu 22.04/24.04/26.04 (CPack) | Fertig |
+| `.rpm`-Pakete für Fedora 43/44 (CPack) | Fertig |
+| GitHub-Release mit Changelog per GitHub Actions bei Tag-Push | Fertig |
+| Lizenzdatei (`LICENSE`, GPL-2.0-only) und `AUTHORS` | Fertig |
 
 ---
 

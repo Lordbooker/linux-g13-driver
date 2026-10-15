@@ -21,7 +21,8 @@ set -e
 PKG_ARCH="base-devel cmake libusb qt6-base"
 
 # DEBIAN / UBUNTU
-PKG_DEBIAN="build-essential cmake pkg-config libusb-1.0-0-dev qt6-base-dev"
+# libgl-dev: needed by Qt 6.2 (Ubuntu 22.04) to find Qt6::Gui
+PKG_DEBIAN="build-essential cmake pkg-config libusb-1.0-0-dev qt6-base-dev libgl-dev"
 
 # FEDORA
 PKG_FEDORA="gcc-c++ make cmake pkgconf-pkg-config libusb1-devel qt6-qtbase-devel"

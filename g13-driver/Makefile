@@ -13,6 +13,7 @@ APPDIR      := $(DATADIR)/applications
 ICONDIR     := $(DATADIR)/icons/hicolor
 AUTOSTARTDIR:= $(SYSCONFDIR)/xdg/autostart
 ICON_SIZES  := 22 32 48 64 128 256
+DOCDIR      := $(DATADIR)/doc/linux-g13-driver
 
 # --- Directories & Paths ---
 BUILD_DIR   := build
@@ -76,6 +77,10 @@ install:
 		install -Dm 644 $(ICON_SRC)/g13-gui-$$s.png $(DESTDIR)$(ICONDIR)/$${s}x$${s}/apps/g13-gui.png; \
 	done
 	
+	# Dokumentation und Lizenz
+	install -d $(DESTDIR)$(DOCDIR)
+	install -m 644 ../README.md ../LICENSE ../AUTHORS $(DESTDIR)$(DOCDIR)/
+	
 	@echo "System install done."
 	@echo "To enable the service, run: systemctl --user enable --now g13"
 	
@@ -105,6 +110,7 @@ uninstall:
 	rm -f $(DESTDIR)$(AUTOSTARTDIR)/g13-gui-tray.desktop
 	rm -f $(DESTDIR)$(ICONDIR)/scalable/apps/g13-gui.svg
 	for s in $(ICON_SIZES); do rm -f $(DESTDIR)$(ICONDIR)/$${s}x$${s}/apps/g13-gui.png; done
+	rm -rf $(DESTDIR)$(DOCDIR)
 	@echo "Uninstall done. Your configuration in ~/.config/g13 was kept."
 	@echo "If the service was enabled, run: systemctl --user disable --now g13"
 

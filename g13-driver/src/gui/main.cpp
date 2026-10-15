@@ -39,7 +39,7 @@ int main(int argc, char *argv[])
 {
     QApplication app(argc, argv);
     app.setApplicationName("G13 Config Tool");
-    app.setApplicationVersion("2.0");
+    app.setApplicationVersion(G13_VERSION);
     app.setOrganizationName("linux-g13-project");
     app.setDesktopFileName("g13-gui");          // Zuordnung zu g13-gui.desktop (Icon unter Wayland)
     app.setWindowIcon(MainWindow::appIcon());
