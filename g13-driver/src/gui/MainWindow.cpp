@@ -57,10 +57,9 @@ void MainWindow::setupToolbar()
     tb->addWidget(new QLabel("  Profil: ", this));
 
     m_profileCombo = new QComboBox(this);
-    m_profileCombo->addItem("M1  (Profil 0)");
-    m_profileCombo->addItem("M2  (Profil 1)");
-    m_profileCombo->addItem("M3  (Profil 2)");
-    m_profileCombo->addItem("M4  (Profil 3)");
+    // Die Profile werden am Geraet mit L1..L4 (Tasten unter dem Display) gewaehlt.
+    for (int i = 1; i <= 4; ++i)
+        m_profileCombo->addItem(QString("Profil %1  (L%1)").arg(i));
     tb->addWidget(m_profileCombo);
     tb->addSeparator();
     tb->addAction(ui->actionSave_Profile);
@@ -101,7 +100,7 @@ void MainWindow::setupTrayIcon()
 void MainWindow::onProfileComboChanged(int index)
 {
     emit profileChanged(index);
-    statusBar()->showMessage(QString("Profil M%1 aktiv.").arg(index + 1), 2000);
+    statusBar()->showMessage(QString("Profil %1 (L%1) aktiv.").arg(index + 1), 2000);
 }
 
 void MainWindow::onSaveProfile()

@@ -152,8 +152,9 @@ Start it from your application menu or a terminal:
 g13-gui
 ```
 
-Select the profile to edit in the toolbar (**M1–M4** correspond to `bindings-0.properties` …
-`bindings-3.properties`). All changes are written directly to `~/.config/g13/`.
+Select the profile to edit in the toolbar (**Profil 1–4**, selected on the device with
+**L1–L4**, correspond to `bindings-0.properties` … `bindings-3.properties`; the active profile's
+L key is highlighted in the image). All changes are written directly to `~/.config/g13/`.
 
 * **Key Bindings** – click a key in the G13 image (keys with a green dot are bound in the
   active profile; dashed outlines mark profile/LCD keys that cannot be bound), then choose:
@@ -183,8 +184,11 @@ restart of the driver.
 
 ## Profiles on the Device
 
-The four profile buttons (M1–M3, MR) switch between `bindings-0` … `bindings-3`.
-These buttons cannot be bound to other actions.
+The four buttons directly below the display (**L1–L4**) switch between `bindings-0` …
+`bindings-3`. These buttons cannot be bound to other actions.
+
+The buttons **M1, M2, M3 and MR** are freely bindable like the G keys.
+The button with the sun symbol controls the display brightness in hardware and cannot be bound.
 
 ## Configuration Files (manual editing)
 
@@ -205,6 +209,7 @@ G4=m,3,0             # macro 3, repeat mode 0
 | File key | Physical key |
 |---|---|
 | `G0` … `G21` | G1 … G22 |
+| `G29`, `G30`, `G31`, `G32` | M1, M2, M3, MR |
 | `G33`, `G34`, `G35` | thumb keys LEFT, DOWN, TOP (stick press) |
 | `G36`, `G37`, `G38`, `G39` | joystick up, left, right, down |
 

@@ -180,7 +180,10 @@ void G13Visualizer::paintEvent(QPaintEvent *)
         const bool selected     = area.name == m_selected;
         const bool hover        = area.name == m_hover;
 
-        // Fuellung
+        // Fuellung; die L-Taste des aktiven Profils ist dauerhaft markiert.
+        const bool activeProfile = area.name == QString("L%1").arg(m_profile + 1);
+        if (activeProfile)
+            p.fillPath(area.path, QColor(255, 170, 0, 140));
         if (selected)
             p.fillPath(area.path, QColor(0, 170, 255, 110));
         else if (hover)
@@ -261,7 +264,9 @@ bool G13Visualizer::event(QEvent *event)
         } else {
             QString text = G13Keys::displayName(key);
             if (!G13Keys::isConfigurable(key))
-                text += " – Profil-/LCD-Taste, nicht belegbar";
+                text += key == QString("L%1").arg(m_profile + 1)
+                            ? " – aktives Profil, nicht belegbar"
+                            : " – Profiltaste, nicht belegbar";
             else if (m_bound.contains(key))
                 text += " – belegt";
             QToolTip::showText(help->globalPos(), text, this);

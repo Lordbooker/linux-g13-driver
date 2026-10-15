@@ -58,7 +58,7 @@ BindingEditor::BindingEditor(QWidget *parent) : QWidget(parent)
     // Kopfzeile
     auto *infoBox    = new QGroupBox("Aktuelle Auswahl", this);
     auto *infoLayout = new QFormLayout(infoBox);
-    lblProfile = new QLabel("M1", this);
+    lblProfile = new QLabel("1 (L1)", this);
     lblKey     = new QLabel("–", this);
     QFont f = lblKey->font();
     f.setBold(true);
@@ -125,8 +125,7 @@ BindingEditor::BindingEditor(QWidget *parent) : QWidget(parent)
 void BindingEditor::setProfile(int profile)
 {
     m_profile = profile;
-    const QString names[] = {"M1","M2","M3","M4"};
-    lblProfile->setText(names[profile]);
+    lblProfile->setText(QString("%1 (L%1)").arg(profile + 1));
     if (!m_currentKey.isEmpty())
         loadFromFile();
 }
@@ -140,7 +139,7 @@ void BindingEditor::setKey(const QString &keyName)
         cmbType->setEnabled(false);
         stack->setEnabled(false);
         btnSave->setEnabled(false);
-        lblStatus->setText("Diese Taste ist nicht frei belegbar (Profil-/LCD-Taste).");
+        lblStatus->setText("Diese Taste schaltet das Profil um und ist nicht belegbar.");
         return;
     }
 

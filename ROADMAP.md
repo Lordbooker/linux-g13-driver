@@ -16,7 +16,7 @@ bis hin zu einer stabilen, vollstaendig paketisierten Open-Source-Loesung.
 | Binding-Dateien lesen (`.properties`) | Fertig |
 | Joystick-Emulation | Fertig |
 | LCD-Grundfunktionen (Buffer, Pixel, Text) | Fertig |
-| Vier Binding-Profile (M1–M4) mit Live-Reload | Fertig |
+| Vier Binding-Profile (Umschaltung per L1–L4) mit Live-Reload | Fertig |
 | Makro-Unterstuetzung | Fertig |
 | LCD-FIFO-Schnittstelle (`$XDG_RUNTIME_DIR/g13-lcd`, Fallback `/tmp/g13-lcd`) | Fertig |
 | `systemd`-Unit + `udev`-Regel | Fertig |

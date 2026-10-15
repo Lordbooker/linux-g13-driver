@@ -14,6 +14,9 @@ const QHash<QString, QString> &fileKeys()
         for (int n = 1; n <= 22; ++n)
             m.insert(QString("G%1").arg(n), QString("G%1").arg(n - 1));
         m.insert("BD",          "G24");
+        m.insert("M1",          "G29");
+        m.insert("M2",          "G30");
+        m.insert("M3",          "G31");
         m.insert("MR",          "G32");
         m.insert("LEFT",        "G33");
         m.insert("DOWN",        "G34");
@@ -29,7 +32,8 @@ const QHash<QString, QString> &fileKeys()
 
 const QSet<QString> &locked()
 {
-    static const QSet<QString> set = {"L1", "L2", "L3", "L4", "M1", "M2", "M3"};
+    // L1-L4 schalten im Treiber die vier Profile um (bindings-0..3).
+    static const QSet<QString> set = {"L1", "L2", "L3", "L4"};
     return set;
 }
 
