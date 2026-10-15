@@ -82,6 +82,8 @@ if(BUILD_CONFIG_TOOL)
         src/gui/MacroSequence.cpp
         src/gui/MacroSequence.h
         src/gui/KeyNames.cpp
+        src/gui/G13Keys.cpp
+        src/gui/G13Keys.h
         src/gui/KeyNames.h
         src/resources.qrc
     )

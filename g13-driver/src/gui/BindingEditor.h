@@ -24,8 +24,6 @@ private:
     void saveToFile();
 
     QString bindingFilePath() const;
-    static QString toFileKey(const QString &guiKey);
-    static bool isConfigurable(const QString &guiKey);
 
     int     m_profile    = 0;
     QString m_currentKey;

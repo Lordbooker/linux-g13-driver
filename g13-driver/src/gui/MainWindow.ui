@@ -31,26 +31,10 @@
      <widget class="G13Visualizer" name="visualizer" native="true">
       <property name="minimumSize">
        <size>
-        <width>500</width>
-        <height>600</height>
+        <width>360</width>
+        <height>520</height>
        </size>
       </property>
-      <property name="baseSize">
-       <size>
-        <width>500</width>
-        <height>600</height>
-       </size>
-      </property>
-      <widget class="QWidget" name="widget" native="true">
-       <property name="geometry">
-        <rect>
-         <x>50</x>
-         <y>40</y>
-         <width>391</width>
-         <height>511</height>
-        </rect>
-       </property>
-      </widget>
      </widget>
     </item>
     <item>

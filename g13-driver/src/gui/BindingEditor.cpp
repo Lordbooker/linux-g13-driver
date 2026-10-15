@@ -1,5 +1,6 @@
 #include "BindingEditor.h"
 #include "KeyNames.h"
+#include "G13Keys.h"
 
 #include <QVBoxLayout>
 #include <QHBoxLayout>
@@ -57,7 +58,7 @@ BindingEditor::BindingEditor(QWidget *parent) : QWidget(parent)
     // Kopfzeile
     auto *infoBox    = new QGroupBox("Aktuelle Auswahl", this);
     auto *infoLayout = new QFormLayout(infoBox);
-    lblProfile = new QLabel("Profil: M1", this);
+    lblProfile = new QLabel("M1", this);
     lblKey     = new QLabel("–", this);
     QFont f = lblKey->font();
     f.setBold(true);
@@ -133,9 +134,9 @@ void BindingEditor::setProfile(int profile)
 void BindingEditor::setKey(const QString &keyName)
 {
     m_currentKey = keyName;
-    lblKey->setText(keyName);
+    lblKey->setText(G13Keys::displayName(keyName));
 
-    if (!isConfigurable(keyName)) {
+    if (!G13Keys::isConfigurable(keyName)) {
         cmbType->setEnabled(false);
         stack->setEnabled(false);
         btnSave->setEnabled(false);
@@ -167,30 +168,9 @@ QString BindingEditor::bindingFilePath() const
            + QString("/g13/bindings-%1.properties").arg(m_profile);
 }
 
-QString BindingEditor::toFileKey(const QString &guiKey)
-{
-    if (guiKey.startsWith('G')) {
-        bool ok;
-        int n = guiKey.mid(1).toInt(&ok);
-        if (ok && n >= 1 && n <= 22)
-            return QString("G%1").arg(n - 1);
-    }
-    static const QMap<QString, QString> special = {
-        {"BD",   "G24"}, {"MR",   "G32"},
-        {"LEFT", "G33"}, {"DOWN", "G34"}, {"TOP", "G35"},
-    };
-    return special.value(guiKey, guiKey);
-}
-
-bool BindingEditor::isConfigurable(const QString &guiKey)
-{
-    static const QSet<QString> locked = {"L1","L2","L3","L4","M1","M2","M3"};
-    return !locked.contains(guiKey);
-}
-
 void BindingEditor::loadFromFile()
 {
-    const QString fileKey = toFileKey(m_currentKey);
+    const QString fileKey = G13Keys::fileKey(m_currentKey);
     const auto    props   = readProps(bindingFilePath());
 
     if (!props.contains(fileKey)) {
@@ -225,10 +205,10 @@ void BindingEditor::loadFromFile()
 
 void BindingEditor::saveToFile()
 {
-    if (m_currentKey.isEmpty() || !isConfigurable(m_currentKey))
+    if (m_currentKey.isEmpty() || !G13Keys::isConfigurable(m_currentKey))
         return;
 
-    const QString fileKey = toFileKey(m_currentKey);
+    const QString fileKey = G13Keys::fileKey(m_currentKey);
     auto props = readProps(bindingFilePath());
 
     switch (cmbType->currentIndex()) {

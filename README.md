@@ -155,7 +155,8 @@ g13-gui
 Select the profile to edit in the toolbar (**M1–M4** correspond to `bindings-0.properties` …
 `bindings-3.properties`). All changes are written directly to `~/.config/g13/`.
 
-* **Key Bindings** – click a key in the G13 image, then choose:
+* **Key Bindings** – click a key in the G13 image (keys with a green dot are bound in the
+  active profile; dashed outlines mark profile/LCD keys that cannot be bound), then choose:
   * *Tastencode (Pass-Through)*: the key sends a normal keyboard key,
   * *Makro*: the key runs a macro (macro ID and repeat mode),
   * *Keine Aktion*: the key is unbound.
@@ -207,8 +208,8 @@ G4=m,3,0             # macro 3, repeat mode 0
 | `G33`, `G34`, `G35` | thumb keys LEFT, DOWN, TOP (stick press) |
 | `G36`, `G37`, `G38`, `G39` | joystick up, left, right, down |
 
-The joystick directions cannot be set in the GUI yet; edit them in the file
-(default: W, A, D, S).
+The joystick directions can be set in the GUI (click the ring around the stick) or in
+the file (default: W, A, D, S).
 
 Key codes are Linux input event codes, see `docs/Eventcodes_for_Mapping.pdf` or
 `/usr/include/linux/input-event-codes.h` (e.g. `KEY_T` = 20).
