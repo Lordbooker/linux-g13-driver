@@ -19,7 +19,7 @@ SCRIPT_DIR  := scripts
 SERVICE_SRC := src/systemd/g13.service
 UDEV_SRC    := src/udev/99-g13.rules
 
-.PHONY: all dependencies build-driver build-gui clean install install-user uninstall
+.PHONY: all dependencies build-driver build-gui clean install install-user uninstall remove-legacy
 
 # =============================================================================
 # Main Workflow
@@ -62,10 +62,20 @@ install:
 	
 	@echo "System install done."
 	@echo "To enable the service, run: systemctl --user enable --now g13"
+	
+	# Warn about files of the old version (GTK daemon / Java tool). Never fails.
+	# Skipped for package builds (DESTDIR set), they must not inspect the build host.
+	-@if [ -z "$(DESTDIR)" ]; then bash $(SCRIPT_DIR)/remove_legacy.sh --check; fi
 
 install-user:
 	@echo "--- User Local Install not fully supported in this version ---"
 	@echo "Please use 'sudo make install' or build an Arch Package."
+
+# Removes files of the old version (GTK tray daemon, Java config tool) from
+# old 'make install' / 'make install-user' runs. Run WITHOUT sudo; the script
+# asks for sudo itself. Files owned by a package manager are not touched.
+remove-legacy:
+	@bash $(SCRIPT_DIR)/remove_legacy.sh
 
 # Removes exactly the files installed by 'install'.
 # The user configuration in ~/.config/g13 is kept.

@@ -66,6 +66,43 @@ CMake options:
 | `BUILD_TESTS` | `OFF` | Build tests (requires GoogleTest; no tests exist yet) |
 | `ENABLE_SANITIZERS` | `OFF` | ASan/UBSan, only for `CMAKE_BUILD_TYPE=Debug` |
 
+## Upgrading from the old Version (GTK tray / Java config tool)
+
+Earlier versions installed a daemon with a GTK tray icon and a Java config tool, either
+system-wide (`make install`) or into your home directory (`make install-user`).
+Leftovers of the old version can keep the **old driver or the old config tool running**
+after an upgrade – for example `~/.config/systemd/user/g13.service` takes precedence over the
+new service, and `~/.local/bin/g13-gui` usually comes first in `PATH`.
+
+Remove them **before** installing the new version (run without sudo; the script asks for sudo
+itself when system files are affected):
+
+```bash
+cd g13-driver
+make remove-legacy
+```
+
+The script lists everything it found and asks before removing anything. It
+
+* identifies old files by their content (Java wrapper, the old daemon linked against GTK/AppIndicator,
+  the generated user service), so it works on every distribution,
+* never touches files owned by a package manager (pacman, dpkg, rpm) – those are only listed and
+  have to be removed with the package manager,
+* stops the old service if the old driver is affected,
+* keeps your configuration in `~/.config/g13`.
+
+`sudo make install` also checks for leftovers and prints a warning, but does not remove anything.
+
+| Old file | Origin |
+|---|---|
+| `~/.local/bin/linux-g13-driver`, `g13-gui`, `Linux-G13-GUI.jar` | `make install-user` |
+| `~/.config/systemd/user/g13.service` | `make install-user` |
+| `/etc/udev/rules.d/99-g13.rules` | `make install-user` |
+| `/usr/share/java/linux-g13-driver/Linux-G13-GUI.jar` | `make install` |
+| `/usr/bin/g13-gui` (Java wrapper), `/usr/bin/linux-g13-driver` (GTK version) | `make install` |
+
+The same paths below `/usr/local` are checked as well.
+
 ## Installation
 
 ```bash
