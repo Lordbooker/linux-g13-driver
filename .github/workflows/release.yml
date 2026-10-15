@@ -104,16 +104,17 @@ jobs:
             echo
             echo "| System | Package |"
             echo "|---|---|"
-            echo "| Debian 12 / 13 | \`linux-g13-driver_*~debian12_amd64.deb\` / \`*~debian13_amd64.deb\` |"
-            echo "| Ubuntu 22.04 / 24.04 / 26.04 (and Linux Mint, Pop!_OS, ...) | \`linux-g13-driver_*~ubuntuXX.04_amd64.deb\` |"
+            # GitHub ersetzt "~" in Dateinamen von Release-Assets durch "."
+            echo "| Debian 12 / 13 | \`linux-g13-driver_*.debian12_amd64.deb\` / \`*.debian13_amd64.deb\` |"
+            echo "| Ubuntu 22.04 / 24.04 / 26.04 (and Linux Mint, Pop!_OS, ...) | \`linux-g13-driver_*.ubuntuXX.04_amd64.deb\` |"
             echo "| Fedora 43 / 44 (and Nobara, ...) | \`linux-g13-driver-*.fc43.x86_64.rpm\` / \`*.fc44.x86_64.rpm\` |"
             echo "| Arch Linux | AUR: \`linux-g13-driver-git\` |"
             echo
             echo '```bash'
             echo '# Debian / Ubuntu'
-            echo 'sudo apt install ./linux-g13-driver_<version>~<system>_amd64.deb'
+            echo 'sudo apt install ./linux-g13-driver_<version>-1.<system>_amd64.deb'
             echo '# Fedora'
-            echo 'sudo dnf install ./linux-g13-driver-<version>.fc<NN>.x86_64.rpm'
+            echo 'sudo dnf install ./linux-g13-driver-<version>-1.fc<NN>.x86_64.rpm'
             echo '# then, as your user:'
             echo 'systemctl --user enable --now g13'
             echo '```'

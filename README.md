@@ -20,9 +20,9 @@ Ready-made packages are attached to every [GitHub release](https://github.com/Lo
 
 | System | Package |
 |---|---|
-| Debian 12 / 13 | `linux-g13-driver_<version>~debian12_amd64.deb` / `~debian13` |
-| Ubuntu 22.04 / 24.04 / 26.04 and derivatives (Linux Mint, Pop!_OS, …) | `linux-g13-driver_<version>~ubuntu<release>_amd64.deb` |
-| Fedora 43 / 44 and derivatives (Nobara, …) | `linux-g13-driver-<version>.fc43.x86_64.rpm` / `.fc44` |
+| Debian 12 / 13 | `linux-g13-driver_<version>-1.debian12_amd64.deb` / `.debian13` |
+| Ubuntu 22.04 / 24.04 / 26.04 and derivatives (Linux Mint, Pop!_OS, …) | `linux-g13-driver_<version>-1.ubuntu<release>_amd64.deb` |
+| Fedora 43 / 44 and derivatives (Nobara, …) | `linux-g13-driver-<version>-1.fc43.x86_64.rpm` / `.fc44` |
 | Arch Linux and derivatives | AUR: [`linux-g13-driver-git`](https://aur.archlinux.org/packages/linux-g13-driver-git) |
 
 Pick the package matching your system (derivatives use the package of their base release,
@@ -30,10 +30,10 @@ e.g. Linux Mint 22 → Ubuntu 24.04), then:
 
 ```bash
 # Debian / Ubuntu
-sudo apt install ./linux-g13-driver_<version>~<system>_amd64.deb
+sudo apt install ./linux-g13-driver_<version>-1.<system>_amd64.deb
 
 # Fedora
-sudo dnf install ./linux-g13-driver-<version>.fc<NN>.x86_64.rpm
+sudo dnf install ./linux-g13-driver-<version>-1.fc<NN>.x86_64.rpm
 
 # then, as your normal user:
 systemctl --user enable --now g13
