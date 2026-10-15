@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- App-Icon fuer g13-gui: stilisiertes Gameboard (Tastenfeld, Display, Stick). Eigene Gestaltung. -->
+<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 256 256">
+  <defs>
+    <linearGradient id="body" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#3a3f47"/>
+      <stop offset="1" stop-color="#1c1f24"/>
+    </linearGradient>
+    <linearGradient id="screen" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#58b8ff"/>
+      <stop offset="1" stop-color="#1f7fd6"/>
+    </linearGradient>
+  </defs>
+  <!-- Gehaeuse -->
+  <path d="M40 28 H216 Q236 28 236 48 V150 Q236 168 222 178 L186 204 Q176 212 164 212 H92 Q80 212 70 204 L34 178 Q20 168 20 150 V48 Q20 28 40 28 Z"
+        fill="url(#body)" stroke="#0e1013" stroke-width="4"/>
+  <!-- Display -->
+  <rect x="62" y="42" width="132" height="34" rx="6" fill="url(#screen)"/>
+  <rect x="72" y="52" width="56" height="5" rx="2.5" fill="#e8f5ff" opacity="0.85"/>
+  <rect x="72" y="62" width="38" height="5" rx="2.5" fill="#e8f5ff" opacity="0.6"/>
+  <!-- Tastenfeld 3 Reihen -->
+  <g fill="#6b7480">
+    <rect x="40"  y="90"  width="28" height="22" rx="4"/>
+    <rect x="74"  y="90"  width="28" height="22" rx="4"/>
+    <rect x="108" y="90"  width="28" height="22" rx="4"/>
+    <rect x="142" y="90"  width="28" height="22" rx="4"/>
+    <rect x="176" y="90"  width="28" height="22" rx="4"/>
+    <rect x="48"  y="118" width="28" height="22" rx="4"/>
+    <rect x="82"  y="118" width="28" height="22" rx="4"/>
+    <rect x="116" y="118" width="28" height="22" rx="4"/>
+    <rect x="150" y="118" width="28" height="22" rx="4"/>
+    <rect x="66"  y="146" width="40" height="22" rx="4"/>
+    <rect x="112" y="146" width="40" height="22" rx="4"/>
+  </g>
+  <!-- hervorgehobene Taste -->
+  <rect x="108" y="90" width="28" height="22" rx="4" fill="#3ea6ff"/>
+  <!-- Stick -->
+  <circle cx="200" cy="150" r="20" fill="#121418" stroke="#4a515b" stroke-width="4"/>
+  <circle cx="200" cy="150" r="9" fill="#8a929d"/>
+</svg>

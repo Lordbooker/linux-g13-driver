@@ -7,11 +7,12 @@ The original project is over 10 years old. This fork modernizes it:
 * **`linux-g13-driver`** – a C++23 background daemon. It talks to the G13 via `libusb`,
   passes key presses to the system through `uinput`, drives the LCD and the backlight.
   It runs as a systemd user service and needs **no GUI toolkit**.
-* **`g13-gui`** – a new **Qt6** configuration tool with its own tray icon.
-  It replaces the former Java/Swing config tool and the GTK/AppIndicator tray icon of the daemon.
+* **`g13-gui`** – a new **Qt6** configuration tool with a tray icon that starts automatically
+  at login. It replaces the former Java/Swing config tool and the GTK/AppIndicator tray icon of
+  the daemon.
 
-> **Status:** The Qt6 config tool is under active development on the `refactoring` branch.
-> Existing configuration files in `~/.config/g13/` keep the same format and remain usable.
+> Since version 2.0 the Qt6 config tool replaces the Java tool. Existing configuration files in
+> `~/.config/g13/` keep the same format and remain usable.
 
 ## Requirements
 
@@ -117,6 +118,9 @@ This installs:
 | Config tool | `/usr/bin/g13-gui` |
 | udev rule | `/usr/lib/udev/rules.d/99-g13.rules` |
 | systemd user service | `/usr/lib/systemd/user/g13.service` |
+| Application menu entry | `/usr/share/applications/g13-gui.desktop` |
+| Tray icon autostart | `/etc/xdg/autostart/g13-gui-tray.desktop` |
+| Icons | `/usr/share/icons/hicolor/*/apps/g13-gui.{png,svg}` |
 
 `PREFIX` and `DESTDIR` can be overridden for packaging, e.g. `make install DESTDIR=pkgdir`.
 
@@ -144,13 +148,47 @@ journalctl --user -u g13 -f      # live log
 systemctl --user restart g13     # restart
 ```
 
+## Tray Icon
+
+After the next login, the **G13 tray icon** appears in the taskbar (started via XDG autostart
+with `g13-gui --tray`). To show it right away without logging out:
+
+```bash
+g13-gui --tray &
+```
+
+* **Left click** – open or hide the configuration window.
+* **Right click** – menu:
+  * *Konfiguration öffnen*
+  * driver status (*läuft* / *gestoppt*), *Treiber starten/stoppen*, *Treiber neu starten*
+    (controls the systemd user service `g13`)
+  * *Tray-Symbol beenden* – closes only the tray icon; the driver keeps running.
+
+The driver itself runs independently of the tray icon as a systemd user service.
+
+**GNOME:** tray icons are only shown with the extension
+*AppIndicator and KStatusNotifierItem Support* (same as with the former AppIndicator icon).
+Without a tray, `g13-gui --tray` exits quietly after 30 seconds; start the config tool from the
+application menu instead.
+
+**Disable the autostart:** turn off "G13 Tray-Symbol" in your desktop's autostart settings, or
+create `~/.config/autostart/g13-gui-tray.desktop` containing:
+
+```ini
+[Desktop Entry]
+Hidden=true
+```
+
 ## Using the Config Tool
 
-Start it from your application menu or a terminal:
+Start it from the application menu (**G13 Config Tool**), the tray icon, or a terminal:
 
 ```bash
 g13-gui
 ```
+
+Only one instance runs at a time: starting `g13-gui` again opens the window of the running
+instance.
 
 Select the profile to edit in the toolbar (**Profil 1–4**, selected on the device with
 **L1–L4**, correspond to `bindings-0.properties` … `bindings-3.properties`; the active profile's
@@ -172,8 +210,8 @@ L key is highlighted in the image). All changes are written directly to `~/.conf
   * *Auf alle anwenden* replaces all recorded delays with a fixed value.
   * *Speichern* warns if a key is pressed but never released.
 
-Closing the window keeps the tool running in the system tray (if your desktop provides one);
-quit it via the tray menu (*Beenden*).
+Closing the window keeps the tool running in the system tray (if your desktop provides one).
+*Datei → Beenden* or *Tray-Symbol beenden* closes it completely; the driver keeps running.
 
 ### When do changes take effect?
 
@@ -281,7 +319,8 @@ cd g13-driver
 sudo make uninstall
 ```
 
-This removes the daemon, the config tool, the udev rule and the service file.
+This removes the daemon, the config tool, the udev rule, the service file, the menu entry,
+the tray autostart entry and the icons.
 Your configuration in `~/.config/g13` is kept.
 
 ## Notes

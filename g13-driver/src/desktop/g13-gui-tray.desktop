@@ -1,0 +1,12 @@
+[Desktop Entry]
+Type=Application
+Name=G13 Tray Icon
+Name[de]=G13 Tray-Symbol
+Comment=Tray icon for the Logitech G13 driver
+Comment[de]=Tray-Symbol für den Logitech-G13-Treiber
+Exec=g13-gui --tray
+Icon=g13-gui
+Terminal=false
+NoDisplay=true
+X-GNOME-Autostart-enabled=true
+X-KDE-autostart-after=panel

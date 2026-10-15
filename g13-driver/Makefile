@@ -8,6 +8,11 @@ BINDIR      ?= $(PREFIX)/bin
 DATADIR     ?= $(PREFIX)/share
 UDEVDIR     ?= /usr/lib/udev/rules.d
 SYSTEMDDIR  ?= /usr/lib/systemd/user
+SYSCONFDIR  ?= /etc
+APPDIR      := $(DATADIR)/applications
+ICONDIR     := $(DATADIR)/icons/hicolor
+AUTOSTARTDIR:= $(SYSCONFDIR)/xdg/autostart
+ICON_SIZES  := 22 32 48 64 128 256
 
 # --- Directories & Paths ---
 BUILD_DIR   := build
@@ -18,6 +23,9 @@ TARGET_GUI    := g13-gui
 SCRIPT_DIR  := scripts
 SERVICE_SRC := src/systemd/g13.service
 UDEV_SRC    := src/udev/99-g13.rules
+DESKTOP_SRC := src/desktop/g13-gui.desktop
+TRAY_SRC    := src/desktop/g13-gui-tray.desktop
+ICON_SRC    := src/resources/icons
 
 .PHONY: all dependencies build-driver build-gui clean install install-user uninstall remove-legacy
 
@@ -60,6 +68,14 @@ install:
 	install -d $(DESTDIR)$(SYSTEMDDIR)
 	install -m 644 $(SERVICE_SRC) $(DESTDIR)$(SYSTEMDDIR)/g13.service
 	
+	# Menueeintrag, Tray-Autostart, Icons
+	install -Dm 644 $(DESKTOP_SRC) $(DESTDIR)$(APPDIR)/g13-gui.desktop
+	install -Dm 644 $(TRAY_SRC) $(DESTDIR)$(AUTOSTARTDIR)/g13-gui-tray.desktop
+	install -Dm 644 $(ICON_SRC)/g13-gui.svg $(DESTDIR)$(ICONDIR)/scalable/apps/g13-gui.svg
+	for s in $(ICON_SIZES); do \
+		install -Dm 644 $(ICON_SRC)/g13-gui-$$s.png $(DESTDIR)$(ICONDIR)/$${s}x$${s}/apps/g13-gui.png; \
+	done
+	
 	@echo "System install done."
 	@echo "To enable the service, run: systemctl --user enable --now g13"
 	
@@ -85,6 +101,10 @@ uninstall:
 	rm -f $(DESTDIR)$(BINDIR)/g13-gui
 	rm -f $(DESTDIR)$(UDEVDIR)/99-g13.rules
 	rm -f $(DESTDIR)$(SYSTEMDDIR)/g13.service
+	rm -f $(DESTDIR)$(APPDIR)/g13-gui.desktop
+	rm -f $(DESTDIR)$(AUTOSTARTDIR)/g13-gui-tray.desktop
+	rm -f $(DESTDIR)$(ICONDIR)/scalable/apps/g13-gui.svg
+	for s in $(ICON_SIZES); do rm -f $(DESTDIR)$(ICONDIR)/$${s}x$${s}/apps/g13-gui.png; done
 	@echo "Uninstall done. Your configuration in ~/.config/g13 was kept."
 	@echo "If the service was enabled, run: systemctl --user disable --now g13"
 

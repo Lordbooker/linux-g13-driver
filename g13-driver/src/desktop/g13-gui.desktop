@@ -1,0 +1,13 @@
+[Desktop Entry]
+Type=Application
+Name=G13 Config Tool
+GenericName=Gameboard Configuration
+GenericName[de]=Gameboard-Konfiguration
+Comment=Configure keys, macros and backlight of the Logitech G13
+Comment[de]=Tasten, Makros und Beleuchtung des Logitech G13 konfigurieren
+Exec=g13-gui
+Icon=g13-gui
+Terminal=false
+Categories=Settings;HardwareSettings;Qt;
+Keywords=G13;Logitech;Gameboard;Keypad;Macro;
+StartupNotify=true

@@ -13,12 +13,12 @@
 #include <QAction>
 #include <QMessageBox>
 #include <QApplication>
+#include <QProcess>
+#include <QTimer>
 
 MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent)
     , ui(new Ui::MainWindow)
-    , m_tray(nullptr)
-    , m_profileCombo(nullptr)
 {
     ui->setupUi(this);
     setupToolbar();
@@ -38,6 +38,8 @@ MainWindow::MainWindow(QWidget *parent)
     // Menü-Aktionen
     connect(ui->actionSave_Profile, &QAction::triggered, this, &MainWindow::onSaveProfile);
     connect(ui->actionAbout,        &QAction::triggered, this, &MainWindow::onAbout);
+    // "Beenden" beendet das Config-Tool inkl. Tray-Symbol (der Treiber laeuft weiter).
+    connect(ui->actionQuit,         &QAction::triggered, qApp, &QApplication::quit);
 
     statusBar()->showMessage("G13 Config Tool bereit.", 3000);
 }
@@ -69,29 +71,139 @@ void MainWindow::setupToolbar()
 }
 
 // ---------------------------------------------------------------------------
+// App-Icon und Fenster
+// ---------------------------------------------------------------------------
+QIcon MainWindow::appIcon()
+{
+    QIcon fallback;
+    for (int size : {22, 32, 48, 64, 128, 256})
+        fallback.addFile(QString(":/icons/g13-gui-%1.png").arg(size), QSize(size, size));
+    // Installiertes Theme-Icon bevorzugen (hicolor/g13-gui), sonst eingebettet.
+    return QIcon::fromTheme("g13-gui", fallback);
+}
+
+void MainWindow::showWindow()
+{
+    if (isMinimized())
+        showNormal();
+    show();
+    raise();
+    activateWindow();
+}
+
+// ---------------------------------------------------------------------------
 // System-Tray
 // ---------------------------------------------------------------------------
-void MainWindow::setupTrayIcon()
+bool MainWindow::setupTrayIcon()
 {
+    if (m_tray)
+        return true;
     if (!QSystemTrayIcon::isSystemTrayAvailable())
-        return;
+        return false;
 
-    m_tray = new QSystemTrayIcon(this);
-    m_tray->setIcon(QIcon::fromTheme("input-gaming", QIcon(":/g13_bg")));
+    m_tray = new QSystemTrayIcon(appIcon(), this);
     m_tray->setToolTip("G13 Config Tool");
 
-    auto *menu    = new QMenu(this);
-    auto *actShow = menu->addAction("Fenster anzeigen");
+    auto *menu = new QMenu(this);
+    auto *actOpen = menu->addAction("Konfiguration öffnen");
     menu->addSeparator();
-    auto *actQuit = menu->addAction("Beenden");
+    m_actStatus = menu->addAction("Treiber: wird geprüft …");
+    m_actStatus->setEnabled(false);
+    m_actStartStop = menu->addAction("Treiber stoppen");
+    m_actRestart   = menu->addAction("Treiber neu starten");
+    menu->addSeparator();
+    auto *actQuit = menu->addAction("Tray-Symbol beenden");
 
-    connect(actShow, &QAction::triggered, this,  &QWidget::showNormal);
-    connect(actQuit, &QAction::triggered, qApp,  &QApplication::quit);
+    connect(actOpen, &QAction::triggered, this, &MainWindow::showWindow);
+    connect(m_actStartStop, &QAction::triggered, this, [this] {
+        if (m_driverState == DriverState::Running)
+            runSystemctl("stop", "Treiber gestoppt.");
+        else
+            runSystemctl("start", "Treiber gestartet.");
+    });
+    connect(m_actRestart, &QAction::triggered, this, [this] {
+        runSystemctl("restart", "Treiber neu gestartet.");
+    });
+    connect(actQuit, &QAction::triggered, qApp, &QApplication::quit);
+    connect(menu, &QMenu::aboutToShow, this, &MainWindow::refreshDriverStatus);
 
     m_tray->setContextMenu(menu);
+    connect(m_tray, &QSystemTrayIcon::activated, this, &MainWindow::onTrayActivated);
     m_tray->show();
 
-    connect(m_tray, &QSystemTrayIcon::activated, this, &MainWindow::onTrayActivated);
+    // Status regelmaessig aktualisieren (Tooltip und Menue).
+    m_statusTimer = new QTimer(this);
+    connect(m_statusTimer, &QTimer::timeout, this, &MainWindow::refreshDriverStatus);
+    m_statusTimer->start(10000);
+    refreshDriverStatus();
+    return true;
+}
+
+// Fragt den Zustand des systemd-User-Dienstes "g13" ab (asynchron).
+void MainWindow::refreshDriverStatus()
+{
+    auto *proc = new QProcess(this);
+    connect(proc, &QProcess::finished, this, [this, proc](int exitCode, QProcess::ExitStatus status) {
+        // "systemctl is-active" liefert 0 genau dann, wenn der Dienst laeuft.
+        applyDriverStatus(status == QProcess::NormalExit && exitCode == 0
+                              ? DriverState::Running : DriverState::Stopped);
+        proc->deleteLater();
+    });
+    connect(proc, &QProcess::errorOccurred, this, [this, proc](QProcess::ProcessError error) {
+        if (error == QProcess::FailedToStart) {
+            applyDriverStatus(DriverState::Unknown);   // kein systemctl verfuegbar
+            proc->deleteLater();
+        }
+    });
+    proc->start("systemctl", {"--user", "is-active", "--quiet", "g13"});
+}
+
+void MainWindow::applyDriverStatus(DriverState state)
+{
+    m_driverState = state;
+    if (!m_tray)
+        return;
+
+    QString text;
+    switch (state) {
+    case DriverState::Running: text = "Treiber: läuft";        break;
+    case DriverState::Stopped: text = "Treiber: gestoppt";     break;
+    case DriverState::Unknown: text = "Treiber: unbekannt";    break;
+    }
+    m_actStatus->setText(text);
+    m_actStartStop->setText(state == DriverState::Running ? "Treiber stoppen" : "Treiber starten");
+    m_actStartStop->setEnabled(state != DriverState::Unknown);
+    m_actRestart->setEnabled(state != DriverState::Unknown);
+    m_tray->setToolTip("G13 Config Tool – " + text);
+}
+
+// Startet/stoppt den Treiber ueber den systemd-User-Dienst und meldet das Ergebnis.
+void MainWindow::runSystemctl(const QString &verb, const QString &successMessage)
+{
+    auto *proc = new QProcess(this);
+    connect(proc, &QProcess::finished, this,
+            [this, proc, successMessage](int exitCode, QProcess::ExitStatus status) {
+        if (m_tray) {
+            if (status == QProcess::NormalExit && exitCode == 0) {
+                m_tray->showMessage("G13", successMessage, QSystemTrayIcon::Information, 3000);
+            } else {
+                const QString err = QString::fromLocal8Bit(proc->readAllStandardError()).trimmed();
+                m_tray->showMessage("G13", "Aktion fehlgeschlagen" + (err.isEmpty() ? QString() : ": " + err),
+                                    QSystemTrayIcon::Warning, 5000);
+            }
+        }
+        proc->deleteLater();
+        refreshDriverStatus();
+    });
+    connect(proc, &QProcess::errorOccurred, this, [this, proc](QProcess::ProcessError error) {
+        if (error == QProcess::FailedToStart) {
+            if (m_tray)
+                m_tray->showMessage("G13", "systemctl konnte nicht gestartet werden.",
+                                    QSystemTrayIcon::Warning, 5000);
+            proc->deleteLater();
+        }
+    });
+    proc->start("systemctl", {"--user", verb, "g13"});
 }
 
 // ---------------------------------------------------------------------------
@@ -121,10 +233,12 @@ void MainWindow::onAbout()
 
 void MainWindow::onTrayActivated(QSystemTrayIcon::ActivationReason reason)
 {
+    // Linksklick: Fenster ein-/ausblenden
     if (reason == QSystemTrayIcon::Trigger) {
-        setVisible(!isVisible());
-        if (isVisible())
-            raise();
+        if (isVisible() && !isMinimized())
+            hide();
+        else
+            showWindow();
     }
 }
 
@@ -135,12 +249,17 @@ void MainWindow::closeEvent(QCloseEvent *event)
 {
     if (m_tray && m_tray->isVisible()) {
         hide();
-        m_tray->showMessage(
-            "G13 Config Tool",
-            "Läuft im Hintergrund. Tray-Icon anklicken zum Öffnen.",
-            QSystemTrayIcon::Information, 2000);
+        if (!m_trayHintShown) {
+            m_tray->showMessage(
+                "G13 Config Tool",
+                "Läuft im Hintergrund weiter. Tray-Symbol anklicken zum Öffnen.",
+                QSystemTrayIcon::Information, 3000);
+            m_trayHintShown = true;
+        }
         event->ignore();
     } else {
+        // Ohne Tray-Symbol wuerde die App sonst unsichtbar weiterlaufen.
         event->accept();
+        qApp->quit();
     }
 }

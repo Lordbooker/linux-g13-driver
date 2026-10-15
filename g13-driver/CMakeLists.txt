@@ -17,7 +17,7 @@ pkg_check_modules(LIBUSB  REQUIRED libusb-1.0)
 
 # --- Dependencies (GUI) ---
 if(BUILD_CONFIG_TOOL)
-    find_package(Qt6 REQUIRED COMPONENTS Widgets Core Gui)
+    find_package(Qt6 REQUIRED COMPONENTS Widgets Core Gui Network)
     set(CMAKE_AUTOMOC ON)
     set(CMAKE_AUTORCC ON)
     set(CMAKE_AUTOUIC ON)
@@ -94,6 +94,7 @@ if(BUILD_CONFIG_TOOL)
         Qt6::Widgets
         Qt6::Core
         Qt6::Gui
+        Qt6::Network    # QLocalServer/QLocalSocket fuer die Einzelinstanz
     )
 endif()
 
@@ -108,6 +109,24 @@ if(BUILD_CONFIG_TOOL)
     install(TARGETS g13-gui
         RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
     )
+    # Anwendungsmenue
+    install(FILES src/desktop/g13-gui.desktop
+        DESTINATION ${CMAKE_INSTALL_DATADIR}/applications
+    )
+    # Tray-Symbol beim Anmelden (XDG-Autostart; bei Prefix /usr -> /etc/xdg/autostart)
+    install(FILES src/desktop/g13-gui-tray.desktop
+        DESTINATION ${CMAKE_INSTALL_FULL_SYSCONFDIR}/xdg/autostart
+    )
+    # Icons (hicolor-Theme)
+    install(FILES src/resources/icons/g13-gui.svg
+        DESTINATION ${CMAKE_INSTALL_DATADIR}/icons/hicolor/scalable/apps
+    )
+    foreach(size 22 32 48 64 128 256)
+        install(FILES src/resources/icons/g13-gui-${size}.png
+            DESTINATION ${CMAKE_INSTALL_DATADIR}/icons/hicolor/${size}x${size}/apps
+            RENAME g13-gui.png
+        )
+    endforeach()
 endif()
 install(FILES src/udev/99-g13.rules
     DESTINATION ${CMAKE_INSTALL_PREFIX}/lib/udev/rules.d

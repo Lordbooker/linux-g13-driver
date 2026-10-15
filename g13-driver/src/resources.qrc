@@ -2,5 +2,11 @@
 <RCC version="1.0">
     <qresource prefix="/">
         <file alias="g13_bg">resources/g13.gif</file>
+        <file alias="icons/g13-gui-22.png">resources/icons/g13-gui-22.png</file>
+        <file alias="icons/g13-gui-32.png">resources/icons/g13-gui-32.png</file>
+        <file alias="icons/g13-gui-48.png">resources/icons/g13-gui-48.png</file>
+        <file alias="icons/g13-gui-64.png">resources/icons/g13-gui-64.png</file>
+        <file alias="icons/g13-gui-128.png">resources/icons/g13-gui-128.png</file>
+        <file alias="icons/g13-gui-256.png">resources/icons/g13-gui-256.png</file>
     </qresource>
 </RCC>
