@@ -1,0 +1,133 @@
+# Baut .deb- und .rpm-Pakete fuer alle unterstuetzten Distributionen.
+#
+# - Push eines Tags "v*" (z. B. v2.1.0): Pakete bauen und als GitHub-Release
+#   mit Aenderungsliste veroeffentlichen.
+# - Manuell ("Run workflow" im Actions-Tab): nur bauen; die Pakete stehen als
+#   Artefakte des Laufs zum Testen bereit, es wird kein Release angelegt.
+#
+# Gebaut wird mit g13-driver/packaging/build-package.sh im Container der
+# jeweiligen Distribution (gleiches Skript wie fuer lokale Builds).
+
+name: Release packages
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Build ${{ matrix.name }}
+    runs-on: ubuntu-latest
+    container: ${{ matrix.image }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { name: debian12,    image: "debian:12" }
+          - { name: debian13,    image: "debian:13" }
+          - { name: ubuntu22.04, image: "ubuntu:22.04" }
+          - { name: ubuntu24.04, image: "ubuntu:24.04" }
+          - { name: ubuntu26.04, image: "ubuntu:26.04" }
+          - { name: fedora43,    image: "fedora:43" }
+          - { name: fedora44,    image: "fedora:44" }
+
+    steps:
+      # git vor dem Checkout installieren, damit die volle Historie samt Tags
+      # (fuer die Versionsnummer) ausgecheckt wird.
+      - name: Install git
+        run: |
+          if command -v apt-get >/dev/null; then
+            apt-get update -q && apt-get install -y -q --no-install-recommends git ca-certificates
+          else
+            dnf install -y -q git
+          fi
+
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Build package
+        run: |
+          if [ "$GITHUB_REF_TYPE" = "tag" ]; then
+            export G13_PACKAGE_VERSION="${GITHUB_REF_NAME#v}"
+          fi
+          g13-driver/packaging/build-package.sh dist
+
+      - name: Upload package
+        uses: actions/upload-artifact@v4
+        with:
+          name: package-${{ matrix.name }}
+          path: dist/*
+          if-no-files-found: error
+
+  release:
+    name: Publish release
+    needs: build
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Download packages
+        uses: actions/download-artifact@v4
+        with:
+          pattern: package-*
+          path: dist
+          merge-multiple: true
+
+      - name: Write release notes
+        run: |
+          TAG="$GITHUB_REF_NAME"
+          PREV=$(git describe --tags --abbrev=0 --match 'v[0-9]*' "${TAG}^" 2>/dev/null || true)
+          {
+            echo "## Changes"
+            echo
+            if [ -n "$PREV" ]; then
+              git log --no-merges --pretty='- %s (%h)' "${PREV}..${TAG}"
+            else
+              git log --no-merges --pretty='- %s (%h)' "${TAG}"
+            fi
+            echo
+            echo "## Installation"
+            echo
+            echo "| System | Package |"
+            echo "|---|---|"
+            echo "| Debian 12 / 13 | \`linux-g13-driver_*~debian12_amd64.deb\` / \`*~debian13_amd64.deb\` |"
+            echo "| Ubuntu 22.04 / 24.04 / 26.04 (and Linux Mint, Pop!_OS, ...) | \`linux-g13-driver_*~ubuntuXX.04_amd64.deb\` |"
+            echo "| Fedora 43 / 44 (and Nobara, ...) | \`linux-g13-driver-*.fc43.x86_64.rpm\` / \`*.fc44.x86_64.rpm\` |"
+            echo "| Arch Linux | AUR: \`linux-g13-driver-git\` |"
+            echo
+            echo '```bash'
+            echo '# Debian / Ubuntu'
+            echo 'sudo apt install ./linux-g13-driver_<version>~<system>_amd64.deb'
+            echo '# Fedora'
+            echo 'sudo dnf install ./linux-g13-driver-<version>.fc<NN>.x86_64.rpm'
+            echo '# then, as your user:'
+            echo 'systemctl --user enable --now g13'
+            echo '```'
+            echo
+            echo "Upgrading from 1.x (GTK tray / Java tool): run \`make remove-legacy\` from the"
+            echo "source tree first, see the README section \"Upgrading from the old Version\"."
+          } > release-notes.md
+          cat release-notes.md
+
+      - name: Create GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" dist/* \
+            --title "$GITHUB_REF_NAME" \
+            --notes-file release-notes.md \
+            --verify-tag
