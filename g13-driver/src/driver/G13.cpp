@@ -73,7 +73,7 @@ G13::G13(libusb_device *device) {
     }
 
     if (libusb_claim_interface(handle, 0) < 0) {
-        syslog(LOG_ERR, "Cannot Claim Interface");
+        syslog(LOG_ERR, "Cannot claim interface");
         libusb_close(handle);
         handle = nullptr;
         return;
@@ -508,7 +508,7 @@ void G13::write_lcd() {
     );
 
     if (error) {
-        syslog(LOG_ERR, "LCD Write Error: %s", libusb_error_name(error));
+        syslog(LOG_ERR, "LCD write error: %s", libusb_error_name(error));
     }
 }
 
@@ -519,7 +519,7 @@ void G13::draw_test_pattern() {
     write_text(10, 5,  "   LINUX G13 PROJECT");
     write_text(10, 15, "  POWER of OPENSOURCE");
     write_lcd();
-    syslog(LOG_INFO, "LCD Test Pattern sent.");
+    syslog(LOG_INFO, "LCD test pattern sent.");
 }
 
 void G13::write_char(int x, int y, char c) {
@@ -563,7 +563,7 @@ void G13::init_fifo() {
     if (fifo_fd < 0) {
         syslog(LOG_ERR, "Failed to open FIFO: %s", strerror(errno));
     } else {
-        syslog(LOG_INFO, "LCD Pipe created at %s", fifo_path.c_str());
+        syslog(LOG_INFO, "LCD pipe created at %s", fifo_path.c_str());
     }
 }
 

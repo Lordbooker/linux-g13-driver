@@ -9,6 +9,7 @@
 #   - C++ compiler with C++23 support, make, CMake >= 3.20, pkg-config
 #   - libusb-1.0 (development headers)
 #   - Qt6 Base (Widgets, Core, Gui incl. moc/uic) - only for the config tool
+#   - Qt6 Linguist tools (lrelease) - translations of the config tool
 #
 # GTK3, AppIndicator and Java are no longer needed.
 
@@ -18,17 +19,17 @@ set -e
 
 # ARCH LINUX (CachyOS, Manjaro, EndeavourOS)
 # 'base-devel' includes gcc, make and pkgconf.
-PKG_ARCH="base-devel cmake libusb qt6-base"
+PKG_ARCH="base-devel cmake libusb qt6-base qt6-tools"
 
 # DEBIAN / UBUNTU
 # libgl-dev: needed by Qt 6.2 (Ubuntu 22.04) to find Qt6::Gui
-PKG_DEBIAN="build-essential cmake pkg-config libusb-1.0-0-dev qt6-base-dev libgl-dev"
+PKG_DEBIAN="build-essential cmake pkg-config libusb-1.0-0-dev qt6-base-dev qt6-tools-dev qt6-tools-dev-tools qt6-l10n-tools libgl-dev"
 
 # FEDORA
-PKG_FEDORA="gcc-c++ make cmake pkgconf-pkg-config libusb1-devel qt6-qtbase-devel"
+PKG_FEDORA="gcc-c++ make cmake pkgconf-pkg-config libusb1-devel qt6-qtbase-devel qt6-qttools-devel"
 
 # OPENSUSE
-PKG_SUSE="gcc-c++ make cmake pkg-config libusb-1_0-devel qt6-base-devel"
+PKG_SUSE="gcc-c++ make cmake pkg-config libusb-1_0-devel qt6-base-devel qt6-linguist-devel"
 
 
 echo "--- Detecting Package Manager ---"
@@ -64,6 +65,7 @@ else
     echo "  2. CMake (>= 3.20)"
     echo "  3. libusb-1.0 (development headers)"
     echo "  4. Qt6 Base (Widgets, Core, Gui) - for the config tool"
+    echo "  5. Qt6 Linguist tools (lrelease, CMake module Qt6LinguistTools)"
     echo " If they are already installed, the build will continue."
     echo "================================================================="
 fi

@@ -35,7 +35,7 @@ static bool writeProps(const QString &path, const QMap<QString, QString> &map)
     if (!f.open(QIODevice::WriteOnly | QIODevice::Text))
         return false;
     QTextStream out(&f);
-    out << "# G13 Bindings – bearbeitet von g13-gui\n";
+    out << "# G13 bindings - edited by g13-gui\n";
     for (auto it = map.constBegin(); it != map.constEnd(); ++it)
         out << it.key() << "=" << it.value() << "\n";
     return true;
@@ -57,17 +57,17 @@ ColorSelector::ColorSelector(QWidget *parent) : QWidget(parent)
     colorPreview->setText("R:0  G:0  B:0");
     root->addWidget(colorPreview);
 
-    auto *sliderBox    = new QGroupBox("RGB-Farbe", this);
+    auto *sliderBox    = new QGroupBox(tr("RGB color"), this);
     auto *sliderLayout = new QFormLayout(sliderBox);
     slRed   = createSlider();
     slGreen = createSlider();
     slBlue  = createSlider();
-    sliderLayout->addRow("Rot:",   slRed);
-    sliderLayout->addRow("Gruen:", slGreen);
-    sliderLayout->addRow("Blau:",  slBlue);
+    sliderLayout->addRow(tr("Red:"),   slRed);
+    sliderLayout->addRow(tr("Green:"), slGreen);
+    sliderLayout->addRow(tr("Blue:"),  slBlue);
     root->addWidget(sliderBox);
 
-    btnApply = new QPushButton("Farbe anwenden", this);
+    btnApply = new QPushButton(tr("Apply color"), this);
     root->addWidget(btnApply);
 
     lblStatus = new QLabel("", this);
@@ -135,10 +135,10 @@ void ColorSelector::sendColorToDriver(int r, int g, int b)
     props["color"] = QString("%1,%2,%3").arg(r).arg(g).arg(b);
     if (writeProps(bindingFilePath(), props))
         lblStatus->setText(
-            QString("Farbe gespeichert: R%1 G%2 B%3 – Daemon laedt automatisch neu.")
+            tr("Color saved: R%1 G%2 B%3 – the driver reloads it automatically.")
             .arg(r).arg(g).arg(b));
     else
-        lblStatus->setText("Fehler: Datei konnte nicht geschrieben werden.");
+        lblStatus->setText(tr("Error: could not write the file."));
 }
 
 QString ColorSelector::bindingFilePath() const

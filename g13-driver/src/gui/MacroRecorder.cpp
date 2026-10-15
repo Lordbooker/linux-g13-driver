@@ -37,29 +37,29 @@ MacroRecorder::MacroRecorder(QWidget *parent) : QWidget(parent)
     auto *root = new QVBoxLayout(this);
 
     // --- Makro-Auswahl ------------------------------------------------------
-    auto *idBox    = new QGroupBox("Makro", this);
+    auto *idBox    = new QGroupBox(tr("Macro"), this);
     auto *idLayout = new QFormLayout(idBox);
     spnId = new QSpinBox(this);
     spnId->setRange(0, MaxMacroId);
-    btnLoad = new QPushButton("Laden", this);
+    btnLoad = new QPushButton(tr("Load"), this);
     auto *idRow = new QHBoxLayout();
     idRow->addWidget(spnId, 1);
     idRow->addWidget(btnLoad);
-    idLayout->addRow("Makro-ID:", idRow);
+    idLayout->addRow(tr("Macro ID:"), idRow);
     editName = new QLineEdit(this);
-    editName->setPlaceholderText("z. B. Snipe, Combo …");
-    idLayout->addRow("Name:", editName);
+    editName->setPlaceholderText(tr("e.g. Snipe, Combo …"));
+    idLayout->addRow(tr("Name:"), editName);
     root->addWidget(idBox);
 
     // --- Ablauf (Aufnahme + Liste) -----------------------------------------
-    auto *seqBox    = new QGroupBox("Ablauf", this);
+    auto *seqBox    = new QGroupBox(tr("Sequence"), this);
     auto *seqLayout = new QGridLayout(seqBox);
 
-    btnRecord = new QPushButton("●  Aufnahme starten", this);
+    btnRecord = new QPushButton("●  " + tr("Start recording"), this);
     btnRecord->setCheckable(true);
     lblRecordHint = new QLabel(
-        "Tastendrücke werden mit ihren Zeitabständen ans Ende der Liste angehängt. "
-        "Das Fenster muss dabei im Vordergrund sein.", this);
+        tr("Key presses are appended to the end of the list together with their timing. "
+           "The window must stay in the foreground while recording."), this);
     lblRecordHint->setWordWrap(true);
     seqLayout->addWidget(btnRecord, 0, 0);
     seqLayout->addWidget(lblRecordHint, 0, 1);
@@ -70,10 +70,10 @@ MacroRecorder::MacroRecorder(QWidget *parent) : QWidget(parent)
     seqLayout->addWidget(listEvents, 1, 0, 1, 2);
 
     auto *listButtons = new QVBoxLayout();
-    btnUp     = new QPushButton("Nach oben", this);
-    btnDown   = new QPushButton("Nach unten", this);
-    btnRemove = new QPushButton("Entfernen", this);
-    btnClear  = new QPushButton("Alle löschen", this);
+    btnUp     = new QPushButton(tr("Move up"), this);
+    btnDown   = new QPushButton(tr("Move down"), this);
+    btnRemove = new QPushButton(tr("Remove"), this);
+    btnClear  = new QPushButton(tr("Clear all"), this);
     listButtons->addWidget(btnUp);
     listButtons->addWidget(btnDown);
     listButtons->addWidget(btnRemove);
@@ -84,15 +84,15 @@ MacroRecorder::MacroRecorder(QWidget *parent) : QWidget(parent)
     root->addWidget(seqBox, 1);
 
     // --- Manuell bearbeiten -------------------------------------------------
-    auto *editBox    = new QGroupBox("Manuell einfügen und anpassen", this);
+    auto *editBox    = new QGroupBox(tr("Insert and adjust manually"), this);
     auto *editLayout = new QGridLayout(editBox);
 
     cmbKey = new QComboBox(this);
     for (const auto &[name, code] : KeyNames::all())
         cmbKey->addItem(QString("%1  (%2)").arg(name).arg(code), code);
-    btnInsertDown = new QPushButton("Drücken einfügen", this);
-    btnInsertUp   = new QPushButton("Loslassen einfügen", this);
-    editLayout->addWidget(new QLabel("Taste:", this), 0, 0);
+    btnInsertDown = new QPushButton(tr("Insert press"), this);
+    btnInsertUp   = new QPushButton(tr("Insert release"), this);
+    editLayout->addWidget(new QLabel(tr("Key:"), this), 0, 0);
     editLayout->addWidget(cmbKey,        0, 1);
     editLayout->addWidget(btnInsertDown, 0, 2);
     editLayout->addWidget(btnInsertUp,   0, 3);
@@ -102,11 +102,11 @@ MacroRecorder::MacroRecorder(QWidget *parent) : QWidget(parent)
     spnDelay->setSingleStep(10);
     spnDelay->setValue(50);
     spnDelay->setSuffix(" ms");
-    btnInsertDelay    = new QPushButton("Wartezeit einfügen", this);
-    btnDelaySelection = new QPushButton("Auf Auswahl anwenden", this);
-    btnDelayAll       = new QPushButton("Auf alle anwenden", this);
-    btnDelayAll->setToolTip("Ersetzt alle Wartezeiten der Liste durch diesen Wert.");
-    editLayout->addWidget(new QLabel("Wartezeit:", this), 1, 0);
+    btnInsertDelay    = new QPushButton(tr("Insert delay"), this);
+    btnDelaySelection = new QPushButton(tr("Apply to selection"), this);
+    btnDelayAll       = new QPushButton(tr("Apply to all"), this);
+    btnDelayAll->setToolTip(tr("Replaces all delays in the list with this value."));
+    editLayout->addWidget(new QLabel(tr("Delay:"), this), 1, 0);
     editLayout->addWidget(spnDelay,          1, 1);
     editLayout->addWidget(btnInsertDelay,    1, 2);
     editLayout->addWidget(btnDelaySelection, 1, 3);
@@ -118,7 +118,7 @@ MacroRecorder::MacroRecorder(QWidget *parent) : QWidget(parent)
     auto *saveRow = new QHBoxLayout();
     lblStatus = new QLabel("", this);
     lblStatus->setWordWrap(true);
-    btnSave = new QPushButton("Speichern", this);
+    btnSave = new QPushButton(tr("Save"), this);
     saveRow->addWidget(lblStatus, 1);
     saveRow->addWidget(btnSave);
     root->addLayout(saveRow);
@@ -184,8 +184,8 @@ bool MacroRecorder::confirmDiscardChanges()
     if (!m_dirty)
         return true;
     const auto answer = QMessageBox::question(
-        this, "Ungespeicherte Änderungen",
-        QString("Makro %1 wurde geändert. Änderungen verwerfen?").arg(m_macroId),
+        this, tr("Unsaved changes"),
+        tr("Macro %1 has been changed. Discard the changes?").arg(m_macroId),
         QMessageBox::Discard | QMessageBox::Cancel, QMessageBox::Cancel);
     return answer == QMessageBox::Discard;
 }
@@ -212,8 +212,8 @@ void MacroRecorder::startRecording()
     qApp->installEventFilter(this);
 
     btnRecord->setChecked(true);
-    btnRecord->setText("■  Aufnahme stoppen");
-    lblStatus->setText("Aufnahme läuft … Tasten drücken, zum Beenden auf „Aufnahme stoppen“ klicken.");
+    btnRecord->setText("■  " + tr("Stop recording"));
+    lblStatus->setText(tr("Recording … press keys, click “Stop recording” to finish."));
     updateButtons();
 }
 
@@ -229,10 +229,10 @@ void MacroRecorder::stopRecording()
     m_pressedKeys.clear();
 
     btnRecord->setChecked(false);
-    btnRecord->setText("●  Aufnahme starten");
+    btnRecord->setText("●  " + tr("Start recording"));
     lblStatus->setText(stillPressed.isEmpty()
-        ? "Aufnahme beendet."
-        : QString("Aufnahme beendet. %1 noch gedrückte Taste(n) wurden automatisch losgelassen.")
+        ? tr("Recording finished.")
+        : tr("Recording finished. Keys still held were released automatically: %1")
               .arg(stillPressed.size()));
     updateButtons();
 }
@@ -256,7 +256,7 @@ bool MacroRecorder::eventFilter(QObject *watched, QEvent *event)
 
         const int code = linuxKeyCode(static_cast<int>(keyEvent->nativeScanCode()));
         if (code <= 0) {
-            lblStatus->setText("Taste konnte nicht erkannt werden (kein Scancode vom System).");
+            lblStatus->setText(tr("Key not recognized (the system sent no scan code)."));
             return true;
         }
         recordKey(code, event->type() == QEvent::KeyPress);
@@ -298,7 +298,7 @@ void MacroRecorder::recordKey(int keyCode, bool pressed)
     }
 
     appendEvent({pressed ? Event::Type::KeyDown : Event::Type::KeyUp, keyCode});
-    lblStatus->setText(QString("Aufnahme läuft … zuletzt: %1")
+    lblStatus->setText(tr("Recording … last: %1")
                            .arg(Event{pressed ? Event::Type::KeyDown : Event::Type::KeyUp,
                                       keyCode}.displayText()));
 }
@@ -402,7 +402,7 @@ void MacroRecorder::onClear()
     if (listEvents->count() == 0)
         return;
     const auto answer = QMessageBox::question(
-        this, "Alle löschen", "Alle Einträge des Makros entfernen?",
+        this, tr("Clear all"), tr("Remove all entries of this macro?"),
         QMessageBox::Yes | QMessageBox::No, QMessageBox::No);
     if (answer != QMessageBox::Yes)
         return;
@@ -439,7 +439,7 @@ void MacroRecorder::onApplyDelayToSelection()
     }
     if (changed > 0)
         setDirty(true);
-    lblStatus->setText(QString("%1 Wartezeit(en) geändert.").arg(changed));
+    lblStatus->setText(tr("Delays changed: %1").arg(changed));
 }
 
 void MacroRecorder::onApplyDelayToAll()
@@ -456,7 +456,7 @@ void MacroRecorder::onApplyDelayToAll()
     }
     if (changed > 0)
         setDirty(true);
-    lblStatus->setText(QString("%1 Wartezeit(en) auf %2 ms gesetzt.")
+    lblStatus->setText(tr("Delays set to %2 ms: %1")
                            .arg(changed).arg(spnDelay->value()));
 }
 
@@ -518,7 +518,7 @@ void MacroRecorder::loadFromFile()
         editName->clear();
         setEvents({});
         setDirty(false);
-        lblStatus->setText(QString("Makro %1 ist noch leer.").arg(m_macroId));
+        lblStatus->setText(tr("Macro %1 is still empty.").arg(m_macroId));
         return;
     }
 
@@ -545,13 +545,13 @@ void MacroRecorder::loadFromFile()
 
     if (parsed.invalidTokens.isEmpty()) {
         setDirty(false);
-        lblStatus->setText(QString("Makro %1 geladen (%2 Einträge).")
+        lblStatus->setText(tr("Macro %1 loaded (entries: %2).")
                                .arg(m_macroId).arg(parsed.events.size()));
     } else {
         // Ungueltige Eintraege werden beim naechsten Speichern entfernt.
         setDirty(true);
-        lblStatus->setText(QString("Makro %1 geladen. %2 ungültige(r) Eintrag/Einträge ignoriert "
-                                   "(z. B. „%3“). Beim Speichern werden sie entfernt.")
+        lblStatus->setText(tr("Macro %1 loaded. Invalid entries ignored: %2 (e.g. “%3”). "
+                              "They will be removed when saving.")
                                .arg(m_macroId)
                                .arg(parsed.invalidTokens.size())
                                .arg(parsed.invalidTokens.first()));
@@ -568,9 +568,9 @@ bool MacroRecorder::saveToFile()
         for (int code : unreleased)
             names << KeyNames::nameFor(code);
         const auto answer = QMessageBox::warning(
-            this, "Taste wird nicht losgelassen",
-            QString("Folgende Tasten werden gedrückt, aber nicht wieder losgelassen: %1\n\n"
-                    "Beim Abspielen bleiben sie gedrückt. Trotzdem speichern?")
+            this, tr("Key is not released"),
+            tr("These keys are pressed but never released: %1\n\n"
+               "They will stay pressed during playback. Save anyway?")
                 .arg(names.join(", ")),
             QMessageBox::Save | QMessageBox::Cancel, QMessageBox::Cancel);
         if (answer != QMessageBox::Save)
@@ -583,23 +583,23 @@ bool MacroRecorder::saveToFile()
     // QSaveFile schreibt atomar: der Treiber sieht nie eine halb geschriebene Datei.
     QSaveFile f(path);
     if (!f.open(QIODevice::WriteOnly | QIODevice::Text)) {
-        lblStatus->setText("Fehler: Datei konnte nicht geschrieben werden.");
+        lblStatus->setText(tr("Error: could not write the file."));
         return false;
     }
     QTextStream out(&f);
-    out << "# G13 Makro – bearbeitet von g13-gui\n";
+    out << "# G13 macro - edited by g13-gui\n";
     out << "name="     << editName->text().trimmed() << "\n";
     out << "id="       << m_macroId << "\n";
     out << "sequence=" << MacroSequence::serialize(list) << "\n";
     out.flush();
 
     if (!f.commit()) {
-        lblStatus->setText("Fehler: Datei konnte nicht geschrieben werden.");
+        lblStatus->setText(tr("Error: could not write the file."));
         return false;
     }
 
     setDirty(false);
-    lblStatus->setText(QString("Makro %1 gespeichert (%2 Einträge).")
+    lblStatus->setText(tr("Macro %1 saved (entries: %2).")
                            .arg(m_macroId).arg(list.size()));
     return true;
 }

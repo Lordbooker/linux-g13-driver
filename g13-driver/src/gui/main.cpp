@@ -2,9 +2,12 @@
 
 #include <QApplication>
 #include <QCommandLineParser>
+#include <QLibraryInfo>
+#include <QLocale>
 #include <QLocalServer>
 #include <QLocalSocket>
 #include <QTimer>
+#include <QTranslator>
 
 #include <unistd.h>
 
@@ -33,6 +36,25 @@ bool notifyRunningInstance(const QByteArray &message)
 // startet der Autostart oft, bevor die Taskleiste bereit ist.
 constexpr int TrayWaitSeconds = 30;
 
+// Laedt die Uebersetzungen passend zur Systemsprache (QLocale::system(), also
+// LANGUAGE/LC_ALL/LC_MESSAGES/LANG). Die eigenen Uebersetzungen sind im Programm
+// eingebettet (:/i18n/g13-gui_<sprache>.qm); fehlt eine Sprache, bleibt es bei
+// den englischen Texten aus dem Quelltext. Qts eigene Uebersetzungen (z. B.
+// Standard-Schaltflaechen wie "Cancel") werden geladen, sofern installiert.
+void installTranslations(QApplication &app)
+{
+    const QLocale locale;
+
+    auto *qtTranslator = new QTranslator(&app);
+    if (qtTranslator->load(locale, "qtbase", "_",
+                            QLibraryInfo::path(QLibraryInfo::TranslationsPath)))
+        app.installTranslator(qtTranslator);
+
+    auto *appTranslator = new QTranslator(&app);
+    if (appTranslator->load(locale, "g13-gui", "_", ":/i18n"))
+        app.installTranslator(appTranslator);
+}
+
 }
 
 int main(int argc, char *argv[])
@@ -43,17 +65,19 @@ int main(int argc, char *argv[])
     app.setOrganizationName("linux-g13-project");
     app.setDesktopFileName("g13-gui");          // Zuordnung zu g13-gui.desktop (Icon unter Wayland)
     app.setWindowIcon(MainWindow::appIcon());
+    installTranslations(app);
 
     // Fenster schliessen beendet die App nicht, solange das Tray-Symbol aktiv ist
     // (siehe MainWindow::closeEvent).
     app.setQuitOnLastWindowClosed(false);
 
     QCommandLineParser parser;
-    parser.setApplicationDescription("Konfigurationstool fuer den Logitech-G13-Treiber");
+    parser.setApplicationDescription(
+        QCoreApplication::translate("main", "Configuration tool for the Logitech G13 driver"));
     parser.addHelpOption();
     parser.addVersionOption();
     QCommandLineOption trayOption({"t", "tray"},
-        "Nur das Tray-Symbol starten, ohne Fenster (fuer den Autostart).");
+        QCoreApplication::translate("main", "Start only the tray icon, without a window (for autostart)."));
     parser.addOption(trayOption);
     parser.process(app);
     const bool trayOnly = parser.isSet(trayOption);
@@ -93,7 +117,7 @@ int main(int argc, char *argv[])
             }
             if (++attempts >= TrayWaitSeconds) {
                 timer->stop();
-                qInfo("g13-gui: Kein System-Tray verfuegbar, Tray-Modus wird beendet.");
+                qInfo("g13-gui: No system tray available, exiting tray mode.");
                 QCoreApplication::exit(0);
             }
         });

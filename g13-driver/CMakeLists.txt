@@ -38,7 +38,7 @@ pkg_check_modules(LIBUSB  REQUIRED libusb-1.0)
 
 # --- Dependencies (GUI) ---
 if(BUILD_CONFIG_TOOL)
-    find_package(Qt6 REQUIRED COMPONENTS Widgets Core Gui Network)
+    find_package(Qt6 REQUIRED COMPONENTS Widgets Core Gui Network LinguistTools)
     set(CMAKE_AUTOMOC ON)
     set(CMAKE_AUTORCC ON)
     set(CMAKE_AUTOUIC ON)
@@ -119,6 +119,21 @@ if(BUILD_CONFIG_TOOL)
         Qt6::Network    # QLocalServer/QLocalSocket fuer die Einzelinstanz
     )
     target_compile_definitions(g13-gui PRIVATE G13_VERSION="${G13_VERSION}")
+
+    # Uebersetzungen: Quelltexte sind Englisch (zugleich Rueckfallsprache).
+    # Die .qm-Dateien werden beim Bauen erzeugt und unter :/i18n eingebettet;
+    # g13-gui waehlt beim Start die passende Sprache (QLocale::system()).
+    # .ts-Dateien nach Textaenderungen aktualisieren: cmake --build build --target update_translations
+    set(G13_GUI_LANGUAGES de fr it es pt)
+    set(G13_GUI_TS_FILES)
+    foreach(lang IN LISTS G13_GUI_LANGUAGES)
+        list(APPEND G13_GUI_TS_FILES translations/g13-gui_${lang}.ts)
+    endforeach()
+    qt_add_translations(g13-gui
+        TS_FILES ${G13_GUI_TS_FILES}
+        RESOURCE_PREFIX "/i18n"
+        LUPDATE_OPTIONS -no-obsolete -locations none
+    )
 endif()
 
 # =========================================================

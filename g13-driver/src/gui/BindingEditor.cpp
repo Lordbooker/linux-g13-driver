@@ -42,7 +42,7 @@ static bool writeProps(const QString &path, const QMap<QString, QString> &map)
     if (!f.open(QIODevice::WriteOnly | QIODevice::Text))
         return false;
     QTextStream out(&f);
-    out << "# G13 Bindings – bearbeitet von g13-gui\n";
+    out << "# G13 bindings - edited by g13-gui\n";
     for (auto it = map.constBegin(); it != map.constEnd(); ++it)
         out << it.key() << "=" << it.value() << "\n";
     return true;
@@ -56,7 +56,7 @@ BindingEditor::BindingEditor(QWidget *parent) : QWidget(parent)
     auto *root = new QVBoxLayout(this);
 
     // Kopfzeile
-    auto *infoBox    = new QGroupBox("Aktuelle Auswahl", this);
+    auto *infoBox    = new QGroupBox(tr("Current selection"), this);
     auto *infoLayout = new QFormLayout(infoBox);
     lblProfile = new QLabel("1 (L1)", this);
     lblKey     = new QLabel("–", this);
@@ -64,17 +64,17 @@ BindingEditor::BindingEditor(QWidget *parent) : QWidget(parent)
     f.setBold(true);
     f.setPointSize(13);
     lblKey->setFont(f);
-    infoLayout->addRow("Profil:", lblProfile);
-    infoLayout->addRow("Taste:",  lblKey);
+    infoLayout->addRow(tr("Profile:"), lblProfile);
+    infoLayout->addRow(tr("Key:"),     lblKey);
     root->addWidget(infoBox);
 
     // Typ-Auswahl
-    auto *typeBox    = new QGroupBox("Aktionstyp", this);
+    auto *typeBox    = new QGroupBox(tr("Action type"), this);
     auto *typeLayout = new QVBoxLayout(typeBox);
     cmbType = new QComboBox(this);
-    cmbType->addItem("Tastencode (Pass-Through)");
-    cmbType->addItem("Makro");
-    cmbType->addItem("Keine Aktion");
+    cmbType->addItem(tr("Key code (pass-through)"));
+    cmbType->addItem(tr("Macro"));
+    cmbType->addItem(tr("No action"));
     typeLayout->addWidget(cmbType);
     root->addWidget(typeBox);
 
@@ -87,7 +87,7 @@ BindingEditor::BindingEditor(QWidget *parent) : QWidget(parent)
     cmbKeyName = new QComboBox(pageKey);
     for (const auto &[name, code] : KeyNames::all())
         cmbKeyName->addItem(QString("%1  (%2)").arg(name).arg(code), code);
-    pageKeyLayout->addRow("Taste:", cmbKeyName);
+    pageKeyLayout->addRow(tr("Key:"), cmbKeyName);
     stack->addWidget(pageKey);
 
     // Seite 1 – Makro
@@ -98,9 +98,9 @@ BindingEditor::BindingEditor(QWidget *parent) : QWidget(parent)
     // Wiederholungsmodus wie im Treiber (MacroAction):
     //   0 = einmal ausfuehren, 1 = wiederholen solange gedrueckt, n>1 = n-mal
     cmbRepeatMode = new QComboBox(pageMacro);
-    cmbRepeatMode->addItem("Einmal ausführen");
-    cmbRepeatMode->addItem("Wiederholen, solange gedrückt");
-    cmbRepeatMode->addItem("Mehrmals ausführen");
+    cmbRepeatMode->addItem(tr("Run once"));
+    cmbRepeatMode->addItem(tr("Repeat while held"));
+    cmbRepeatMode->addItem(tr("Run several times"));
     spnRepeats = new QSpinBox(pageMacro);
     spnRepeats->setRange(2, 100);
     spnRepeats->setValue(2);
@@ -108,11 +108,11 @@ BindingEditor::BindingEditor(QWidget *parent) : QWidget(parent)
     spnRepeats->setEnabled(false);
     connect(cmbRepeatMode, &QComboBox::currentIndexChanged, spnRepeats,
             [this](int mode) { spnRepeats->setEnabled(mode == 2); });
-    pageMacroLayout->addRow("Makro-ID:",   spnMacroId);
-    pageMacroLayout->addRow("Ausführung:", cmbRepeatMode);
-    pageMacroLayout->addRow("Anzahl:",     spnRepeats);
+    pageMacroLayout->addRow(tr("Macro ID:"), spnMacroId);
+    pageMacroLayout->addRow(tr("Run mode:"), cmbRepeatMode);
+    pageMacroLayout->addRow(tr("Count:"),    spnRepeats);
     auto *lblRepeatHint = new QLabel(
-        "Erneuter Tastendruck während eines laufenden Makros stoppt es.", pageMacro);
+        tr("Pressing the key again while the macro is running stops it."), pageMacro);
     lblRepeatHint->setWordWrap(true);
     pageMacroLayout->addRow(lblRepeatHint);
     stack->addWidget(pageMacro);
@@ -123,7 +123,7 @@ BindingEditor::BindingEditor(QWidget *parent) : QWidget(parent)
     root->addWidget(stack);
 
     // Speichern
-    btnSave = new QPushButton("Speichern", this);
+    btnSave = new QPushButton(tr("Save"), this);
     btnSave->setEnabled(false);
     root->addWidget(btnSave);
 
@@ -154,7 +154,7 @@ void BindingEditor::setKey(const QString &keyName)
         cmbType->setEnabled(false);
         stack->setEnabled(false);
         btnSave->setEnabled(false);
-        lblStatus->setText("Diese Taste schaltet das Profil um und ist nicht belegbar.");
+        lblStatus->setText(tr("This key switches the profile and cannot be assigned."));
         return;
     }
 
@@ -249,8 +249,8 @@ void BindingEditor::saveToFile()
     }
 
     if (writeProps(bindingFilePath(), props))
-        lblStatus->setText(QString("Gespeichert: %1 → %2")
+        lblStatus->setText(tr("Saved: %1 → %2")
             .arg(m_currentKey, props.value(fileKey, "–")));
     else
-        lblStatus->setText("Fehler: Datei konnte nicht geschrieben werden.");
+        lblStatus->setText(tr("Error: could not write the file."));
 }

@@ -1,6 +1,8 @@
 #include "MacroSequence.h"
 #include "KeyNames.h"
 
+#include <QCoreApplication>
+
 namespace MacroSequence {
 
 QString Event::token() const
@@ -16,9 +18,12 @@ QString Event::token() const
 QString Event::displayText() const
 {
     switch (type) {
-    case Type::KeyDown: return QString("↓  %1 drücken").arg(KeyNames::nameFor(value));
-    case Type::KeyUp:   return QString("↑  %1 loslassen").arg(KeyNames::nameFor(value));
-    case Type::Delay:   return QString("⏱  %1 ms warten").arg(value);
+    case Type::KeyDown:
+        return "↓  " + QCoreApplication::translate("MacroSequence", "press %1").arg(KeyNames::nameFor(value));
+    case Type::KeyUp:
+        return "↑  " + QCoreApplication::translate("MacroSequence", "release %1").arg(KeyNames::nameFor(value));
+    case Type::Delay:
+        return "⏱  " + QCoreApplication::translate("MacroSequence", "wait %1 ms").arg(value);
     }
     return {};
 }

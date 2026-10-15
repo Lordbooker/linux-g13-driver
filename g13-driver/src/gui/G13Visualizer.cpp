@@ -165,7 +165,7 @@ void G13Visualizer::paintEvent(QPaintEvent *)
     p.setRenderHint(QPainter::SmoothPixmapTransform);
 
     if (m_image.isNull()) {
-        p.drawText(rect(), Qt::AlignCenter, "G13-Bild konnte nicht geladen werden.");
+        p.drawText(rect(), Qt::AlignCenter, tr("Could not load the G13 image."));
         return;
     }
 
@@ -265,10 +265,10 @@ bool G13Visualizer::event(QEvent *event)
             QString text = G13Keys::displayName(key);
             if (!G13Keys::isConfigurable(key))
                 text += key == QString("L%1").arg(m_profile + 1)
-                            ? " – aktives Profil, nicht belegbar"
-                            : " – Profiltaste, nicht belegbar";
+                            ? " – " + tr("active profile, cannot be assigned")
+                            : " – " + tr("profile key, cannot be assigned");
             else if (m_bound.contains(key))
-                text += " – belegt";
+                text += " – " + tr("assigned");
             QToolTip::showText(help->globalPos(), text, this);
         }
         return true;

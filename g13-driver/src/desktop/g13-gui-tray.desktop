@@ -2,8 +2,16 @@
 Type=Application
 Name=G13 Tray Icon
 Name[de]=G13 Tray-Symbol
+Name[es]=Icono de bandeja G13
+Name[fr]=Icône de notification G13
+Name[it]=Icona di notifica G13
+Name[pt]=Ícone da bandeja G13
 Comment=Tray icon for the Logitech G13 driver
 Comment[de]=Tray-Symbol für den Logitech-G13-Treiber
+Comment[es]=Icono de bandeja del controlador Logitech G13
+Comment[fr]=Icône de notification du pilote Logitech G13
+Comment[it]=Icona di notifica del driver Logitech G13
+Comment[pt]=Ícone da bandeja do driver Logitech G13
 Exec=g13-gui --tray
 Icon=g13-gui
 Terminal=false

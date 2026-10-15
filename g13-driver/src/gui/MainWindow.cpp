@@ -41,7 +41,7 @@ MainWindow::MainWindow(QWidget *parent)
     // "Beenden" beendet das Config-Tool inkl. Tray-Symbol (der Treiber laeuft weiter).
     connect(ui->actionQuit,         &QAction::triggered, qApp, &QApplication::quit);
 
-    statusBar()->showMessage("G13 Config Tool bereit.", 3000);
+    statusBar()->showMessage(tr("G13 Config Tool ready."), 3000);
 }
 
 MainWindow::~MainWindow()
@@ -54,14 +54,14 @@ MainWindow::~MainWindow()
 // ---------------------------------------------------------------------------
 void MainWindow::setupToolbar()
 {
-    QToolBar *tb = addToolBar("Hauptleiste");
+    QToolBar *tb = addToolBar(tr("Main toolbar"));
     tb->setMovable(false);
-    tb->addWidget(new QLabel("  Profil: ", this));
+    tb->addWidget(new QLabel("  " + tr("Profile:") + " ", this));
 
     m_profileCombo = new QComboBox(this);
     // Die Profile werden am Geraet mit L1..L4 (Tasten unter dem Display) gewaehlt.
     for (int i = 1; i <= 4; ++i)
-        m_profileCombo->addItem(QString("Profil %1  (L%1)").arg(i));
+        m_profileCombo->addItem(tr("Profile %1  (L%1)").arg(i));
     tb->addWidget(m_profileCombo);
     tb->addSeparator();
     tb->addAction(ui->actionSave_Profile);
@@ -102,27 +102,27 @@ bool MainWindow::setupTrayIcon()
         return false;
 
     m_tray = new QSystemTrayIcon(appIcon(), this);
-    m_tray->setToolTip("G13 Config Tool");
+    m_tray->setToolTip(tr("G13 Config Tool"));
 
     auto *menu = new QMenu(this);
-    auto *actOpen = menu->addAction("Konfiguration öffnen");
+    auto *actOpen = menu->addAction(tr("Open configuration"));
     menu->addSeparator();
-    m_actStatus = menu->addAction("Treiber: wird geprüft …");
+    m_actStatus = menu->addAction(tr("Driver: checking …"));
     m_actStatus->setEnabled(false);
-    m_actStartStop = menu->addAction("Treiber stoppen");
-    m_actRestart   = menu->addAction("Treiber neu starten");
+    m_actStartStop = menu->addAction(tr("Stop driver"));
+    m_actRestart   = menu->addAction(tr("Restart driver"));
     menu->addSeparator();
-    auto *actQuit = menu->addAction("Tray-Symbol beenden");
+    auto *actQuit = menu->addAction(tr("Quit tray icon"));
 
     connect(actOpen, &QAction::triggered, this, &MainWindow::showWindow);
     connect(m_actStartStop, &QAction::triggered, this, [this] {
         if (m_driverState == DriverState::Running)
-            runSystemctl("stop", "Treiber gestoppt.");
+            runSystemctl("stop", tr("Driver stopped."));
         else
-            runSystemctl("start", "Treiber gestartet.");
+            runSystemctl("start", tr("Driver started."));
     });
     connect(m_actRestart, &QAction::triggered, this, [this] {
-        runSystemctl("restart", "Treiber neu gestartet.");
+        runSystemctl("restart", tr("Driver restarted."));
     });
     connect(actQuit, &QAction::triggered, qApp, &QApplication::quit);
     connect(menu, &QMenu::aboutToShow, this, &MainWindow::refreshDriverStatus);
@@ -166,15 +166,15 @@ void MainWindow::applyDriverStatus(DriverState state)
 
     QString text;
     switch (state) {
-    case DriverState::Running: text = "Treiber: läuft";        break;
-    case DriverState::Stopped: text = "Treiber: gestoppt";     break;
-    case DriverState::Unknown: text = "Treiber: unbekannt";    break;
+    case DriverState::Running: text = tr("Driver: running");  break;
+    case DriverState::Stopped: text = tr("Driver: stopped");  break;
+    case DriverState::Unknown: text = tr("Driver: unknown");  break;
     }
     m_actStatus->setText(text);
-    m_actStartStop->setText(state == DriverState::Running ? "Treiber stoppen" : "Treiber starten");
+    m_actStartStop->setText(state == DriverState::Running ? tr("Stop driver") : tr("Start driver"));
     m_actStartStop->setEnabled(state != DriverState::Unknown);
     m_actRestart->setEnabled(state != DriverState::Unknown);
-    m_tray->setToolTip("G13 Config Tool – " + text);
+    m_tray->setToolTip(tr("G13 Config Tool") + " – " + text);
 }
 
 // Startet/stoppt den Treiber ueber den systemd-User-Dienst und meldet das Ergebnis.
@@ -188,7 +188,8 @@ void MainWindow::runSystemctl(const QString &verb, const QString &successMessage
                 m_tray->showMessage("G13", successMessage, QSystemTrayIcon::Information, 3000);
             } else {
                 const QString err = QString::fromLocal8Bit(proc->readAllStandardError()).trimmed();
-                m_tray->showMessage("G13", "Aktion fehlgeschlagen" + (err.isEmpty() ? QString() : ": " + err),
+                m_tray->showMessage("G13", err.isEmpty() ? tr("Action failed.")
+                                                         : tr("Action failed: %1").arg(err),
                                     QSystemTrayIcon::Warning, 5000);
             }
         }
@@ -198,7 +199,7 @@ void MainWindow::runSystemctl(const QString &verb, const QString &successMessage
     connect(proc, &QProcess::errorOccurred, this, [this, proc](QProcess::ProcessError error) {
         if (error == QProcess::FailedToStart) {
             if (m_tray)
-                m_tray->showMessage("G13", "systemctl konnte nicht gestartet werden.",
+                m_tray->showMessage("G13", tr("Could not run systemctl."),
                                     QSystemTrayIcon::Warning, 5000);
             proc->deleteLater();
         }
@@ -212,23 +213,23 @@ void MainWindow::runSystemctl(const QString &verb, const QString &successMessage
 void MainWindow::onProfileComboChanged(int index)
 {
     emit profileChanged(index);
-    statusBar()->showMessage(QString("Profil %1 (L%1) aktiv.").arg(index + 1), 2000);
+    statusBar()->showMessage(tr("Profile %1 (L%1) active.").arg(index + 1), 2000);
 }
 
 void MainWindow::onSaveProfile()
 {
     statusBar()->showMessage(
-        "Profil ist gespeichert – der Daemon erkennt Änderungen automatisch.", 4000);
+        tr("Profile is saved – the driver picks up changes automatically."), 4000);
 }
 
 void MainWindow::onAbout()
 {
-    QMessageBox::about(this, "Über G13 Config Tool",
+    QMessageBox::about(this, tr("About G13 Config Tool"),
         "<h2>Linux G13 Driver</h2>"
-        "<p>Version " G13_VERSION "</p>"
-        "<p>Lizenz: GNU GPL v2. Basiert auf linux-g13-driver von Jim Gupta.</p>"
-        "<p>Änderungen werden direkt in <code>~/.config/g13/</code> gespeichert.<br>"
-        "Der Daemon erkennt Dateiänderungen per Live-Reload automatisch.</p>"
+        "<p>" + tr("Version %1").arg(QStringLiteral(G13_VERSION)) + "</p>"
+        "<p>" + tr("License: GNU GPL v2. Based on linux-g13-driver by Jim Gupta.") + "</p>"
+        "<p>" + tr("Changes are saved directly to %1.").arg("<code>~/.config/g13/</code>") + "<br>"
+        + tr("The driver reloads changed files automatically.") + "</p>"
     );
 }
 
@@ -252,8 +253,8 @@ void MainWindow::closeEvent(QCloseEvent *event)
         hide();
         if (!m_trayHintShown) {
             m_tray->showMessage(
-                "G13 Config Tool",
-                "Läuft im Hintergrund weiter. Tray-Symbol anklicken zum Öffnen.",
+                tr("G13 Config Tool"),
+                tr("Still running in the background. Click the tray icon to open it."),
                 QSystemTrayIcon::Information, 3000);
             m_trayHintShown = true;
         }

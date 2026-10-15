@@ -77,6 +77,8 @@ Schnittstelle (IPC) gibt es nicht. Das Tray-Menü steuert den Treiber über `sys
 | Tray-Symbol: Konfiguration öffnen, Treiber starten/stoppen/neu starten, Status | Fertig |
 | XDG-Autostart des Tray-Symbols, Menüeintrag, eigenes App-Icon | Fertig |
 | Einzelinstanz: erneuter Start öffnet das vorhandene Fenster | Fertig |
+| Mehrsprachigkeit nach Systemsprache (Qt Linguist): Englisch als Quelle/Rückfall, Deutsch, Französisch, Italienisch, Spanisch, Portugiesisch | Fertig |
+| Treiber-Logmeldungen einheitlich Englisch | Fertig |
 
 ---
 
@@ -92,7 +94,7 @@ Schnittstelle (IPC) gibt es nicht. Das Tray-Menü steuert den Treiber über `sys
 | Default-Bindings | Die eingebauten Standardbelegungen enthalten `G22`/`G23`, die keiner Taste entsprechen. |
 | Makro-Dateien | Änderungen an `macro-*.properties` wirken erst beim nächsten Laden der Bindings. |
 | `g13_monitor.py` | Schreibt nur nach `/tmp/g13-lcd` und findet die Pipe unter `$XDG_RUNTIME_DIR` nicht. |
-| Kleinigkeiten | Veralteter `install-user`-Kommentar in `g13.service`; Log-Meldungen gemischt Deutsch/Englisch. |
+| Kleinigkeiten | Veralteter `install-user`-Kommentar in `g13.service`. |
 
 ### 4.2 Ideen
 
@@ -143,5 +145,5 @@ Im Repository gibt es bisher keine automatisierten Tests.
 | USB | libusb-1.0 |
 | Tastatur-Ereignisse | uinput / `linux/input.h` |
 | Geräteerkennung | Polling über libusb (1 s) |
-| GUI | Qt6 (Widgets, Network für die Einzelinstanz) |
+| GUI | Qt6 (Widgets, Network für die Einzelinstanz), Qt Linguist für Übersetzungen |
 | Dienst | systemd-User-Unit, udev-Regel mit `uaccess` |

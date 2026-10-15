@@ -1,5 +1,6 @@
 #include "G13Keys.h"
 
+#include <QCoreApplication>
 #include <QHash>
 #include <QSet>
 
@@ -66,16 +67,19 @@ bool isConfigurable(const QString &keyName)
 
 QString displayName(const QString &keyName)
 {
-    static const QHash<QString, QString> names = {
-        {"LEFT",        "Daumentaste links"},
-        {"DOWN",        "Daumentaste unten"},
-        {"TOP",         "Joystick drücken"},
-        {"STICK_UP",    "Joystick ↑"},
-        {"STICK_LEFT",  "Joystick ←"},
-        {"STICK_RIGHT", "Joystick →"},
-        {"STICK_DOWN",  "Joystick ↓"},
+    // Texte werden erst beim Abruf uebersetzt (Sprache steht beim Start fest).
+    static const QHash<QString, const char *> names = {
+        {"LEFT",        QT_TRANSLATE_NOOP("G13Keys", "Left thumb key")},
+        {"DOWN",        QT_TRANSLATE_NOOP("G13Keys", "Lower thumb key")},
+        {"TOP",         QT_TRANSLATE_NOOP("G13Keys", "Joystick press")},
+        {"STICK_UP",    QT_TRANSLATE_NOOP("G13Keys", "Joystick ↑")},
+        {"STICK_LEFT",  QT_TRANSLATE_NOOP("G13Keys", "Joystick ←")},
+        {"STICK_RIGHT", QT_TRANSLATE_NOOP("G13Keys", "Joystick →")},
+        {"STICK_DOWN",  QT_TRANSLATE_NOOP("G13Keys", "Joystick ↓")},
     };
-    return names.value(keyName, keyName);
+    const auto it = names.constFind(keyName);
+    return it == names.constEnd() ? keyName
+                                  : QCoreApplication::translate("G13Keys", it.value());
 }
 
 }

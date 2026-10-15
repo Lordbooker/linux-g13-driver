@@ -72,11 +72,11 @@ static void reap_finished_handlers() {
             it->second.thread.join();
         if (s == HandlerState::OpenFailed) {
             retry_after[it->first] = std::chrono::steady_clock::now() + OpenRetryDelay;
-            syslog(LOG_WARNING, "G13-Geraet (ID: %x) konnte nicht geoeffnet werden. "
-                                "Neuer Versuch in %lld s.", it->first,
+            syslog(LOG_WARNING, "Could not open G13 device (ID: %x). "
+                                "Retrying in %lld s.", it->first,
                    static_cast<long long>(OpenRetryDelay.count()));
         } else {
-            syslog(LOG_INFO, "Handler fuer G13-Geraet (ID: %x) beendet.", it->first);
+            syslog(LOG_INFO, "Handler for G13 device (ID: %x) finished.", it->first);
         }
         it = g13_instances.erase(it);
     }
@@ -107,7 +107,7 @@ static void find_and_manage_devices() {
                 retry_after.erase(r);
             }
 
-            syslog(LOG_INFO, "Neues G13-Geraet gefunden (ID: %x). Starte Handler.", key);
+            syslog(LOG_INFO, "New G13 device found (ID: %x). Starting handler.", key);
             libusb_ref_device(devs[i]);
             auto state = std::make_shared<std::atomic<HandlerState>>(HandlerState::Running);
             g13_instances[key] = DeviceHandler{std::thread(executeG13, devs[i], state), state};
@@ -128,7 +128,7 @@ static void device_management_thread_loop() {
 // Laeuft im Haupt-Thread, nachdem der Geraete-Management-Thread beendet ist.
 // Alle Geraete-Threads werden gejoint, bevor uinput und libusb freigegeben werden.
 static void shutdown_driver() {
-    syslog(LOG_INFO, "Fahre Treiber herunter...");
+    syslog(LOG_INFO, "Shutting down driver...");
 
     // Threads unter Lock aus der Map nehmen, aber ausserhalb des Locks joinen.
     std::map<uint16_t, DeviceHandler> handlers;
@@ -143,7 +143,7 @@ static void shutdown_driver() {
 
     UInput::close_uinput();
     libusb_exit(ctx);
-    syslog(LOG_INFO, "Shutdown abgeschlossen.");
+    syslog(LOG_INFO, "Shutdown complete.");
     closelog();
 }
 
@@ -156,15 +156,15 @@ static void signal_handler(int /*signum*/) {
 // --- Einstiegspunkt ---
 int main(int /*argc*/, char * /*argv*/[]) {
     openlog("linux-g13-driver", LOG_PID | LOG_CONS, LOG_USER);
-    syslog(LOG_INFO, "G13-Treiber startet (Version %s)...", G13_VERSION);
+    syslog(LOG_INFO, "G13 driver starting (version %s)...", G13_VERSION);
 
     if (!UInput::create_uinput()) {
-        syslog(LOG_ERR, "uinput konnte nicht initialisiert werden. Beende.");
+        syslog(LOG_ERR, "Could not initialize uinput. Exiting.");
         return 1;
     }
 
     if (libusb_init(&ctx) < 0) {
-        syslog(LOG_ERR, "libusb konnte nicht initialisiert werden. Beende.");
+        syslog(LOG_ERR, "Could not initialize libusb. Exiting.");
         UInput::close_uinput();
         return 1;
     }
@@ -172,12 +172,12 @@ int main(int /*argc*/, char * /*argv*/[]) {
     std::signal(SIGINT,  signal_handler);
     std::signal(SIGTERM, signal_handler);
 
-    syslog(LOG_INFO, "Treiber aktiv. Warte auf G13-Geraete...");
+    syslog(LOG_INFO, "Driver active. Waiting for G13 devices...");
 
     try {
         device_thread = std::thread(device_management_thread_loop);
     } catch (const std::system_error &e) {
-        syslog(LOG_ERR, "Thread konnte nicht erstellt werden: %s", e.what());
+        syslog(LOG_ERR, "Could not create thread: %s", e.what());
         UInput::close_uinput();
         libusb_exit(ctx);
         return 1;

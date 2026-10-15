@@ -23,7 +23,7 @@ case "$ID" in
         apt-get update -q
         apt-get install -y -q --no-install-recommends \
             build-essential cmake pkg-config git ca-certificates file dpkg-dev \
-            libusb-1.0-0-dev qt6-base-dev libgl-dev
+            libusb-1.0-0-dev qt6-base-dev qt6-tools-dev qt6-tools-dev-tools qt6-l10n-tools libgl-dev
         # libgl-dev: Qt 6.2 (Ubuntu 22.04) findet Qt6::Gui sonst nicht (WrapOpenGL)
         GENERATOR=DEB
         # z. B. 1~debian13 oder 1~ubuntu24.04 – eindeutige Dateinamen je System
@@ -32,7 +32,7 @@ case "$ID" in
     fedora)
         dnf install -y -q \
             gcc-c++ make cmake pkgconf-pkg-config git rpm-build \
-            libusb1-devel qt6-qtbase-devel
+            libusb1-devel qt6-qtbase-devel qt6-qttools-devel
         GENERATOR=RPM
         RELEASE="1"          # %{?dist} (z. B. .fc44) haengt CPack an
         ;;

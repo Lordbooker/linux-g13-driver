@@ -48,7 +48,9 @@ set(CPACK_DEBIAN_PACKAGE_SHLIBDEPS    ON)     # Abhaengigkeiten aus den Binaries
 # eigenen Paket, das libqt6gui6 nicht ueberall mitzieht (z. B. Ubuntu 22.04).
 # Ohne sie startet g13-gui nicht. Wird mit den shlibdeps zusammengefuehrt.
 set(CPACK_DEBIAN_PACKAGE_DEPENDS      "qt6-qpa-plugins")
-set(CPACK_DEBIAN_PACKAGE_RECOMMENDS   "qt6-wayland")   # native Wayland-Sitzungen
+# qt6-wayland: native Wayland-Sitzungen; qt6-translations-l10n: Qts eigene
+# Texte (z. B. Standard-Schaltflaechen) in der Systemsprache.
+set(CPACK_DEBIAN_PACKAGE_RECOMMENDS   "qt6-wayland, qt6-translations-l10n")
 set(CPACK_DEBIAN_PACKAGE_CONTROL_EXTRA
     "${CMAKE_CURRENT_SOURCE_DIR}/packaging/deb/postinst"
     "${CMAKE_CURRENT_SOURCE_DIR}/packaging/deb/postrm"
@@ -66,7 +68,8 @@ set(CPACK_RPM_PACKAGE_GROUP           "System Environment/Daemons")
 set(CPACK_RPM_PACKAGE_URL             "${CPACK_PACKAGE_HOMEPAGE_URL}")
 set(CPACK_RPM_PACKAGE_DESCRIPTION     "${CPACK_PACKAGE_DESCRIPTION}")
 set(CPACK_RPM_PACKAGE_AUTOREQ         ON)     # Abhaengigkeiten aus den Binaries
-set(CPACK_RPM_PACKAGE_SUGGESTS        "qt6-qtwayland")  # native Wayland-Sitzungen
+# qt6-qtwayland: native Wayland-Sitzungen; qt6-qttranslations: Qts eigene Texte
+set(CPACK_RPM_PACKAGE_SUGGESTS        "qt6-qtwayland, qt6-qttranslations")
 set(CPACK_RPM_POST_INSTALL_SCRIPT_FILE   "${CMAKE_CURRENT_SOURCE_DIR}/packaging/rpm/post")
 set(CPACK_RPM_POST_UNINSTALL_SCRIPT_FILE "${CMAKE_CURRENT_SOURCE_DIR}/packaging/rpm/postun")
 # Verzeichnisse, die bereits anderen Systempaketen gehoeren, nicht beanspruchen

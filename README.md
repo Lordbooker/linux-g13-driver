@@ -53,6 +53,9 @@ The rest of this section describes building from source.
 * CMake >= 3.20
 * `libusb-1.0` (development headers)
 * Qt6 Base (Widgets, Core, Gui, Network) – only needed for the config tool
+* Qt6 Linguist tools (`lrelease`, CMake module `Qt6LinguistTools`) – translations of the config
+  tool (`qt6-tools` on Arch, `qt6-tools-dev`, `qt6-tools-dev-tools` and `qt6-l10n-tools` on
+  Debian/Ubuntu, `qt6-qttools-devel` on Fedora)
 * Optional: Python 3 with `psutil` for the example LCD monitor script
 
 GTK3, AppIndicator and Java are **no longer required**.
@@ -206,10 +209,10 @@ g13-gui --tray &
 
 * **Left click** – open or hide the configuration window.
 * **Right click** – menu:
-  * *Konfiguration öffnen*
-  * driver status (*läuft* / *gestoppt*), *Treiber starten/stoppen*, *Treiber neu starten*
+  * *Open configuration*
+  * driver status (*running* / *stopped*), *Start/Stop driver*, *Restart driver*
     (controls the systemd user service `g13`)
-  * *Tray-Symbol beenden* – closes only the tray icon; the driver keeps running.
+  * *Quit tray icon* – closes only the tray icon; the driver keeps running.
 
 The driver itself runs independently of the tray icon as a systemd user service.
 
@@ -218,8 +221,8 @@ The driver itself runs independently of the tray icon as a systemd user service.
 Without a tray, `g13-gui --tray` exits quietly after 30 seconds; start the config tool from the
 application menu instead.
 
-**Disable the autostart:** turn off "G13 Tray Icon" ("G13 Tray-Symbol" on German desktops) in
-your desktop's autostart settings, or
+**Disable the autostart:** turn off "G13 Tray Icon" (shown translated on non-English desktops,
+e.g. "G13 Tray-Symbol") in your desktop's autostart settings, or
 create `~/.config/autostart/g13-gui-tray.desktop` containing:
 
 ```ini
@@ -238,30 +241,50 @@ g13-gui
 Only one instance runs at a time: starting `g13-gui` again opens the window of the running
 instance.
 
-Select the profile to edit in the toolbar (**Profil 1–4**, selected on the device with
+Select the profile to edit in the toolbar (**Profile 1–4**, selected on the device with
 **L1–L4**, correspond to `bindings-0.properties` … `bindings-3.properties`; the active profile's
 L key is highlighted in the image). All changes are written directly to `~/.config/g13/`.
 
 * **Key Bindings** – click a key in the G13 image (keys with a green dot are bound in the
   active profile; dashed outlines mark the profile keys L1–L4, which cannot be bound), then
   choose:
-  * *Tastencode (Pass-Through)*: the key sends a normal keyboard key,
-  * *Makro*: the key runs a macro – choose the macro ID and *Ausführung*: *Einmal ausführen*,
-    *Wiederholen, solange gedrückt* or *Mehrmals ausführen* (with a count),
-  * *Keine Aktion*: the key is unbound.
+  * *Key code (pass-through)*: the key sends a normal keyboard key,
+  * *Macro*: the key runs a macro – choose the macro ID and the *Run mode*: *Run once*,
+    *Repeat while held* or *Run several times* (with a count),
+  * *No action*: the key is unbound.
 
-  Then click *Speichern*.
+  Then click *Save*.
 * **Backlight Color** – choose the RGB color of the profile.
 * **Macro Recorder** – create macros:
-  * *Aufnahme starten*: records key presses including their timing. The window must be in the
+  * *Start recording*: records key presses including their timing. The window must be in the
     foreground; shortcuts handled by your desktop (e.g. Alt+Tab) cannot be recorded.
   * The macro is shown as a list of steps (press, release, wait). Steps can be moved, removed
     or inserted manually.
-  * *Auf alle anwenden* replaces all recorded delays with a fixed value.
-  * *Speichern* warns if a key is pressed but never released.
+  * *Apply to all* replaces all recorded delays with a fixed value.
+  * *Save* warns if a key is pressed but never released.
 
 Closing the window keeps the tool running in the system tray (if your desktop provides one).
-*File → Quit* or *Tray-Symbol beenden* closes it completely; the driver keeps running.
+*File → Quit* or *Quit tray icon* closes it completely; the driver keeps running.
+
+### Languages
+
+The config tool follows the system language (`LANGUAGE`, `LC_ALL`, `LC_MESSAGES`, `LANG`).
+Translations are included for **German, French, Italian, Spanish and Portuguese**; all other
+languages use English. The translations are built into `g13-gui`, no extra files are installed.
+Standard dialog buttons (e.g. *Cancel*) come from Qt's own translations – package
+`qt6-translations` (Arch), `qt6-translations-l10n` (Debian/Ubuntu) or `qt6-qttranslations`
+(Fedora). To start the tool in another language, e.g. English:
+
+```bash
+LANGUAGE=en g13-gui
+```
+
+The driver's log messages (`journalctl --user -u g13`) are always English.
+
+**Adding a language:** add the language code to `G13_GUI_LANGUAGES` in
+`g13-driver/CMakeLists.txt`, run `cmake --build build --target update_translations` to create
+`g13-driver/translations/g13-gui_<code>.ts`, translate it with Qt Linguist (`linguist6` or
+`linguist`) and rebuild. The same target updates all `.ts` files after text changes in the code.
 
 ### When do changes take effect?
 

@@ -1,5 +1,6 @@
 #include "KeyNames.h"
 
+#include <QCoreApplication>
 #include <QHash>
 
 namespace KeyNames {
@@ -42,7 +43,9 @@ QString nameFor(int code)
             map.insert(keyCode, name);
         return map;
     }();
-    return byCode.value(code, QString("Taste %1").arg(code));
+    const auto it = byCode.constFind(code);
+    return it != byCode.constEnd() ? it.value()
+                                   : QCoreApplication::translate("KeyNames", "Key %1").arg(code);
 }
 
 }
