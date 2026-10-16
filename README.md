@@ -374,10 +374,32 @@ sequence=kd.29,d.40,kd.46,d.60,ku.46,d.30,ku.29
 
 Tokens are separated by commas without spaces.
 
+### `settings.properties`
+
+Settings that apply to all profiles:
+
+```ini
+# 1 = play the start animation (default), 0 = show the logo directly
+intro=1
+```
+
+The config tool changes it under *Options → Start animation on the display*.
+
 ## Use with External Tools
 
 The driver works without the config tool: it creates a default mapping if no configuration
 exists. You can then remap the keys with tools like **Input Remapper**.
+
+## Start Animation
+
+When the G13 is connected or the driver starts, a flame wall rises on the LCD, burns the
+"G13" logo of the firmware and reveals Tux and a new logo as it recedes (about 9 seconds).
+The keys work normally while it plays. Text written to the LCD pipe stops the animation
+immediately.
+
+Turn it off in the config tool (*Options → Start animation on the display*) or with `intro=0`
+in `~/.config/g13/settings.properties`; the logo is then shown directly. The setting is read
+whenever the G13 is (re)connected or the driver starts.
 
 ## LCD Scripting
 

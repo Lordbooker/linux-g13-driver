@@ -15,6 +15,12 @@
 #include <QApplication>
 #include <QProcess>
 #include <QTimer>
+#include <QDir>
+#include <QFile>
+#include <QFileInfo>
+#include <QSaveFile>
+#include <QStandardPaths>
+#include <QTextStream>
 
 MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent)
@@ -22,6 +28,7 @@ MainWindow::MainWindow(QWidget *parent)
 {
     ui->setupUi(this);
     setupToolbar();
+    setupOptionsMenu();
     setupTrayIcon();
 
     // Klick auf Taste im Visualizer → Binding-Editor wechseln
@@ -68,6 +75,98 @@ void MainWindow::setupToolbar()
 
     connect(m_profileCombo, &QComboBox::currentIndexChanged,
             this, &MainWindow::onProfileComboChanged);
+}
+
+// ---------------------------------------------------------------------------
+// Optionen (globale Einstellungen in ~/.config/g13/settings.properties)
+// ---------------------------------------------------------------------------
+namespace {
+
+QString settingsFilePath()
+{
+    return QStandardPaths::writableLocation(QStandardPaths::ConfigLocation)
+           + "/g13/settings.properties";
+}
+
+// Liest einen Wert; fehlt der Schluessel, gilt defaultValue.
+QString readSetting(const QString &key, const QString &defaultValue)
+{
+    QFile f(settingsFilePath());
+    if (!f.open(QIODevice::ReadOnly | QIODevice::Text))
+        return defaultValue;
+    QString value = defaultValue;
+    QTextStream in(&f);
+    while (!in.atEnd()) {
+        const QString line = in.readLine().trimmed();
+        if (line.isEmpty() || line.startsWith('#'))
+            continue;
+        const int eq = line.indexOf('=');
+        if (eq > 0 && line.left(eq).trimmed() == key)
+            value = line.mid(eq + 1).trimmed();
+    }
+    return value;
+}
+
+// Setzt einen Wert und laesst alle anderen Zeilen (auch Kommentare) unveraendert.
+bool writeSetting(const QString &key, const QString &value)
+{
+    QStringList lines;
+    QFile in(settingsFilePath());
+    if (in.open(QIODevice::ReadOnly | QIODevice::Text)) {
+        QTextStream ts(&in);
+        while (!ts.atEnd())
+            lines << ts.readLine();
+        in.close();
+    } else {
+        lines << "# G13 settings - edited by g13-gui";
+    }
+    bool replaced = false;
+    for (QString &line : lines) {
+        const QString t = line.trimmed();
+        const int eq = t.indexOf('=');
+        if (!t.startsWith('#') && eq > 0 && t.left(eq).trimmed() == key) {
+            line = key + "=" + value;
+            replaced = true;
+        }
+    }
+    if (!replaced)
+        lines << key + "=" + value;
+
+    QDir().mkpath(QFileInfo(settingsFilePath()).absolutePath());
+    QSaveFile out(settingsFilePath());
+    if (!out.open(QIODevice::WriteOnly | QIODevice::Text))
+        return false;
+    QTextStream ts(&out);
+    for (const QString &line : lines)
+        ts << line << "\n";
+    ts.flush();
+    return out.commit();
+}
+
+}
+
+void MainWindow::setupOptionsMenu()
+{
+    auto *menu = new QMenu(tr("Options"), this);
+    menuBar()->insertMenu(ui->menuHelp->menuAction(), menu);
+
+    m_actIntro = menu->addAction(tr("Start animation on the display"));
+    m_actIntro->setCheckable(true);
+    m_actIntro->setChecked(readSetting("intro", "1") != "0");
+    m_actIntro->setToolTip(tr("Plays the flame animation when the G13 is connected or the driver starts."));
+    menu->setToolTipsVisible(true);
+
+    connect(m_actIntro, &QAction::toggled, this, [this](bool on) {
+        if (writeSetting("intro", on ? "1" : "0")) {
+            statusBar()->showMessage(on
+                ? tr("Start animation on. It plays the next time the G13 is connected or the driver restarts.")
+                : tr("Start animation off. The logo is shown directly from now on."), 6000);
+        } else {
+            statusBar()->showMessage(tr("Error: could not write the settings file."), 6000);
+            const QSignalBlocker block(m_actIntro);
+            m_actIntro->setChecked(!on);
+        }
+    });
 }
 
 // ---------------------------------------------------------------------------

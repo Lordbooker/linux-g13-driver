@@ -539,6 +539,30 @@ Beim Abspielen bleiben sie gedrückt. Trotzdem speichern?</translation>
         <source>Still running in the background. Click the tray icon to open it.</source>
         <translation>Läuft im Hintergrund weiter. Zum Öffnen auf das Tray-Symbol klicken.</translation>
     </message>
+    <message>
+        <source>Options</source>
+        <translation>Optionen</translation>
+    </message>
+    <message>
+        <source>Start animation on the display</source>
+        <translation>Startanimation auf dem Display</translation>
+    </message>
+    <message>
+        <source>Plays the flame animation when the G13 is connected or the driver starts.</source>
+        <translation>Spielt die Flammen-Animation ab, wenn das G13 angeschlossen wird oder der Treiber startet.</translation>
+    </message>
+    <message>
+        <source>Start animation on. It plays the next time the G13 is connected or the driver restarts.</source>
+        <translation>Startanimation an. Sie läuft beim nächsten Anschließen des G13 oder Neustart des Treibers.</translation>
+    </message>
+    <message>
+        <source>Start animation off. The logo is shown directly from now on.</source>
+        <translation>Startanimation aus. Ab jetzt wird direkt das Logo angezeigt.</translation>
+    </message>
+    <message>
+        <source>Error: could not write the settings file.</source>
+        <translation>Fehler: Die Einstellungsdatei konnte nicht geschrieben werden.</translation>
+    </message>
 </context>
 <context>
     <name>main</name>

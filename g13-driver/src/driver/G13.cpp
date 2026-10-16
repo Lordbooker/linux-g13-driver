@@ -26,6 +26,7 @@
 #include "Output.h"
 #include "Font.h"
 #include "ConfigPath.h" // NEW: Include Helper
+#include "IntroAnimation.h"
 
 extern volatile sig_atomic_t daemon_keep_running;
 const int G13_MAX_MACROS = 200;
@@ -93,6 +94,7 @@ G13::G13(libusb_device *device) {
 }
 
 G13::~G13() {
+    stop_intro();
     cleanup_fifo(); 
     if (!this->loaded) return;
     libusb_release_interface(this->handle, 0);
@@ -101,9 +103,9 @@ G13::~G13() {
 
 void G13::start() {
     if (!this->loaded) return;
-    draw_test_pattern();
     loadBindings();
-    keepGoing = 1;
+    keepGoing = true;
+    start_intro();
 
     while (keepGoing && daemon_keep_running) {
         check_for_config_update();
@@ -113,11 +115,12 @@ void G13::start() {
             break; 
         }
     }
+    stop_intro();
 }
 
 void G13::stop() {
     if (!this->loaded) return;
-    keepGoing = 0;
+    keepGoing = false;
 }
 
 // --- Live-Reload Implementation ---
@@ -487,9 +490,8 @@ void G13::set_pixel(int x, int y, bool on) {
     else this->lcd_buffer[index] &= ~(1 << bit);
 }
 
-void G13::write_lcd() {
-    // (Existing implementation)
-    if (!this->loaded) return;
+bool G13::write_lcd() {
+    if (!this->loaded) return false;
 
     unsigned char transfer_buffer[992];
     memset(transfer_buffer, 0, sizeof(transfer_buffer));
@@ -509,17 +511,87 @@ void G13::write_lcd() {
 
     if (error) {
         syslog(LOG_ERR, "LCD write error: %s", libusb_error_name(error));
+        return false;
+    }
+    return true;
+}
+
+// --- Startanimation ---
+
+// Global setting "intro" in settings.properties (default: on).
+bool G13::intro_enabled() {
+    std::ifstream file(ConfigPath::getSettingsPath());
+    std::string line;
+    bool enabled = true;
+    while (std::getline(file, line)) {
+        line = trim_string(line);
+        if (line.empty() || line[0] == '#') continue;
+        const size_t eq = line.find('=');
+        if (eq == std::string::npos) continue;
+        if (trim_string(line.substr(0, eq)) == "intro")
+            enabled = trim_string(line.substr(eq + 1)) != "0";
+    }
+    return enabled;
+}
+
+void G13::draw_final_logo() {
+    clear_lcd_buffer();
+    for (int y = 0; y < IntroAnimation::Height; ++y)
+        for (int x = 0; x < IntroAnimation::Width; ++x)
+            set_pixel(x, y, IntroAnimation::finalPixel(x, y));
+}
+
+void G13::start_intro() {
+    if (!intro_enabled()) {
+        std::lock_guard<std::mutex> lock(lcd_mutex);
+        draw_final_logo();
+        write_lcd();
+        return;
+    }
+    intro_stop = false;
+    try {
+        intro_thread = std::thread(&G13::run_intro, this);
+    } catch (const std::system_error &e) {
+        syslog(LOG_WARNING, "Could not start intro animation: %s", e.what());
+        std::lock_guard<std::mutex> lock(lcd_mutex);
+        draw_final_logo();
+        write_lcd();
     }
 }
 
-void G13::draw_test_pattern() {
-    clear_lcd_buffer();
-    for(int x=0; x<160; x++) { set_pixel(x, 0, true); set_pixel(x, 42, true); }
-    for(int y=0; y<43; y++) { set_pixel(0, y, true); set_pixel(159, y, true); }
-    write_text(10, 5,  "   LINUX G13 PROJECT");
-    write_text(10, 15, "  POWER of OPENSOURCE");
-    write_lcd();
-    syslog(LOG_INFO, "LCD test pattern sent.");
+void G13::stop_intro() {
+    intro_stop = true;
+    if (intro_thread.joinable())
+        intro_thread.join();
+}
+
+void G13::run_intro() {
+    IntroAnimation intro;
+    uint8_t bits[IntroAnimation::Width * IntroAnimation::Height];
+    const auto frame_time = std::chrono::milliseconds(1000 / IntroAnimation::Fps);
+    auto next = std::chrono::steady_clock::now();
+
+    for (int n = 0; n <= IntroAnimation::frameCount(); ++n) {
+        if (intro_stop || !daemon_keep_running) return;
+        if (n > 0) intro.step();
+        intro.compose(bits);
+        {
+            std::lock_guard<std::mutex> lock(lcd_mutex);
+            if (intro_stop) return;   // z. B. Text aus der LCD-Pipe kam zuvor
+            for (int y = 0; y < IntroAnimation::Height; ++y)
+                for (int x = 0; x < IntroAnimation::Width; ++x)
+                    set_pixel(x, y, bits[y * IntroAnimation::Width + x] != 0);
+            if (!write_lcd()) return;   // Geraet weg o. ae.; Fehler ist bereits geloggt
+        }
+        next += frame_time;
+        std::this_thread::sleep_until(next);
+    }
+
+    std::lock_guard<std::mutex> lock(lcd_mutex);
+    if (!intro_stop) {
+        draw_final_logo();
+        write_lcd();
+    }
 }
 
 void G13::write_char(int x, int y, char c) {
@@ -591,6 +663,8 @@ void G13::check_fifo() {
             input.pop_back();
         }
 
+        stop_intro();   // Text aus der Pipe hat Vorrang vor der Startanimation
+        std::lock_guard<std::mutex> lock(lcd_mutex);
         clear_lcd_buffer();
         
         std::stringstream ss(input);

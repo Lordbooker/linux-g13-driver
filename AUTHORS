@@ -14,5 +14,11 @@ Contributors (from the git history)
   Lordbooker     – modernized fork: C++ driver, Qt6 configuration tool,
                    packaging (2025–2026)
 
+Third-party artwork
+  Tux (in the LCD start animation) was originally drawn by Larry Ewing
+  (lewing@isc.tamu.edu) with The GIMP. Use and modification are permitted
+  provided this is acknowledged. The LCD version is a simplified 1-bit
+  redraw.
+
 All contributions are distributed under the GNU General Public License,
 version 2 only (GPL-2.0-only). See the file LICENSE.
