@@ -1,6 +1,7 @@
 #include "BindingEditor.h"
 #include "KeyNames.h"
 #include "G13Keys.h"
+#include "KeyCaptureEdit.h"
 
 #include <QVBoxLayout>
 #include <QHBoxLayout>
@@ -84,10 +85,21 @@ BindingEditor::BindingEditor(QWidget *parent) : QWidget(parent)
     // Seite 0 – Tastencode
     auto *pageKey       = new QWidget();
     auto *pageKeyLayout = new QFormLayout(pageKey);
-    cmbKeyName = new QComboBox(pageKey);
-    for (const auto &[name, code] : KeyNames::all())
-        cmbKeyName->addItem(QString("%1  (%2)").arg(name).arg(code), code);
-    pageKeyLayout->addRow(tr("Key:"), cmbKeyName);
+    editKey = new KeyCaptureEdit(pageKey);
+    pageKeyLayout->addRow(tr("Key:"), editKey);
+    auto *lblKeyHint = new QLabel(
+        tr("Click into the field and press a key on your keyboard, then save. "
+           "One key per G13 key – use a macro for key combinations such as Ctrl+C."),
+        pageKey);
+    lblKeyHint->setWordWrap(true);
+    pageKeyLayout->addRow(lblKeyHint);
+    connect(editKey, &KeyCaptureEdit::keyCaptured, this, [this](int code, bool withModifiers) {
+        lblStatus->setText(withModifiers
+            ? tr("Key detected: %1. Key combinations are not possible here, only this key "
+                 "is assigned – use a macro for combinations. Click “Save” to assign it.")
+                  .arg(KeyNames::nameFor(code))
+            : tr("Key detected: %1 – click “Save” to assign it.").arg(KeyNames::nameFor(code)));
+    });
     stack->addWidget(pageKey);
 
     // Seite 1 – Makro
@@ -163,11 +175,15 @@ void BindingEditor::setKey(const QString &keyName)
     btnSave->setEnabled(true);
     lblStatus->clear();
     loadFromFile();
+    if (cmbType->currentIndex() == 0)
+        editKey->setFocus();        // direkt Taste druecken koennen
 }
 
 void BindingEditor::onTypeChanged(int index)
 {
     stack->setCurrentIndex(index);
+    if (index == 0 && isVisible())
+        editKey->setFocus();        // direkt Taste druecken koennen
 }
 
 void BindingEditor::onSaveClicked()
@@ -187,6 +203,7 @@ void BindingEditor::loadFromFile()
     const QString fileKey = G13Keys::fileKey(m_currentKey);
     const auto    props   = readProps(bindingFilePath());
 
+    editKey->clearKey();
     if (!props.contains(fileKey)) {
         cmbType->setCurrentIndex(2);
         return;
@@ -197,16 +214,9 @@ void BindingEditor::loadFromFile()
     const QString type = parts[0].trimmed();
 
     if (type == "p" && parts.size() >= 2) {
-        QString codeStr = parts[1].trimmed();
-        if (codeStr.startsWith("k.")) {
-            int code = codeStr.mid(2).toInt();
-            for (int i = 0; i < cmbKeyName->count(); ++i) {
-                if (cmbKeyName->itemData(i).toInt() == code) {
-                    cmbKeyName->setCurrentIndex(i);
-                    break;
-                }
-            }
-        }
+        const QString codeStr = parts[1].trimmed();
+        if (codeStr.startsWith("k."))
+            editKey->setKeyCode(codeStr.mid(2).toInt());
         cmbType->setCurrentIndex(0);
     } else if (type == "m" && parts.size() >= 3) {
         spnMacroId->setValue(parts[1].trimmed().toInt());
@@ -235,7 +245,12 @@ void BindingEditor::saveToFile()
 
     switch (cmbType->currentIndex()) {
     case 0:
-        props[fileKey] = QString("p,k.%1").arg(cmbKeyName->currentData().toInt());
+        if (editKey->keyCode() <= 0) {
+            lblStatus->setText(tr("Press a key in the input field first."));
+            editKey->setFocus();
+            return;
+        }
+        props[fileKey] = QString("p,k.%1").arg(editKey->keyCode());
         break;
     case 1: {
         const int mode = cmbRepeatMode->currentIndex();

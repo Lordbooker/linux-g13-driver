@@ -248,7 +248,10 @@ L key is highlighted in the image). All changes are written directly to `~/.conf
 * **Key Bindings** – click a key in the G13 image (keys with a green dot are bound in the
   active profile; dashed outlines mark the profile keys L1–L4, which cannot be bound), then
   choose:
-  * *Key code (pass-through)*: the key sends a normal keyboard key,
+  * *Key code (pass-through)*: the key sends a normal keyboard key. Click into the input field
+    and press the key on your keyboard – it is detected directly, including Tab, Enter, Esc,
+    function keys and single modifiers (Shift, Ctrl, Alt, Super). One key per G13 key; for
+    combinations such as Ctrl+C use a macro. Only keys your keyboard has can be assigned.
   * *Macro*: the key runs a macro – choose the macro ID and the *Run mode*: *Run once*,
     *Repeat while held* or *Run several times* (with a count),
   * *No action*: the key is unbound.
@@ -259,9 +262,14 @@ L key is highlighted in the image). All changes are written directly to `~/.conf
   * *Start recording*: records key presses including their timing. The window must be in the
     foreground; shortcuts handled by your desktop (e.g. Alt+Tab) cannot be recorded.
   * The macro is shown as a list of steps (press, release, wait). Steps can be moved, removed
-    or inserted manually.
+    or inserted manually: press a key in the *Key* field, then *Insert press* or
+    *Insert release*.
   * *Apply to all* replaces all recorded delays with a fixed value.
   * *Save* warns if a key is pressed but never released.
+
+Keys are shown with the label of your own keyboard layout (e.g. *Z* on a German keyboard)
+once they have been pressed in the tool; keys never pressed there are shown with their US
+layout name. The labels are stored in `~/.config/linux-g13-project/G13 Config Tool.conf`.
 
 Closing the window keeps the tool running in the system tray (if your desktop provides one).
 *File → Quit* or *Quit tray icon* closes it completely; the driver keeps running.

@@ -75,6 +75,22 @@
         <source>Error: could not write the file.</source>
         <translation>Erro: não foi possível gravar o arquivo.</translation>
     </message>
+    <message>
+        <source>Click into the field and press a key on your keyboard, then save. One key per G13 key – use a macro for key combinations such as Ctrl+C.</source>
+        <translation>Clique no campo, pressione uma tecla do teclado e salve. Uma tecla por tecla do G13 – para combinações como Ctrl+C use uma macro.</translation>
+    </message>
+    <message>
+        <source>Key detected: %1. Key combinations are not possible here, only this key is assigned – use a macro for combinations. Click “Save” to assign it.</source>
+        <translation>Tecla detectada: %1. Combinações de teclas não são possíveis aqui, apenas esta tecla é atribuída – para combinações use uma macro. Clique em “Salvar” para atribuí-la.</translation>
+    </message>
+    <message>
+        <source>Key detected: %1 – click “Save” to assign it.</source>
+        <translation>Tecla detectada: %1 – clique em “Salvar” para atribuí-la.</translation>
+    </message>
+    <message>
+        <source>Press a key in the input field first.</source>
+        <translation>Pressione primeiro uma tecla no campo de entrada.</translation>
+    </message>
 </context>
 <context>
     <name>ColorSelector</name>
@@ -155,6 +171,21 @@
     <message>
         <source>assigned</source>
         <translation>atribuída</translation>
+    </message>
+</context>
+<context>
+    <name>KeyCaptureEdit</name>
+    <message>
+        <source>Click here and press a key</source>
+        <translation>Clique aqui e pressione uma tecla</translation>
+    </message>
+    <message>
+        <source>Click into the field and press a key on your keyboard.</source>
+        <translation>Clique no campo e pressione uma tecla do teclado.</translation>
+    </message>
+    <message>
+        <source>%1  (code %2)</source>
+        <translation>%1  (código %2)</translation>
     </message>
 </context>
 <context>
@@ -329,6 +360,10 @@ Elas permanecerão pressionadas durante a reprodução. Salvar mesmo assim?</tra
     <message>
         <source>Macro %1 saved (entries: %2).</source>
         <translation>Macro %1 salva (entradas: %2).</translation>
+    </message>
+    <message>
+        <source>Press a key in the input field first.</source>
+        <translation>Pressione primeiro uma tecla no campo de entrada.</translation>
     </message>
 </context>
 <context>

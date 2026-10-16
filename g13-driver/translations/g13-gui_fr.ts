@@ -75,6 +75,22 @@
         <source>Error: could not write the file.</source>
         <translation>Erreur : impossible d’écrire le fichier.</translation>
     </message>
+    <message>
+        <source>Click into the field and press a key on your keyboard, then save. One key per G13 key – use a macro for key combinations such as Ctrl+C.</source>
+        <translation>Cliquez dans le champ, appuyez sur une touche du clavier, puis enregistrez. Une touche par touche du G13 – utilisez une macro pour les combinaisons comme Ctrl+C.</translation>
+    </message>
+    <message>
+        <source>Key detected: %1. Key combinations are not possible here, only this key is assigned – use a macro for combinations. Click “Save” to assign it.</source>
+        <translation>Touche détectée : %1. Les combinaisons de touches ne sont pas possibles ici, seule cette touche est affectée – utilisez une macro pour les combinaisons. Cliquez sur « Enregistrer » pour l’affecter.</translation>
+    </message>
+    <message>
+        <source>Key detected: %1 – click “Save” to assign it.</source>
+        <translation>Touche détectée : %1 – cliquez sur « Enregistrer » pour l’affecter.</translation>
+    </message>
+    <message>
+        <source>Press a key in the input field first.</source>
+        <translation>Appuyez d’abord sur une touche dans le champ de saisie.</translation>
+    </message>
 </context>
 <context>
     <name>ColorSelector</name>
@@ -155,6 +171,21 @@
     <message>
         <source>assigned</source>
         <translation>affectée</translation>
+    </message>
+</context>
+<context>
+    <name>KeyCaptureEdit</name>
+    <message>
+        <source>Click here and press a key</source>
+        <translation>Cliquez ici et appuyez sur une touche</translation>
+    </message>
+    <message>
+        <source>Click into the field and press a key on your keyboard.</source>
+        <translation>Cliquez dans le champ et appuyez sur une touche du clavier.</translation>
+    </message>
+    <message>
+        <source>%1  (code %2)</source>
+        <translation>%1  (code %2)</translation>
     </message>
 </context>
 <context>
@@ -329,6 +360,10 @@ Elles resteront enfoncées pendant la lecture. Enregistrer quand même ?</transl
     <message>
         <source>Macro %1 saved (entries: %2).</source>
         <translation>Macro %1 enregistrée (entrées : %2).</translation>
+    </message>
+    <message>
+        <source>Press a key in the input field first.</source>
+        <translation>Appuyez d’abord sur une touche dans le champ de saisie.</translation>
     </message>
 </context>
 <context>

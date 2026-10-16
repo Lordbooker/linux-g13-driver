@@ -75,6 +75,22 @@
         <source>Error: could not write the file.</source>
         <translation>Error: no se pudo escribir el archivo.</translation>
     </message>
+    <message>
+        <source>Click into the field and press a key on your keyboard, then save. One key per G13 key – use a macro for key combinations such as Ctrl+C.</source>
+        <translation>Haga clic en el campo, pulse una tecla del teclado y guarde. Una tecla por cada tecla del G13 – para combinaciones como Ctrl+C use una macro.</translation>
+    </message>
+    <message>
+        <source>Key detected: %1. Key combinations are not possible here, only this key is assigned – use a macro for combinations. Click “Save” to assign it.</source>
+        <translation>Tecla detectada: %1. Aquí no se pueden usar combinaciones de teclas, solo se asigna esta tecla – para combinaciones use una macro. Haga clic en «Guardar» para asignarla.</translation>
+    </message>
+    <message>
+        <source>Key detected: %1 – click “Save” to assign it.</source>
+        <translation>Tecla detectada: %1 – haga clic en «Guardar» para asignarla.</translation>
+    </message>
+    <message>
+        <source>Press a key in the input field first.</source>
+        <translation>Pulse primero una tecla en el campo de entrada.</translation>
+    </message>
 </context>
 <context>
     <name>ColorSelector</name>
@@ -155,6 +171,21 @@
     <message>
         <source>assigned</source>
         <translation>asignada</translation>
+    </message>
+</context>
+<context>
+    <name>KeyCaptureEdit</name>
+    <message>
+        <source>Click here and press a key</source>
+        <translation>Haga clic aquí y pulse una tecla</translation>
+    </message>
+    <message>
+        <source>Click into the field and press a key on your keyboard.</source>
+        <translation>Haga clic en el campo y pulse una tecla del teclado.</translation>
+    </message>
+    <message>
+        <source>%1  (code %2)</source>
+        <translation>%1  (código %2)</translation>
     </message>
 </context>
 <context>
@@ -329,6 +360,10 @@ Permanecerán pulsadas durante la reproducción. ¿Guardar de todos modos?</tran
     <message>
         <source>Macro %1 saved (entries: %2).</source>
         <translation>Macro %1 guardada (entradas: %2).</translation>
+    </message>
+    <message>
+        <source>Press a key in the input field first.</source>
+        <translation>Pulse primero una tecla en el campo de entrada.</translation>
     </message>
 </context>
 <context>

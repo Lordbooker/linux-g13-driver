@@ -75,6 +75,22 @@
         <source>Error: could not write the file.</source>
         <translation>Fehler: Die Datei konnte nicht geschrieben werden.</translation>
     </message>
+    <message>
+        <source>Click into the field and press a key on your keyboard, then save. One key per G13 key – use a macro for key combinations such as Ctrl+C.</source>
+        <translation>In das Feld klicken, eine Taste auf der Tastatur drücken und speichern. Eine Taste pro G13-Taste – für Tastenkombinationen wie Strg+C ein Makro verwenden.</translation>
+    </message>
+    <message>
+        <source>Key detected: %1. Key combinations are not possible here, only this key is assigned – use a macro for combinations. Click “Save” to assign it.</source>
+        <translation>Taste erkannt: %1. Tastenkombinationen sind hier nicht möglich, belegt wird nur diese Taste – für Kombinationen ein Makro verwenden. Zum Übernehmen auf „Speichern“ klicken.</translation>
+    </message>
+    <message>
+        <source>Key detected: %1 – click “Save” to assign it.</source>
+        <translation>Taste erkannt: %1 – zum Übernehmen auf „Speichern“ klicken.</translation>
+    </message>
+    <message>
+        <source>Press a key in the input field first.</source>
+        <translation>Zuerst im Eingabefeld eine Taste drücken.</translation>
+    </message>
 </context>
 <context>
     <name>ColorSelector</name>
@@ -155,6 +171,21 @@
     <message>
         <source>assigned</source>
         <translation>belegt</translation>
+    </message>
+</context>
+<context>
+    <name>KeyCaptureEdit</name>
+    <message>
+        <source>Click here and press a key</source>
+        <translation>Hier klicken und Taste drücken</translation>
+    </message>
+    <message>
+        <source>Click into the field and press a key on your keyboard.</source>
+        <translation>In das Feld klicken und eine Taste auf der Tastatur drücken.</translation>
+    </message>
+    <message>
+        <source>%1  (code %2)</source>
+        <translation>%1  (Code %2)</translation>
     </message>
 </context>
 <context>
@@ -329,6 +360,10 @@ Beim Abspielen bleiben sie gedrückt. Trotzdem speichern?</translation>
     <message>
         <source>Macro %1 saved (entries: %2).</source>
         <translation>Makro %1 gespeichert (Einträge: %2).</translation>
+    </message>
+    <message>
+        <source>Press a key in the input field first.</source>
+        <translation>Zuerst im Eingabefeld eine Taste drücken.</translation>
     </message>
 </context>
 <context>

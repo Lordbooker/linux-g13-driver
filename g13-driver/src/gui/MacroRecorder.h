@@ -5,7 +5,7 @@
 
 #include "MacroSequence.h"
 
-class QComboBox;
+class KeyCaptureEdit;
 class QLabel;
 class QLineEdit;
 class QListWidget;
@@ -49,7 +49,6 @@ private:
     void startRecording();
     void stopRecording();
     void recordKey(int keyCode, bool pressed);
-    static int linuxKeyCode(int nativeScanCode);
 
     // Liste
     QList<Event> events() const;
@@ -87,7 +86,7 @@ private:
     QPushButton *btnRemove;
     QPushButton *btnClear;
 
-    QComboBox   *cmbKey;
+    KeyCaptureEdit *editKey;
     QPushButton *btnInsertDown;
     QPushButton *btnInsertUp;
     QSpinBox    *spnDelay;

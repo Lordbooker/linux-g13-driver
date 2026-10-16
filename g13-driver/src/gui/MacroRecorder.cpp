@@ -1,8 +1,8 @@
 #include "MacroRecorder.h"
 #include "KeyNames.h"
+#include "KeyCaptureEdit.h"
 
 #include <QApplication>
-#include <QComboBox>
 #include <QDir>
 #include <QFile>
 #include <QFileInfo>
@@ -87,13 +87,11 @@ MacroRecorder::MacroRecorder(QWidget *parent) : QWidget(parent)
     auto *editBox    = new QGroupBox(tr("Insert and adjust manually"), this);
     auto *editLayout = new QGridLayout(editBox);
 
-    cmbKey = new QComboBox(this);
-    for (const auto &[name, code] : KeyNames::all())
-        cmbKey->addItem(QString("%1  (%2)").arg(name).arg(code), code);
+    editKey = new KeyCaptureEdit(this);
     btnInsertDown = new QPushButton(tr("Insert press"), this);
     btnInsertUp   = new QPushButton(tr("Insert release"), this);
     editLayout->addWidget(new QLabel(tr("Key:"), this), 0, 0);
-    editLayout->addWidget(cmbKey,        0, 1);
+    editLayout->addWidget(editKey,       0, 1);
     editLayout->addWidget(btnInsertDown, 0, 2);
     editLayout->addWidget(btnInsertUp,   0, 3);
 
@@ -138,6 +136,7 @@ MacroRecorder::MacroRecorder(QWidget *parent) : QWidget(parent)
     connect(btnDelayAll,       &QPushButton::clicked, this, &MacroRecorder::onApplyDelayToAll);
     connect(listEvents, &QListWidget::itemSelectionChanged, this, &MacroRecorder::onSelectionChanged);
     connect(editName,   &QLineEdit::textEdited, this, [this] { setDirty(true); });
+    connect(editKey,    &KeyCaptureEdit::keyCaptured, lblStatus, &QLabel::clear);
 
     loadFromFile();
 }
@@ -254,11 +253,13 @@ bool MacroRecorder::eventFilter(QObject *watched, QEvent *event)
         if (keyEvent->isAutoRepeat())
             return true;   // Tastenwiederholung ignorieren
 
-        const int code = linuxKeyCode(static_cast<int>(keyEvent->nativeScanCode()));
+        const int code = KeyCaptureEdit::linuxKeyCode(keyEvent->nativeScanCode());
         if (code <= 0) {
             lblStatus->setText(tr("Key not recognized (the system sent no scan code)."));
             return true;
         }
+        if (event->type() == QEvent::KeyPress)
+            KeyNames::learnLabel(code, keyEvent);
         recordKey(code, event->type() == QEvent::KeyPress);
         return true;       // Taste nicht an die Oberflaeche weitergeben
     }
@@ -266,14 +267,6 @@ bool MacroRecorder::eventFilter(QObject *watched, QEvent *event)
     default:
         return QWidget::eventFilter(watched, event);
     }
-}
-
-// Qt liefert unter Linux (X11/xcb und Wayland) als nativeScanCode den
-// XKB-Keycode. Dieser ist der Linux-Input-Keycode + 8.
-int MacroRecorder::linuxKeyCode(int nativeScanCode)
-{
-    constexpr int XkbOffset = 8;
-    return nativeScanCode > XkbOffset ? nativeScanCode - XkbOffset : 0;
 }
 
 void MacroRecorder::recordKey(int keyCode, bool pressed)
@@ -413,12 +406,22 @@ void MacroRecorder::onClear()
 
 void MacroRecorder::onInsertKeyDown()
 {
-    insertEvent({Event::Type::KeyDown, cmbKey->currentData().toInt()});
+    if (editKey->keyCode() <= 0) {
+        lblStatus->setText(tr("Press a key in the input field first."));
+        editKey->setFocus();
+        return;
+    }
+    insertEvent({Event::Type::KeyDown, editKey->keyCode()});
 }
 
 void MacroRecorder::onInsertKeyUp()
 {
-    insertEvent({Event::Type::KeyUp, cmbKey->currentData().toInt()});
+    if (editKey->keyCode() <= 0) {
+        lblStatus->setText(tr("Press a key in the input field first."));
+        editKey->setFocus();
+        return;
+    }
+    insertEvent({Event::Type::KeyUp, editKey->keyCode()});
 }
 
 void MacroRecorder::onInsertDelay()
@@ -487,7 +490,7 @@ void MacroRecorder::updateButtons()
     btnDown->setEnabled(idle && selection && row >= 0 && row < listEvents->count() - 1);
     btnRemove->setEnabled(idle && selection);
     btnClear->setEnabled(idle && hasItems);
-    cmbKey->setEnabled(idle);
+    editKey->setEnabled(idle);
     btnInsertDown->setEnabled(idle);
     btnInsertUp->setEnabled(idle);
     spnDelay->setEnabled(idle);

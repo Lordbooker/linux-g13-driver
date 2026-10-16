@@ -6,6 +6,8 @@
 #include <QStackedWidget>
 #include <QPushButton>
 
+class KeyCaptureEdit;
+
 class BindingEditor : public QWidget {
     Q_OBJECT
 public:
@@ -32,8 +34,8 @@ private:
     QLabel         *lblProfile;
     QComboBox      *cmbType;    // 0=Tastencode  1=Makro  2=Keine Aktion
     QStackedWidget *stack;
-    // Seite 0: Tastencode-Auswahl
-    QComboBox      *cmbKeyName;
+    // Seite 0: Tastencode (Eingabefeld: Taste druecken)
+    KeyCaptureEdit *editKey;
     // Seite 1: Makro
     QSpinBox       *spnMacroId;
     QComboBox      *cmbRepeatMode;   // 0=einmal  1=solange gedrueckt  2=Anzahl
