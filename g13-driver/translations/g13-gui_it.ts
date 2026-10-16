@@ -539,6 +539,30 @@ Durante la riproduzione resteranno premuti. Salvare comunque?</translation>
         <source>Still running in the background. Click the tray icon to open it.</source>
         <translation>Continua a funzionare in background. Fai clic sull’icona nell’area di notifica per aprirlo.</translation>
     </message>
+    <message>
+        <source>Options</source>
+        <translation>Opzioni</translation>
+    </message>
+    <message>
+        <source>Start animation on the display</source>
+        <translation>Animazione di avvio sul display</translation>
+    </message>
+    <message>
+        <source>Plays the flame animation when the G13 is connected or the driver starts.</source>
+        <translation>Riproduce l’animazione delle fiamme quando il G13 viene collegato o il driver si avvia.</translation>
+    </message>
+    <message>
+        <source>Start animation on. It plays the next time the G13 is connected or the driver restarts.</source>
+        <translation>Animazione di avvio attiva. Verrà riprodotta al prossimo collegamento del G13 o riavvio del driver.</translation>
+    </message>
+    <message>
+        <source>Start animation off. The logo is shown directly from now on.</source>
+        <translation>Animazione di avvio disattivata. D’ora in poi il logo viene mostrato direttamente.</translation>
+    </message>
+    <message>
+        <source>Error: could not write the settings file.</source>
+        <translation>Errore: impossibile scrivere il file delle impostazioni.</translation>
+    </message>
 </context>
 <context>
     <name>main</name>

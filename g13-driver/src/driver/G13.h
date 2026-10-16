@@ -8,6 +8,9 @@
 #include <istream>
 #include <libusb-1.0/libusb.h>
 #include <time.h> // For time_t
+#include <atomic>
+#include <mutex>
+#include <thread>
 
 #include "Constants.h"
 #include "G13Action.h"
@@ -22,7 +25,7 @@ private:
     int                   uinput_file;   
 
     int                   loaded = 0;
-    volatile int          keepGoing = 0;
+    std::atomic<bool>     keepGoing{false};   // stop() kann aus einem anderen Thread kommen
 
     stick_mode_t          stick_mode;    
     int                   stick_keys[4];   
@@ -37,6 +40,17 @@ private:
     int last_read_error  = 0;
 
     unsigned char lcd_buffer[G13_LCD_BUFFER_SIZE];
+    // Schuetzt lcd_buffer und das Senden ans LCD (Startanimation laeuft in eigenem Thread)
+    std::mutex lcd_mutex;
+
+    // Startanimation (Flammen-Intro), siehe IntroAnimation
+    std::thread       intro_thread;
+    std::atomic<bool> intro_stop{false};
+    static bool intro_enabled();
+    void start_intro();
+    void stop_intro();
+    void run_intro();
+    void draw_final_logo();   // erwartet gesperrten lcd_mutex
 
     // Feature: Live-Reload
     time_t last_config_mtime;
@@ -73,8 +87,7 @@ public:
     // --- LCD ---
     void clear_lcd_buffer();
     void set_pixel(int x, int y, bool on);
-    void write_lcd();
-    void draw_test_pattern();
+    bool write_lcd();         // erwartet gesperrten lcd_mutex
     void write_char(int x, int y, char c);
     void write_text(int x, int y, const std::string& text);
 };

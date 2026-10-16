@@ -68,6 +68,7 @@ add_executable(linux-g13-driver
     src/driver/ConfigPath.cpp
     src/driver/PassThroughAction.cpp
     src/driver/Output.cpp
+    src/driver/IntroAnimation.cpp
 )
 
 target_include_directories(linux-g13-driver PRIVATE

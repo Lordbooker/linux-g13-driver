@@ -60,6 +60,11 @@ std::string ConfigPath::getMacroPath(int macroId) {
     return getConfigDir() + "/macro-" + std::to_string(macroId) + ".properties";
 }
 
+std::string ConfigPath::getSettingsPath() {
+    ensureConfigDirExists();
+    return getConfigDir() + "/settings.properties";
+}
+
 std::string ConfigPath::getFifoPath() {
     // Ideally use XDG_RUNTIME_DIR for pipes (/run/user/1000/)
     const char* xdgRuntime = getenv("XDG_RUNTIME_DIR");

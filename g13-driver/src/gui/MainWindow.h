@@ -46,6 +46,7 @@ private:
     enum class DriverState { Unknown, Running, Stopped };
 
     void setupToolbar();
+    void setupOptionsMenu();
     void refreshDriverStatus();
     void applyDriverStatus(DriverState state);
     void runSystemctl(const QString &verb, const QString &successMessage);
@@ -61,6 +62,9 @@ private:
     QTimer  *m_statusTimer = nullptr;
     DriverState m_driverState = DriverState::Unknown;
     bool m_trayHintShown = false;
+
+    // Optionen: Startanimation auf dem Display (settings.properties, Schluessel "intro")
+    QAction *m_actIntro = nullptr;
 };
 
 #endif // MAINWINDOW_H

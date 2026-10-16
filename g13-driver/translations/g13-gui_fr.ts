@@ -539,6 +539,30 @@ Elles resteront enfoncées pendant la lecture. Enregistrer quand même ?</transl
         <source>Still running in the background. Click the tray icon to open it.</source>
         <translation>Continue de fonctionner en arrière-plan. Cliquez sur l’icône de notification pour l’ouvrir.</translation>
     </message>
+    <message>
+        <source>Options</source>
+        <translation>Options</translation>
+    </message>
+    <message>
+        <source>Start animation on the display</source>
+        <translation>Animation de démarrage sur l’écran</translation>
+    </message>
+    <message>
+        <source>Plays the flame animation when the G13 is connected or the driver starts.</source>
+        <translation>Joue l’animation de flammes lorsque le G13 est branché ou que le pilote démarre.</translation>
+    </message>
+    <message>
+        <source>Start animation on. It plays the next time the G13 is connected or the driver restarts.</source>
+        <translation>Animation de démarrage activée. Elle sera jouée au prochain branchement du G13 ou redémarrage du pilote.</translation>
+    </message>
+    <message>
+        <source>Start animation off. The logo is shown directly from now on.</source>
+        <translation>Animation de démarrage désactivée. Le logo s’affiche désormais directement.</translation>
+    </message>
+    <message>
+        <source>Error: could not write the settings file.</source>
+        <translation>Erreur : impossible d’écrire le fichier de paramètres.</translation>
+    </message>
 </context>
 <context>
     <name>main</name>

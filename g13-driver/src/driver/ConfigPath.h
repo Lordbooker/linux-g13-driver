@@ -27,6 +27,12 @@ public:
     static std::string getMacroPath(int macroId);
 
     /**
+     * @brief Gets the full path to the global settings file (settings.properties).
+     * Holds settings that apply to all profiles, e.g. intro=0|1.
+     */
+    static std::string getSettingsPath();
+
+    /**
      * @brief Gets the full path to the FIFO pipe.
      * @return The absolute path (e.g., "/run/user/1000/g13-lcd" or fallback to "/tmp/g13-lcd").
      */

@@ -79,6 +79,8 @@ Schnittstelle (IPC) gibt es nicht. Das Tray-Menü steuert den Treiber über `sys
 | Einzelinstanz: erneuter Start öffnet das vorhandene Fenster | Fertig |
 | Mehrsprachigkeit nach Systemsprache (Qt Linguist): Englisch als Quelle/Rückfall, Deutsch, Französisch, Italienisch, Spanisch, Portugiesisch | Fertig |
 | Treiber-Logmeldungen einheitlich Englisch | Fertig |
+| Tasteneingabe per Tastendruck statt Auswahlliste, Tastennamen im eigenen Layout | Fertig |
+| LCD-Startanimation (Flammenwand, Tux und Logo), abschaltbar unter Optionen | Fertig |
 
 ---
 
