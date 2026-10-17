@@ -67,7 +67,7 @@ build dependencies:
 
 ```bash
 cd g13-driver
-./scripts/install_deps.sh
+make deps            # same as ./scripts/install_deps.sh, asks for sudo
 ```
 
 The package lists for Debian/Ubuntu and Fedora are tested; the Arch and openSUSE lists are untested.
@@ -79,14 +79,9 @@ cd g13-driver
 make
 ```
 
-`make` installs the dependencies (via `install_deps.sh`, requires sudo) and builds both the
-daemon and the config tool into `g13-driver/build/`.
-
-To build **without** touching system packages (e.g. for packaging):
-
-```bash
-make build-driver
-```
+`make` builds the daemon and the config tool into `g13-driver/build/`. It does not install
+anything and never asks for sudo; install missing build dependencies beforehand with
+`make deps` (see above).
 
 Alternatively with CMake directly (use `build` as directory if you want to use `make install` afterwards):
 
@@ -149,6 +144,7 @@ The script lists everything it found and asks before removing anything. It
 | `~/.local/bin/linux-g13-driver`, `g13-gui`, `Linux-G13-GUI.jar` | `make install-user` |
 | `~/.config/systemd/user/g13.service` | `make install-user` |
 | `/etc/udev/rules.d/99-g13.rules` | `make install-user` |
+| `/usr/lib/udev/rules.d/99-g13.rules` (the rule is now called `70-g13.rules`) | `make install` of earlier versions |
 | `/usr/share/java/linux-g13-driver/Linux-G13-GUI.jar` | `make install` |
 | `/usr/bin/g13-gui` (Java wrapper), `/usr/bin/linux-g13-driver` (GTK version) | `make install` |
 
@@ -166,7 +162,7 @@ This installs:
 |---|---|
 | Daemon | `/usr/bin/linux-g13-driver` |
 | Config tool | `/usr/bin/g13-gui` |
-| udev rule | `/usr/lib/udev/rules.d/99-g13.rules` |
+| udev rule | `/usr/lib/udev/rules.d/70-g13.rules` |
 | systemd user service | `/usr/lib/systemd/user/g13.service` |
 | Application menu entry | `/usr/share/applications/g13-gui.desktop` |
 | Tray icon autostart | `/etc/xdg/autostart/g13-gui-tray.desktop` |
@@ -174,7 +170,8 @@ This installs:
 
 `PREFIX` and `DESTDIR` can be overridden for packaging, e.g. `make install DESTDIR=pkgdir`.
 
-The udev rule gives the logged-in user access to the G13 and to `uinput` without root.
+The udev rule gives the user of the active local session access to the G13 and to `uinput`
+without root (`uaccess`); other users and system services get no access.
 Reload the rules once (or unplug and replug the G13):
 
 ```bash

@@ -23,23 +23,27 @@ TARGET_GUI    := g13-gui
 # Scripts & Configs
 SCRIPT_DIR  := scripts
 SERVICE_SRC := src/systemd/g13.service
-UDEV_SRC    := src/udev/99-g13.rules
+UDEV_SRC    := src/udev/70-g13.rules
 DESKTOP_SRC := src/desktop/g13-gui.desktop
 TRAY_SRC    := src/desktop/g13-gui-tray.desktop
 ICON_SRC    := src/resources/icons
 
-.PHONY: all dependencies build-driver build-gui clean install install-user uninstall remove-legacy
+.PHONY: all deps dependencies build-driver build-gui clean install install-user uninstall remove-legacy
 
 # =============================================================================
 # Main Workflow
 # =============================================================================
-all: dependencies build-driver
+# "make" baut nur und veraendert das System nicht. Build-Abhaengigkeiten
+# installiert bei Bedarf "make deps" (fragt per sudo nach).
+all: build-driver
 	@echo "Build complete."
 	@echo " -> Run 'sudo make install' to install system-wide."
 
-dependencies:
-	@chmod +x $(SCRIPT_DIR)/install_deps.sh
-	@$(SCRIPT_DIR)/install_deps.sh
+deps:
+	@bash $(SCRIPT_DIR)/install_deps.sh
+
+# Alter Name, bleibt fuer bestehende Anleitungen erhalten
+dependencies: deps
 
 # Uses CMake to build both targets (Driver + GUI)
 build-driver:
@@ -63,7 +67,9 @@ install:
 	
 	# UDEV
 	install -d $(DESTDIR)$(UDEVDIR)
-	install -m 644 $(UDEV_SRC) $(DESTDIR)$(UDEVDIR)/99-g13.rules
+	install -m 644 $(UDEV_SRC) $(DESTDIR)$(UDEVDIR)/70-g13.rules
+	# Fruehere Versionen installierten 99-g13.rules (mit MODE=0666) - entfernen
+	rm -f $(DESTDIR)$(UDEVDIR)/99-g13.rules
 	
 	# Systemd
 	install -d $(DESTDIR)$(SYSTEMDDIR)
@@ -104,7 +110,7 @@ uninstall:
 	@echo "--- Removing installed files from $(DESTDIR)$(PREFIX) ---"
 	rm -f $(DESTDIR)$(BINDIR)/linux-g13-driver
 	rm -f $(DESTDIR)$(BINDIR)/g13-gui
-	rm -f $(DESTDIR)$(UDEVDIR)/99-g13.rules
+	rm -f $(DESTDIR)$(UDEVDIR)/70-g13.rules $(DESTDIR)$(UDEVDIR)/99-g13.rules
 	rm -f $(DESTDIR)$(SYSTEMDDIR)/g13.service
 	rm -f $(DESTDIR)$(APPDIR)/g13-gui.desktop
 	rm -f $(DESTDIR)$(AUTOSTARTDIR)/g13-gui-tray.desktop

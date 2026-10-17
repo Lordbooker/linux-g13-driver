@@ -81,6 +81,9 @@ Schnittstelle (IPC) gibt es nicht. Das Tray-Menü steuert den Treiber über `sys
 | Treiber-Logmeldungen einheitlich Englisch | Fertig |
 | Tasteneingabe per Tastendruck statt Auswahlliste, Tastennamen im eigenen Layout | Fertig |
 | LCD-Startanimation (Flammenwand, Tux und Logo), abschaltbar unter Optionen | Fertig |
+| Zugriffsrechte: nur `uaccess` (Regel `70-g13.rules`, kein `MODE="0666"`), LCD-Pipe 0600 | Fertig |
+| Profildatei atomar schreiben, Live-Reload mit Nanosekunden; Live-Reload auch nach erstmaligem Anlegen | Fertig |
+| `make` baut nur; Abhängigkeiten per `make deps` | Fertig |
 
 ---
 
@@ -91,7 +94,6 @@ Schnittstelle (IPC) gibt es nicht. Das Tray-Menü steuert den Treiber über `sys
 | Punkt | Beschreibung |
 |---|---|
 | Makros blockieren beim Stoppen | Wird ein laufendes Makro gestoppt oder ersetzt, wartet der Lese-Thread bis zum Ende des aktuellen Warteschritts (`d.<ms>`). |
-| Zugriffsrechte | udev-Regel setzt zusätzlich zu `uaccess` `MODE="0666"`; die LCD-Pipe wird mit 0666 angelegt (kritisch nur im `/tmp`-Fallback). |
 | Mehrere G13 | Mehrere Geräte teilen sich eine LCD-Pipe und dieselben Konfigurationsdateien. |
 | Default-Bindings | Die eingebauten Standardbelegungen enthalten `G22`/`G23`, die keiner Taste entsprechen. |
 | Makro-Dateien | Änderungen an `macro-*.properties` wirken erst beim nächsten Laden der Bindings. |

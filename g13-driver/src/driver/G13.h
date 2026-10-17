@@ -52,8 +52,11 @@ private:
     void run_intro();
     void draw_final_logo();   // erwartet gesperrten lcd_mutex
 
-    // Feature: Live-Reload
-    time_t last_config_mtime;
+    // Feature: Live-Reload. Aenderungszeit mit Nanosekunden, damit auch mehrere
+    // Speicherungen innerhalb einer Sekunde erkannt werden.
+    struct timespec last_config_mtime{};
+    bool            config_mtime_known = false;
+    void remember_config_mtime(const std::string &filename);
     void check_for_config_update();
 
     // --- Private Methods ---

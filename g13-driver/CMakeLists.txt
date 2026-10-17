@@ -171,7 +171,7 @@ if(BUILD_CONFIG_TOOL)
 endif()
 # Relative Ziele (= <prefix>/lib/...): absolute Pfade wuerden von CPack/RPM
 # automatisch als %config markiert, was fuer Dateien unter /usr/lib falsch ist.
-install(FILES src/udev/99-g13.rules
+install(FILES src/udev/70-g13.rules
     DESTINATION lib/udev/rules.d
 )
 install(FILES src/systemd/g13.service
