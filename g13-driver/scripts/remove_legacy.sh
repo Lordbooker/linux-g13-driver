@@ -114,6 +114,10 @@ is_java_wrapper "$LOCAL_BIN/g13-gui"               && USER_FILES+=("$LOCAL_BIN/g
 # The old install-user copied the udev rule to /etc (overrides /usr/lib).
 is_g13_udev_rule "$ROOT/etc/udev/rules.d/99-g13.rules" \
     && add_system_file "$ROOT/etc/udev/rules.d/99-g13.rules"
+# Earlier versions of 'make install' put the rule (with MODE="0666") into /usr/lib as
+# 99-g13.rules; it is now 70-g13.rules. Package-owned copies are left alone.
+is_g13_udev_rule "$ROOT/usr/lib/udev/rules.d/99-g13.rules" \
+    && add_system_file "$ROOT/usr/lib/udev/rules.d/99-g13.rules"
 
 # 2) Old system-wide installation (make install, PREFIX /usr or /usr/local)
 for prefix in /usr /usr/local; do

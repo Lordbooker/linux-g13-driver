@@ -4,6 +4,7 @@
 #include <QFormLayout>
 #include <QGroupBox>
 #include <QFile>
+#include <QSaveFile>
 #include <QTextStream>
 #include <QDir>
 #include <QFileInfo>
@@ -31,14 +32,17 @@ static QMap<QString, QString> readProps(const QString &path)
 static bool writeProps(const QString &path, const QMap<QString, QString> &map)
 {
     QDir().mkpath(QFileInfo(path).absolutePath());
-    QFile f(path);
+    // QSaveFile schreibt in eine temporaere Datei und benennt sie atomar um:
+    // der Treiber liest so nie eine leere oder halb geschriebene Datei.
+    QSaveFile f(path);
     if (!f.open(QIODevice::WriteOnly | QIODevice::Text))
         return false;
     QTextStream out(&f);
     out << "# G13 bindings - edited by g13-gui\n";
     for (auto it = map.constBegin(); it != map.constEnd(); ++it)
         out << it.key() << "=" << it.value() << "\n";
-    return true;
+    out.flush();
+    return f.commit();
 }
 
 // ---------------------------------------------------------------------------

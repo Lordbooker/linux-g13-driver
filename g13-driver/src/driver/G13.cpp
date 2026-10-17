@@ -55,7 +55,6 @@ G13::G13(libusb_device *device) {
     this->loaded = 0;
     this->bindings = 0;
     this->stick_mode = STICK_KEYS;
-    this->last_config_mtime = 0;
 
     actions.resize(G13_NUM_KEYS);
     for (int i = 0; i < G13_NUM_KEYS; i++) {
@@ -129,12 +128,24 @@ void G13::check_for_config_update() {
     std::string filename = ConfigPath::getBindingPath(bindings);
     
     struct stat file_stat;
-    if (stat(filename.c_str(), &file_stat) == 0) {
-        if (last_config_mtime != 0 && file_stat.st_mtime > last_config_mtime) {
-            syslog(LOG_INFO, "Config file change detected. Reloading...");
-            loadBindings();
-        }
+    if (stat(filename.c_str(), &file_stat) != 0)
+        return;
+    // Auf Gleichheit pruefen statt auf "neuer": auch eine zurueckgestellte Uhr
+    // oder eine erst spaeter angelegte Datei fuehren so zum Neuladen.
+    const bool changed = !config_mtime_known
+        || file_stat.st_mtim.tv_sec  != last_config_mtime.tv_sec
+        || file_stat.st_mtim.tv_nsec != last_config_mtime.tv_nsec;
+    if (changed) {
+        syslog(LOG_INFO, "Config file change detected. Reloading...");
+        loadBindings();
     }
+}
+
+void G13::remember_config_mtime(const std::string &filename) {
+    struct stat file_stat;
+    config_mtime_known = stat(filename.c_str(), &file_stat) == 0;
+    if (config_mtime_known)
+        last_config_mtime = file_stat.st_mtim;
 }
 
 std::unique_ptr<Macro> G13::loadMacro(int num) {
@@ -263,11 +274,9 @@ void G13::loadBindings() {
     // NEW: Use ConfigPath helper
     std::string filename = ConfigPath::getBindingPath(bindings);
 
-    // Update timestamp for Live-Reload
-    struct stat file_stat;
-    if (stat(filename.c_str(), &file_stat) == 0) {
-        last_config_mtime = file_stat.st_mtime;
-    }
+    // Zeitstempel VOR dem Lesen merken: aendert sich die Datei waehrenddessen,
+    // erkennt check_for_config_update() das und laedt erneut.
+    remember_config_mtime(filename);
 
     std::ifstream file(filename);
     if (!file.is_open()) {
@@ -319,6 +328,7 @@ G20=p,k.50
 )RAW";
             outfile << default_bindings;
             outfile.close();
+            remember_config_mtime(filename);   // sonst wirken spaetere Aenderungen nicht
             
             // Now parse what we just wrote
             std::stringstream ss(default_bindings);
@@ -623,12 +633,13 @@ void G13::init_fifo() {
 
     unlink(fifo_path.c_str());
 
-    if (mkfifo(fifo_path.c_str(), 0666) != 0) {
+    // Nur fuer den eigenen Benutzer (liegt normalerweise in /run/user/<uid>)
+    if (mkfifo(fifo_path.c_str(), 0600) != 0) {
         syslog(LOG_ERR, "Failed to create FIFO at %s: %s", fifo_path.c_str(), strerror(errno));
         return;
     }
     
-    chmod(fifo_path.c_str(), 0666);
+    chmod(fifo_path.c_str(), 0600);
 
     fifo_fd = ::open(fifo_path.c_str(), O_RDWR | O_NONBLOCK);
     
