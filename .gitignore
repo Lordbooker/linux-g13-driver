@@ -64,3 +64,6 @@ experimental_stuff/
 
 # CLion / CMake
 /cmake-build-*/
+# Python bytecode
+__pycache__/
+*.pyc

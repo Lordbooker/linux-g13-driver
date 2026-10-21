@@ -413,10 +413,7 @@ echo -e "CPU: 50%\nRAM: 4GB" > "$PIPE"
 ```
 
 Only one font (5×7) is implemented. An example monitor script is located in
-`g13-driver/scripts/g13_monitor.py`.
-
-> **Known limitation:** `g13_monitor.py` currently writes to `/tmp/g13-lcd` only and therefore
-> does not find the pipe when `XDG_RUNTIME_DIR` is set (the normal case).
+`g13-driver/scripts/g13_monitor.py` (requires the Python module `psutil`).
 
 ## Uninstallation
 

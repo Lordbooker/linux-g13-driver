@@ -1,7 +1,7 @@
 # Linux G13 Driver – Development Roadmap
 
 This roadmap describes the development path from the original prototype to a stable,
-packaged open source solution. Status: version 2.0.
+packaged open source solution. Status: version 2.6.
 
 ---
 
@@ -96,9 +96,7 @@ interface (IPC). The tray menu controls the driver via `systemctl --user`.
 |---|---|
 | Macros block when stopped | When a running macro is stopped or replaced, the reading thread waits until the end of the current delay step (`d.<ms>`). |
 | Several G13 | Several devices share one LCD pipe and the same configuration files. |
-| Default bindings | The built-in default bindings contain `G22`/`G23`, which do not correspond to any key. |
 | Macro files | Changes to `macro-*.properties` only take effect the next time the bindings are loaded. |
-| `g13_monitor.py` | Only writes to `/tmp/g13-lcd` and does not find the pipe under `$XDG_RUNTIME_DIR`. |
 
 ### 4.2 Ideas
 
