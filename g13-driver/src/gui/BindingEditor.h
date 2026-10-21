@@ -32,15 +32,15 @@ private:
 
     QLabel         *lblKey;
     QLabel         *lblProfile;
-    QComboBox      *cmbType;    // 0=Tastencode  1=Makro  2=Keine Aktion
+    QComboBox      *cmbType;    // 0=key code  1=macro  2=no action
     QStackedWidget *stack;
-    // Seite 0: Tastencode (Eingabefeld: Taste druecken)
+    // Page 0: key code (input field: press a key)
     KeyCaptureEdit *editKey;
-    // Seite 1: Makro
+    // Page 1: macro
     QSpinBox       *spnMacroId;
-    QComboBox      *cmbRepeatMode;   // 0=einmal  1=solange gedrueckt  2=Anzahl
-    QSpinBox       *spnRepeats;      // Anzahl bei Modus 2 (>= 2)
-    // (Seite 2 ist eine leere QWidget fuer "Keine Aktion")
+    QComboBox      *cmbRepeatMode;   // 0=once  1=while held  2=count
+    QSpinBox       *spnRepeats;      // count for mode 2 (>= 2)
+    // (page 2 is an empty QWidget for "no action")
     QPushButton    *btnSave;
     QLabel         *lblStatus;
 };

@@ -31,21 +31,21 @@ MainWindow::MainWindow(QWidget *parent)
     setupOptionsMenu();
     setupTrayIcon();
 
-    // Klick auf Taste im Visualizer → Binding-Editor wechseln
+    // Click on a key in the visualizer -> switch to the binding editor
     connect(ui->visualizer, &G13Visualizer::keySelected, this, [this](const QString &keyName) {
         ui->tabWidget->setCurrentIndex(0);
         ui->editor->setKey(keyName);
     });
 
-    // Profil-Wechsel an alle Tabs weitergeben
+    // Pass profile changes on to all tabs
     connect(this, &MainWindow::profileChanged, ui->visualizer,    &G13Visualizer::setProfile);
     connect(this, &MainWindow::profileChanged, ui->editor,        &BindingEditor::setProfile);
     connect(this, &MainWindow::profileChanged, ui->colorSelector, &ColorSelector::setProfile);
 
-    // Menü-Aktionen
+    // Menu actions
     connect(ui->actionSave_Profile, &QAction::triggered, this, &MainWindow::onSaveProfile);
     connect(ui->actionAbout,        &QAction::triggered, this, &MainWindow::onAbout);
-    // "Beenden" beendet das Config-Tool inkl. Tray-Symbol (der Treiber laeuft weiter).
+    // "Quit" exits the config tool including the tray icon (the driver keeps running).
     connect(ui->actionQuit,         &QAction::triggered, qApp, &QApplication::quit);
 
     statusBar()->showMessage(tr("G13 Config Tool ready."), 3000);
@@ -66,7 +66,7 @@ void MainWindow::setupToolbar()
     tb->addWidget(new QLabel("  " + tr("Profile:") + " ", this));
 
     m_profileCombo = new QComboBox(this);
-    // Die Profile werden am Geraet mit L1..L4 (Tasten unter dem Display) gewaehlt.
+    // Profiles are selected on the device with L1..L4 (keys below the display).
     for (int i = 1; i <= 4; ++i)
         m_profileCombo->addItem(tr("Profile %1  (L%1)").arg(i));
     tb->addWidget(m_profileCombo);
@@ -78,7 +78,7 @@ void MainWindow::setupToolbar()
 }
 
 // ---------------------------------------------------------------------------
-// Optionen (globale Einstellungen in ~/.config/g13/settings.properties)
+// Options (global settings in ~/.config/g13/settings.properties)
 // ---------------------------------------------------------------------------
 namespace {
 
@@ -88,7 +88,7 @@ QString settingsFilePath()
            + "/g13/settings.properties";
 }
 
-// Liest einen Wert; fehlt der Schluessel, gilt defaultValue.
+// Reads a value; if the key is missing, defaultValue applies.
 QString readSetting(const QString &key, const QString &defaultValue)
 {
     QFile f(settingsFilePath());
@@ -107,7 +107,7 @@ QString readSetting(const QString &key, const QString &defaultValue)
     return value;
 }
 
-// Setzt einen Wert und laesst alle anderen Zeilen (auch Kommentare) unveraendert.
+// Sets a value and leaves all other lines (including comments) unchanged.
 bool writeSetting(const QString &key, const QString &value)
 {
     QStringList lines;
@@ -170,14 +170,14 @@ void MainWindow::setupOptionsMenu()
 }
 
 // ---------------------------------------------------------------------------
-// App-Icon und Fenster
+// App icon and window
 // ---------------------------------------------------------------------------
 QIcon MainWindow::appIcon()
 {
     QIcon fallback;
     for (int size : {22, 32, 48, 64, 128, 256})
         fallback.addFile(QString(":/icons/g13-gui-%1.png").arg(size), QSize(size, size));
-    // Installiertes Theme-Icon bevorzugen (hicolor/g13-gui), sonst eingebettet.
+    // Prefer the installed theme icon (hicolor/g13-gui), else the embedded one.
     return QIcon::fromTheme("g13-gui", fallback);
 }
 
@@ -230,7 +230,7 @@ bool MainWindow::setupTrayIcon()
     connect(m_tray, &QSystemTrayIcon::activated, this, &MainWindow::onTrayActivated);
     m_tray->show();
 
-    // Status regelmaessig aktualisieren (Tooltip und Menue).
+    // Update the status regularly (tooltip and menu).
     m_statusTimer = new QTimer(this);
     connect(m_statusTimer, &QTimer::timeout, this, &MainWindow::refreshDriverStatus);
     m_statusTimer->start(10000);
@@ -238,19 +238,19 @@ bool MainWindow::setupTrayIcon()
     return true;
 }
 
-// Fragt den Zustand des systemd-User-Dienstes "g13" ab (asynchron).
+// Queries the state of the systemd user service "g13" (asynchronously).
 void MainWindow::refreshDriverStatus()
 {
     auto *proc = new QProcess(this);
     connect(proc, &QProcess::finished, this, [this, proc](int exitCode, QProcess::ExitStatus status) {
-        // "systemctl is-active" liefert 0 genau dann, wenn der Dienst laeuft.
+        // "systemctl is-active" returns 0 exactly when the service is running.
         applyDriverStatus(status == QProcess::NormalExit && exitCode == 0
                               ? DriverState::Running : DriverState::Stopped);
         proc->deleteLater();
     });
     connect(proc, &QProcess::errorOccurred, this, [this, proc](QProcess::ProcessError error) {
         if (error == QProcess::FailedToStart) {
-            applyDriverStatus(DriverState::Unknown);   // kein systemctl verfuegbar
+            applyDriverStatus(DriverState::Unknown);   // no systemctl available
             proc->deleteLater();
         }
     });
@@ -276,7 +276,7 @@ void MainWindow::applyDriverStatus(DriverState state)
     m_tray->setToolTip(tr("G13 Config Tool") + " – " + text);
 }
 
-// Startet/stoppt den Treiber ueber den systemd-User-Dienst und meldet das Ergebnis.
+// Starts/stops the driver via the systemd user service and reports the result.
 void MainWindow::runSystemctl(const QString &verb, const QString &successMessage)
 {
     auto *proc = new QProcess(this);
@@ -334,7 +334,7 @@ void MainWindow::onAbout()
 
 void MainWindow::onTrayActivated(QSystemTrayIcon::ActivationReason reason)
 {
-    // Linksklick: Fenster ein-/ausblenden
+    // Left click: show/hide the window
     if (reason == QSystemTrayIcon::Trigger) {
         if (isVisible() && !isMinimized())
             hide();
@@ -344,7 +344,7 @@ void MainWindow::onTrayActivated(QSystemTrayIcon::ActivationReason reason)
 }
 
 // ---------------------------------------------------------------------------
-// Schließen → Tray (nicht beenden)
+// Close -> tray (do not quit)
 // ---------------------------------------------------------------------------
 void MainWindow::closeEvent(QCloseEvent *event)
 {
@@ -359,7 +359,7 @@ void MainWindow::closeEvent(QCloseEvent *event)
         }
         event->ignore();
     } else {
-        // Ohne Tray-Symbol wuerde die App sonst unsichtbar weiterlaufen.
+        // Without a tray icon the app would otherwise keep running invisibly.
         event->accept();
         qApp->quit();
     }

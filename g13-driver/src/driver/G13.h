@@ -18,42 +18,45 @@
 
 class G13 {
 private:
+    void reattach_kernel_driver();
+
     std::vector<std::unique_ptr<G13Action>> actions;
 
     libusb_device        *device = nullptr;
     libusb_device_handle *handle = nullptr;
+    bool                  kernel_driver_detached = false;  // reattach on shutdown
     int                   uinput_file;   
 
     int                   loaded = 0;
-    std::atomic<bool>     keepGoing{false};   // stop() kann aus einem anderen Thread kommen
+    std::atomic<bool>     keepGoing{false};   // stop() may be called from another thread
 
     stick_mode_t          stick_mode;    
     int                   stick_keys[4];   
     int                   bindings;      
 
-    // Profiltasten L1-L4: vorheriger Zustand, damit nur beim Druecken
-    // (Flanke) umgeschaltet wird und nicht bei jedem USB-Report.
+    // Profile keys L1-L4: previous state, so the profile is switched only on
+    // press (edge) and not with every USB report.
     bool profile_key_down[4] = {false, false, false, false};
 
-    // Aufeinanderfolgende USB-Lesefehler (ohne Timeout)
+    // Consecutive USB read errors (timeouts excluded)
     int read_error_count = 0;
     int last_read_error  = 0;
 
     unsigned char lcd_buffer[G13_LCD_BUFFER_SIZE];
-    // Schuetzt lcd_buffer und das Senden ans LCD (Startanimation laeuft in eigenem Thread)
+    // Protects lcd_buffer and sending to the LCD (the start animation runs in its own thread)
     std::mutex lcd_mutex;
 
-    // Startanimation (Flammen-Intro), siehe IntroAnimation
+    // Start animation (flame intro), see IntroAnimation
     std::thread       intro_thread;
     std::atomic<bool> intro_stop{false};
     static bool intro_enabled();
     void start_intro();
     void stop_intro();
     void run_intro();
-    void draw_final_logo();   // erwartet gesperrten lcd_mutex
+    void draw_final_logo();   // expects lcd_mutex to be locked
 
-    // Feature: Live-Reload. Aenderungszeit mit Nanosekunden, damit auch mehrere
-    // Speicherungen innerhalb einer Sekunde erkannt werden.
+    // Feature: live reload. Modification time with nanoseconds, so that several
+    // saves within one second are detected as well.
     struct timespec last_config_mtime{};
     bool            config_mtime_known = false;
     void remember_config_mtime(const std::string &filename);
@@ -90,7 +93,7 @@ public:
     // --- LCD ---
     void clear_lcd_buffer();
     void set_pixel(int x, int y, bool on);
-    bool write_lcd();         // erwartet gesperrten lcd_mutex
+    bool write_lcd();         // expects lcd_mutex to be locked
     void write_char(int x, int y, char c);
     void write_text(int x, int y, const std::string& text);
 };

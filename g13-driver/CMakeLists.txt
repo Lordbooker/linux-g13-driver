@@ -2,9 +2,9 @@ cmake_minimum_required(VERSION 3.20)
 
 project(Linux-G13-Driver VERSION 2.0.0 LANGUAGES CXX)
 
-# --- Versionsangabe -----------------------------------------------------------
-# G13_VERSION: Anzeige-Version (Treiber-Log, GUI). Standard: "git describe" ohne
-# fuehrendes "v" (z. B. 2.0.0 oder 2.0.0-3-gd1568bb), sonst PROJECT_VERSION.
+# --- Version ------------------------------------------------------------------
+# G13_VERSION: displayed version (driver log, GUI). Default: "git describe"
+# without the leading "v" (e.g. 2.0.0 or 2.0.0-3-gd1568bb), else PROJECT_VERSION.
 if(NOT DEFINED G13_VERSION)
     find_package(Git QUIET)
     if(GIT_FOUND)
@@ -25,7 +25,7 @@ message(STATUS "linux-g13-driver version: ${G13_VERSION}")
 
 set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
-set(CMAKE_EXPORT_COMPILE_COMMANDS ON)  # fuer clang-tidy
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON)  # for clang-tidy
 
 # --- Build Options ---
 option(BUILD_CONFIG_TOOL "Build the Qt6 config tool" ON)
@@ -50,14 +50,14 @@ if(BUILD_TESTS)
     find_package(GTest REQUIRED)
 endif()
 
-# --- Sanitizer-Support (nur Debug) ---
+# --- Sanitizer support (Debug only) ---
 if(ENABLE_SANITIZERS AND CMAKE_BUILD_TYPE STREQUAL "Debug")
     add_compile_options(-fsanitize=address,undefined -fno-omit-frame-pointer)
     add_link_options(-fsanitize=address,undefined)
 endif()
 
 # =========================================================
-# TARGET 1: Treiber-Daemon (kein GUI-Link)
+# TARGET 1: driver daemon (no GUI libraries)
 # =========================================================
 add_executable(linux-g13-driver
     src/driver/Main.cpp
@@ -86,7 +86,7 @@ target_compile_options(linux-g13-driver PRIVATE
 target_compile_definitions(linux-g13-driver PRIVATE G13_VERSION="${G13_VERSION}")
 
 # =========================================================
-# TARGET 2: Qt6 Config-Tool (nur wenn BUILD_CONFIG_TOOL)
+# TARGET 2: Qt6 config tool (only if BUILD_CONFIG_TOOL)
 # =========================================================
 if(BUILD_CONFIG_TOOL)
     add_executable(g13-gui
@@ -119,14 +119,14 @@ if(BUILD_CONFIG_TOOL)
         Qt6::Widgets
         Qt6::Core
         Qt6::Gui
-        Qt6::Network    # QLocalServer/QLocalSocket fuer die Einzelinstanz
+        Qt6::Network    # QLocalServer/QLocalSocket for the single instance
     )
     target_compile_definitions(g13-gui PRIVATE G13_VERSION="${G13_VERSION}")
 
-    # Uebersetzungen: Quelltexte sind Englisch (zugleich Rueckfallsprache).
-    # Die .qm-Dateien werden beim Bauen erzeugt und unter :/i18n eingebettet;
-    # g13-gui waehlt beim Start die passende Sprache (QLocale::system()).
-    # .ts-Dateien nach Textaenderungen aktualisieren: cmake --build build --target update_translations
+    # Translations: source texts are English (also the fallback language).
+    # The .qm files are generated during the build and embedded under :/i18n;
+    # g13-gui picks the matching language at startup (QLocale::system()).
+    # Update the .ts files after text changes: cmake --build build --target update_translations
     set(G13_GUI_LANGUAGES de fr it es pt)
     set(G13_GUI_TS_FILES)
     foreach(lang IN LISTS G13_GUI_LANGUAGES)
@@ -150,15 +150,15 @@ if(BUILD_CONFIG_TOOL)
     install(TARGETS g13-gui
         RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
     )
-    # Anwendungsmenue
+    # Application menu
     install(FILES src/desktop/g13-gui.desktop
         DESTINATION ${CMAKE_INSTALL_DATADIR}/applications
     )
-    # Tray-Symbol beim Anmelden (XDG-Autostart; bei Prefix /usr -> /etc/xdg/autostart)
+    # Tray icon at login (XDG autostart; with prefix /usr -> /etc/xdg/autostart)
     install(FILES src/desktop/g13-gui-tray.desktop
         DESTINATION ${CMAKE_INSTALL_FULL_SYSCONFDIR}/xdg/autostart
     )
-    # Icons (hicolor-Theme)
+    # Icons (hicolor theme)
     install(FILES src/resources/icons/g13-gui.svg
         DESTINATION ${CMAKE_INSTALL_DATADIR}/icons/hicolor/scalable/apps
     )
@@ -169,20 +169,20 @@ if(BUILD_CONFIG_TOOL)
         )
     endforeach()
 endif()
-# Relative Ziele (= <prefix>/lib/...): absolute Pfade wuerden von CPack/RPM
-# automatisch als %config markiert, was fuer Dateien unter /usr/lib falsch ist.
+# Relative destinations (= <prefix>/lib/...): CPack/RPM would automatically mark
+# absolute paths as %config, which is wrong for files under /usr/lib.
 install(FILES src/udev/70-g13.rules
     DESTINATION lib/udev/rules.d
 )
 install(FILES src/systemd/g13.service
     DESTINATION lib/systemd/user
 )
-# Dokumentation und Lizenz
+# Documentation and license
 install(FILES ../README.md ../LICENSE ../AUTHORS
     DESTINATION ${CMAKE_INSTALL_DATADIR}/doc/linux-g13-driver
 )
 
 # =========================================================
-# Pakete (.deb / .rpm) – siehe cmake/Packaging.cmake
+# Packages (.deb / .rpm) - see cmake/Packaging.cmake
 # =========================================================
 include(cmake/Packaging.cmake)

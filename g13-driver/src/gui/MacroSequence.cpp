@@ -28,7 +28,7 @@ QString Event::displayText() const
     return {};
 }
 
-// Liest "<prefix><zahl>" mit nicht-negativer Ganzzahl; sonst false.
+// Reads "<prefix><number>" with a non-negative integer; false otherwise.
 static bool readValue(const QString &token, const QString &prefix, int &value)
 {
     if (!token.startsWith(prefix))

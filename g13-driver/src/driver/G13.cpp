@@ -31,15 +31,15 @@
 extern volatile sig_atomic_t daemon_keep_running;
 const int G13_MAX_MACROS = 200;
 
-// bmRequestType fuer HID-Class-Requests an das Interface (LCD-Init, Farbe).
-// Explizit als uint8_t gebildet: die direkte Verknuepfung zweier libusb-Enums
-// unterschiedlichen Typs ist seit C++20 veraltet (-Wdeprecated-enum-enum-conversion).
+// bmRequestType for HID class requests to the interface (LCD init, color).
+// Built explicitly as uint8_t: combining two libusb enums of different types
+// directly is deprecated since C++20 (-Wdeprecated-enum-enum-conversion).
 constexpr uint8_t G13_HID_CLASS_REQUEST =
     static_cast<uint8_t>(LIBUSB_REQUEST_TYPE_CLASS) |
     static_cast<uint8_t>(LIBUSB_RECIPIENT_INTERFACE);
 
-// Nach so vielen aufeinanderfolgenden USB-Lesefehlern (je ca. 100 ms Pause)
-// wird das Geraet freigegeben; der Geraete-Thread oeffnet es danach neu.
+// After this many consecutive USB read errors (about 100 ms pause each) the
+// device is released; the device thread opens it again afterwards.
 const int G13_MAX_CONSECUTIVE_READ_ERRORS = 50;
 
 std::string trim_string(const std::string& str) {
@@ -67,13 +67,18 @@ G13::G13(libusb_device *device) {
     }
 
     if (libusb_kernel_driver_active(handle, 0) == 1) {
-        if (libusb_detach_kernel_driver(handle, 0) == 0) {
+        const int rc = libusb_detach_kernel_driver(handle, 0);
+        if (rc == 0) {
+            kernel_driver_detached = true;
             syslog(LOG_INFO, "Kernel driver detached");
+        } else {
+            syslog(LOG_WARNING, "Could not detach kernel driver: %s", libusb_error_name(rc));
         }
     }
 
     if (libusb_claim_interface(handle, 0) < 0) {
         syslog(LOG_ERR, "Cannot claim interface");
+        reattach_kernel_driver();
         libusb_close(handle);
         handle = nullptr;
         return;
@@ -97,7 +102,20 @@ G13::~G13() {
     cleanup_fifo(); 
     if (!this->loaded) return;
     libusb_release_interface(this->handle, 0);
+    reattach_kernel_driver();
     libusb_close(this->handle);
+}
+
+// Reattach the kernel driver detached at startup (e.g. hid-lg-g15), so the G13
+// keeps working after the driver stops, without replugging.
+void G13::reattach_kernel_driver() {
+    if (!kernel_driver_detached || !handle) return;
+    kernel_driver_detached = false;
+    const int rc = libusb_attach_kernel_driver(handle, 0);
+    if (rc == 0)
+        syslog(LOG_INFO, "Kernel driver reattached");
+    else if (rc != LIBUSB_ERROR_NO_DEVICE)   // device unplugged: nothing to do
+        syslog(LOG_WARNING, "Could not reattach kernel driver: %s", libusb_error_name(rc));
 }
 
 void G13::start() {
@@ -130,8 +148,8 @@ void G13::check_for_config_update() {
     struct stat file_stat;
     if (stat(filename.c_str(), &file_stat) != 0)
         return;
-    // Auf Gleichheit pruefen statt auf "neuer": auch eine zurueckgestellte Uhr
-    // oder eine erst spaeter angelegte Datei fuehren so zum Neuladen.
+    // Check for inequality instead of "newer": a clock set back or a file
+    // created later also trigger a reload this way.
     const bool changed = !config_mtime_known
         || file_stat.st_mtim.tv_sec  != last_config_mtime.tv_sec
         || file_stat.st_mtim.tv_nsec != last_config_mtime.tv_nsec;
@@ -189,8 +207,8 @@ void G13::parse_bindings_from_stream(std::istream& stream) {
         std::string value = trim_string(trimmed_line.substr(eq_pos + 1));
 
         if (key == "color") {
-            // Ungueltige Werte werden ignoriert (frueher: std::stoi warf eine
-            // Exception ausserhalb des try und beendete den Daemon).
+            // Invalid values are ignored (previously std::stoi threw an
+            // exception outside the try block and terminated the daemon).
             try {
                 std::stringstream ss(value);
                 std::string segment;
@@ -253,13 +271,13 @@ void G13::parse_bindings_from_stream(std::istream& stream) {
     }
 }
 
-// Laesst alle gedrueckten Tasten los und entfernt alle Belegungen.
-// Wird vor jedem Laden aufgerufen:
-//  - Tasten, die im (neuen) Profil nicht eingetragen sind, haben keine Funktion
-//    (vorher behielten sie die Belegung des vorherigen Profils bzw. einer
-//    aus der Datei entfernten Zeile).
-//  - Gedrueckte Tasten werden losgelassen, damit sie im System nicht haengen.
-//  - Laufende Makros werden beim Ersetzen gestoppt (MacroAction-Destruktor).
+// Releases all pressed keys and removes all bindings.
+// Called before every load:
+//  - Keys that are not listed in the (new) profile have no function
+//    (previously they kept the binding of the previous profile or of a line
+//    removed from the file).
+//  - Pressed keys are released so they do not get stuck in the system.
+//  - Running macros are stopped when replaced (MacroAction destructor).
 void G13::reset_actions() {
     for (auto &action : actions) {
         if (action && action->isPressed())
@@ -274,8 +292,8 @@ void G13::loadBindings() {
     // NEW: Use ConfigPath helper
     std::string filename = ConfigPath::getBindingPath(bindings);
 
-    // Zeitstempel VOR dem Lesen merken: aendert sich die Datei waehrenddessen,
-    // erkennt check_for_config_update() das und laedt erneut.
+    // Remember the timestamp BEFORE reading: if the file changes meanwhile,
+    // check_for_config_update() notices it and loads again.
     remember_config_mtime(filename);
 
     std::ifstream file(filename);
@@ -328,7 +346,7 @@ G20=p,k.50
 )RAW";
             outfile << default_bindings;
             outfile.close();
-            remember_config_mtime(filename);   // sonst wirken spaetere Aenderungen nicht
+            remember_config_mtime(filename);   // otherwise later changes have no effect
             
             // Now parse what we just wrote
             std::stringstream ss(default_bindings);
@@ -362,7 +380,7 @@ int G13::read() {
     
     if (error && error != LIBUSB_ERROR_TIMEOUT) {
         ++read_error_count;
-        // Nur den ersten Fehler einer Serie bzw. einen neuen Fehlertyp loggen.
+        // Log only the first error of a series or a new error type.
         if (read_error_count == 1 || error != last_read_error) {
             syslog(LOG_ERR, "Error while reading keys: %s", libusb_error_name(error));
         }
@@ -375,7 +393,7 @@ int G13::read() {
             last_read_error = 0;
             return -4;
         }
-        // Kurze Pause statt sofortiger Wiederholung (sonst Volllast + Log-Flut).
+        // Short pause instead of an immediate retry (otherwise full CPU load and log flood).
         std::this_thread::sleep_for(std::chrono::milliseconds(100));
         return -1;
     }
@@ -429,8 +447,8 @@ void G13::parse_key(int key, unsigned char *byte) {
 
     switch (key) {
     case 25: case 26: case 27: case 28: {
-        // Nur beim Druecken (Flanke) umschalten. Vorher wurde bei jedem
-        // USB-Report neu geladen, solange die Taste gehalten wurde.
+        // Switch only on press (edge). Previously the profile was reloaded with
+        // every USB report while the key was held.
         const int index = key - 25;
         const bool down = pressed != 0;
         if (down && !profile_key_down[index]) {
@@ -526,7 +544,7 @@ bool G13::write_lcd() {
     return true;
 }
 
-// --- Startanimation ---
+// --- Start animation ---
 
 // Global setting "intro" in settings.properties (default: on).
 bool G13::intro_enabled() {
@@ -587,11 +605,11 @@ void G13::run_intro() {
         intro.compose(bits);
         {
             std::lock_guard<std::mutex> lock(lcd_mutex);
-            if (intro_stop) return;   // z. B. Text aus der LCD-Pipe kam zuvor
+            if (intro_stop) return;   // e.g. text from the LCD pipe came first
             for (int y = 0; y < IntroAnimation::Height; ++y)
                 for (int x = 0; x < IntroAnimation::Width; ++x)
                     set_pixel(x, y, bits[y * IntroAnimation::Width + x] != 0);
-            if (!write_lcd()) return;   // Geraet weg o. ae.; Fehler ist bereits geloggt
+            if (!write_lcd()) return;   // device gone or similar; error is already logged
         }
         next += frame_time;
         std::this_thread::sleep_until(next);
@@ -606,7 +624,7 @@ void G13::run_intro() {
 
 void G13::write_char(int x, int y, char c) {
     // (Existing implementation)
-    if (c < 32 || c > 126) c = 32; // font_5x7 enthaelt die Zeichen 32..126
+    if (c < 32 || c > 126) c = 32; // font_5x7 contains the characters 32..126
     int font_index = (c - 32) * 5;
     for (int col = 0; col < 5; col++) {
         uint8_t line = font_5x7[font_index + col];
@@ -633,7 +651,7 @@ void G13::init_fifo() {
 
     unlink(fifo_path.c_str());
 
-    // Nur fuer den eigenen Benutzer (liegt normalerweise in /run/user/<uid>)
+    // Only for the own user (usually located in /run/user/<uid>)
     if (mkfifo(fifo_path.c_str(), 0600) != 0) {
         syslog(LOG_ERR, "Failed to create FIFO at %s: %s", fifo_path.c_str(), strerror(errno));
         return;
@@ -655,7 +673,7 @@ void G13::cleanup_fifo() {
         ::close(fifo_fd);
         fifo_fd = -1;
     }
-    // fifo_path ist leer, wenn der Konstruktor vor init_fifo() abgebrochen hat.
+    // fifo_path is empty if the constructor aborted before init_fifo().
     if (!fifo_path.empty()) {
         unlink(fifo_path.c_str());
     }
@@ -674,7 +692,7 @@ void G13::check_fifo() {
             input.pop_back();
         }
 
-        stop_intro();   // Text aus der Pipe hat Vorrang vor der Startanimation
+        stop_intro();   // text from the pipe takes precedence over the start animation
         std::lock_guard<std::mutex> lock(lcd_mutex);
         clear_lcd_buffer();
         

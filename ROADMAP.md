@@ -1,153 +1,153 @@
-# Linux G13 Driver – Entwicklungs-Roadmap
+# Linux G13 Driver – Development Roadmap
 
-Diese Roadmap beschreibt den Entwicklungsweg vom ursprünglichen Prototypen bis zu einer stabilen,
-paketierten Open-Source-Lösung. Stand: Version 2.0.
+This roadmap describes the development path from the original prototype to a stable,
+packaged open source solution. Status: version 2.0.
 
 ---
 
-## Phase 1 – Kern-Treiber (abgeschlossen)
+## Phase 1 – Core driver (completed)
 
-**Ziel:** Funktionsfähiger Daemon, der G13-Tasten per `uinput` an das System weiterreicht.
+**Goal:** A working daemon that passes G13 keys on to the system via `uinput`.
 
-| Aufgabe | Status |
+| Task | Status |
 |---|---|
-| USB-Kommunikation via `libusb-1.0` | Fertig |
-| Virtuelle Tastatur via `uinput` | Fertig |
-| Binding-Dateien lesen (`.properties`) | Fertig |
-| Joystick-Emulation (Tasten-Modus) | Fertig |
-| LCD-Grundfunktionen (Buffer, Pixel, Text) | Fertig |
-| Vier Binding-Profile (Umschaltung per L1–L4) mit Live-Reload | Fertig |
-| Makro-Unterstützung | Fertig |
-| LCD-FIFO-Schnittstelle (`$XDG_RUNTIME_DIR/g13-lcd`, Fallback `/tmp/g13-lcd`) | Fertig |
-| `systemd`-User-Unit + `udev`-Regel | Fertig |
+| USB communication via `libusb-1.0` | Done |
+| Virtual keyboard via `uinput` | Done |
+| Reading binding files (`.properties`) | Done |
+| Joystick emulation (key mode) | Done |
+| Basic LCD functions (buffer, pixels, text) | Done |
+| Four binding profiles (switched with L1–L4) with live reload | Done |
+| Macro support | Done |
+| LCD FIFO interface (`$XDG_RUNTIME_DIR/g13-lcd`, fallback `/tmp/g13-lcd`) | Done |
+| `systemd` user unit + `udev` rule | Done |
 
 ---
 
-## Phase 2 – Refactoring & Robustheit (abgeschlossen)
+## Phase 2 – Refactoring & robustness (completed)
 
-**Ziel:** Daemon ohne GUI-Toolkit, modernes Build-System, stabiles Verhalten im Fehlerfall.
+**Goal:** Daemon without a GUI toolkit, modern build system, stable behavior on errors.
 
-| Aufgabe | Status |
+| Task | Status |
 |---|---|
-| C++-Standard auf **C++23**, CMake **3.20+** | Fertig |
-| **GTK3 / AppIndicator aus dem Daemon entfernt** – reiner Hintergrunddienst | Fertig |
-| Build-Optionen `BUILD_CONFIG_TOOL`, `BUILD_TESTS`, `ENABLE_SANITIZERS`; `GNUInstallDirs` | Fertig |
-| Warnungsfreier Build (`-Wall -Wextra`) | Fertig |
-| Sauberes Herunterfahren: Signal-Handler setzt nur ein Flag, alle Geräte-Threads werden gejoint | Fertig |
-| Belegungen werden vor jedem Laden zurückgesetzt (nicht eingetragene Tasten ohne Funktion) | Fertig |
-| Keine hängenden Tasten bei Profilwechsel/Live-Reload; Profilwechsel nur bei Tastendruck | Fertig |
-| Neuversuch nach fehlgeschlagenem Öffnen; beendete Geräte-Threads werden aufgeräumt | Fertig |
-| USB-Lesefehler: Pause, gedrosseltes Logging, Freigabe und Neuöffnen nach Fehlerserie | Fertig |
-| Ungültige `color`-Werte, Init-Fehler und LCD-Zeichen 127 führen nicht mehr zu Absturz/UB | Fertig |
+| C++ standard **C++23**, CMake **3.20+** | Done |
+| **GTK3 / AppIndicator removed from the daemon** – pure background service | Done |
+| Build options `BUILD_CONFIG_TOOL`, `BUILD_TESTS`, `ENABLE_SANITIZERS`; `GNUInstallDirs` | Done |
+| Warning-free build (`-Wall -Wextra`) | Done |
+| Clean shutdown: the signal handler only sets a flag, all device threads are joined | Done |
+| Bindings are reset before every load (keys not listed have no function) | Done |
+| No stuck keys on profile switch/live reload; profile switch only on key press | Done |
+| Retry after a failed open; finished device threads are cleaned up | Done |
+| USB read errors: pause, throttled logging, release and reopen after a series of errors | Done |
+| Invalid `color` values, init errors and LCD character 127 no longer cause crashes/UB | Done |
+| In-kernel driver (`hid-lg-g15`, Linux 6.19+) is reattached when the driver stops | Done |
 
 ---
 
-## Phase 3 – Qt6 Config-Tool (abgeschlossen, v2.0)
+## Phase 3 – Qt6 config tool (completed, v2.0)
 
-**Ziel:** Grafische Konfiguration auf Basis von **Qt6** als Ersatz für das Java-Tool.
+**Goal:** Graphical configuration based on **Qt6** as a replacement for the Java tool.
 
-### 3.1 Architektur
+### 3.1 Architecture
 
 ```
-linux-g13-driver  (systemd-User-Dienst, kein GUI-Toolkit)
+linux-g13-driver  (systemd user service, no GUI toolkit)
         ^
-        |  Konfigurationsdateien ~/.config/g13/*.properties
-        |  (Treiber: Live-Reload der Bindings-Datei des aktiven Profils)
+        |  configuration files ~/.config/g13/*.properties
+        |  (driver: live reload of the bindings file of the active profile)
         |
-g13-gui           (Qt6-Anwendung, Tray-Symbol per XDG-Autostart)
-   ├── MainWindow      – Hauptfenster, Tray-Menü, Einzelinstanz
-   ├── G13Visualizer   – klickbares G13-Bild
-   ├── BindingEditor   – Tastenbelegung pro Profil
-   ├── ColorSelector   – Hintergrundbeleuchtung (RGB)
-   └── MacroRecorder   – Makros aufnehmen und bearbeiten
+g13-gui           (Qt6 application, tray icon via XDG autostart)
+   ├── MainWindow      – main window, tray menu, single instance
+   ├── G13Visualizer   – clickable G13 image
+   ├── BindingEditor   – key bindings per profile
+   ├── ColorSelector   – backlight (RGB)
+   └── MacroRecorder   – record and edit macros
 ```
 
-GUI und Treiber kommunizieren ausschließlich über die Konfigurationsdateien; eine direkte
-Schnittstelle (IPC) gibt es nicht. Das Tray-Menü steuert den Treiber über `systemctl --user`.
+GUI and driver communicate only through the configuration files; there is no direct
+interface (IPC). The tray menu controls the driver via `systemctl --user`.
 
-### 3.2 Umgesetzt
+### 3.2 Implemented
 
-| Aufgabe | Status |
+| Task | Status |
 |---|---|
-| Klickbares G13-Bild (unverzerrt, skalierend) inkl. M1–M3/MR, BD, Daumentasten, Joystick-Richtungen | Fertig |
-| Markierung belegter Tasten und des aktiven Profils (L1–L4) | Fertig |
-| Binding-Editor: Tastencode, Makro (einmal / solange gedrückt / n-mal), keine Aktion | Fertig |
-| Farbwahl pro Profil | Fertig |
-| Makro-Editor: Aufnahme mit Zeitabständen, Ereignisliste, manuelles Einfügen, feste Verzögerung | Fertig |
-| Tray-Symbol: Konfiguration öffnen, Treiber starten/stoppen/neu starten, Status | Fertig |
-| XDG-Autostart des Tray-Symbols, Menüeintrag, eigenes App-Icon | Fertig |
-| Einzelinstanz: erneuter Start öffnet das vorhandene Fenster | Fertig |
-| Mehrsprachigkeit nach Systemsprache (Qt Linguist): Englisch als Quelle/Rückfall, Deutsch, Französisch, Italienisch, Spanisch, Portugiesisch | Fertig |
-| Treiber-Logmeldungen einheitlich Englisch | Fertig |
-| Tasteneingabe per Tastendruck statt Auswahlliste, Tastennamen im eigenen Layout | Fertig |
-| LCD-Startanimation (Flammenwand, Tux und Logo), abschaltbar unter Optionen | Fertig |
-| Zugriffsrechte: nur `uaccess` (Regel `70-g13.rules`, kein `MODE="0666"`), LCD-Pipe 0600 | Fertig |
-| Profildatei atomar schreiben, Live-Reload mit Nanosekunden; Live-Reload auch nach erstmaligem Anlegen | Fertig |
-| `make` baut nur; Abhängigkeiten per `make deps` | Fertig |
+| Clickable G13 image (undistorted, scaling) incl. M1–M3/MR, BD, thumb keys, joystick directions | Done |
+| Highlighting of bound keys and of the active profile (L1–L4) | Done |
+| Binding editor: key code, macro (once / while held / n times), no action | Done |
+| Color selection per profile | Done |
+| Macro editor: recording with delays, event list, manual insertion, fixed delay | Done |
+| Tray icon: open configuration, start/stop/restart driver, status | Done |
+| XDG autostart of the tray icon, menu entry, own app icon | Done |
+| Single instance: starting again opens the existing window | Done |
+| Translations based on the system language (Qt Linguist): English as source/fallback, German, French, Italian, Spanish, Portuguese | Done |
+| Driver log messages consistently in English | Done |
+| Key input by pressing the key instead of a selection list, key names in the user's own layout | Done |
+| LCD start animation (flame wall, Tux and logo), can be disabled under Options | Done |
+| Permissions: `uaccess` only (rule `70-g13.rules`, no `MODE="0666"`), LCD pipe 0600 | Done |
+| Profile files written atomically, live reload with nanoseconds; live reload also after the file is first created | Done |
+| `make` only builds; dependencies via `make deps` | Done |
 
 ---
 
-## Phase 4 – Offene Punkte und erweiterte Funktionen
+## Phase 4 – Open issues and extended features
 
-### 4.1 Bekannte Einschränkungen
+### 4.1 Known limitations
 
-| Punkt | Beschreibung |
+| Item | Description |
 |---|---|
-| Makros blockieren beim Stoppen | Wird ein laufendes Makro gestoppt oder ersetzt, wartet der Lese-Thread bis zum Ende des aktuellen Warteschritts (`d.<ms>`). |
-| Mehrere G13 | Mehrere Geräte teilen sich eine LCD-Pipe und dieselben Konfigurationsdateien. |
-| Default-Bindings | Die eingebauten Standardbelegungen enthalten `G22`/`G23`, die keiner Taste entsprechen. |
-| Makro-Dateien | Änderungen an `macro-*.properties` wirken erst beim nächsten Laden der Bindings. |
-| `g13_monitor.py` | Schreibt nur nach `/tmp/g13-lcd` und findet die Pipe unter `$XDG_RUNTIME_DIR` nicht. |
-| Kleinigkeiten | Veralteter `install-user`-Kommentar in `g13.service`. |
+| Macros block when stopped | When a running macro is stopped or replaced, the reading thread waits until the end of the current delay step (`d.<ms>`). |
+| Several G13 | Several devices share one LCD pipe and the same configuration files. |
+| Default bindings | The built-in default bindings contain `G22`/`G23`, which do not correspond to any key. |
+| Macro files | Changes to `macro-*.properties` only take effect the next time the bindings are loaded. |
+| `g13_monitor.py` | Only writes to `/tmp/g13-lcd` and does not find the pipe under `$XDG_RUNTIME_DIR`. |
 
-### 4.2 Ideen
+### 4.2 Ideas
 
-| Aufgabe | Beschreibung |
+| Task | Description |
 |---|---|
-| Hotplug ohne Polling | Geräteerkennung per libusb-Hotplug statt 1-Sekunden-Abfrage |
-| Joystick-Absolutmodus | Im Treiber vorhanden, aber nicht konfigurierbar |
-| LCD-Plugins | Uhr, Systemlast, „jetzt läuft“ usw. über die FIFO |
-| Profilwechsel von außen | z. B. per D-Bus durch GUI oder andere Programme |
-| Per-App-Profile | Automatischer Profilwechsel je nach aktivem Fenster |
+| Hotplug without polling | Device detection via libusb hotplug instead of polling every second |
+| Joystick absolute mode | Present in the driver, but not configurable |
+| LCD plugins | Clock, system load, "now playing" etc. via the FIFO |
+| Profile switching from outside | e.g. via D-Bus from the GUI or other programs |
+| Per-app profiles | Automatic profile switch depending on the active window |
 
 ---
 
-## Phase 5 – Tests & Qualitätssicherung (offen)
+## Phase 5 – Tests & quality assurance (open)
 
-Im Repository gibt es bisher keine automatisierten Tests.
+There are no automated tests in the repository yet.
 
-| Aufgabe | Werkzeug |
+| Task | Tool |
 |---|---|
-| Unit-Tests für Binding-Parser und Makro-Engine | GoogleTest |
-| Treibertests gegen ein simuliertes G13 (libusb-/uinput-Attrappe) | GoogleTest |
-| Statische Analyse | `clang-tidy`, `cppcheck` |
-| Speicher-Sanitizer | `-fsanitize=address,undefined` (via `ENABLE_SANITIZERS`) |
-| CI-Pipeline | GitHub Actions: Build und Tests bei jedem Push |
+| Unit tests for the binding parser and the macro engine | GoogleTest |
+| Driver tests against a simulated G13 (libusb/uinput mock) | GoogleTest |
+| Static analysis | `clang-tidy`, `cppcheck` |
+| Memory sanitizers | `-fsanitize=address,undefined` (via `ENABLE_SANITIZERS`) |
+| CI pipeline | GitHub Actions: build and tests on every push |
 
 ---
 
-## Phase 6 – Paketierung & Release
+## Phase 6 – Packaging & release
 
-| Aufgabe | Status |
+| Task | Status |
 |---|---|
-| Arch Linux – AUR-Paket `linux-g13-driver-git` | Fertig |
-| Versions-Tags (`v1.0.0` Java-Stand, `v2.0.0` Qt6) | Fertig |
-| `make remove-legacy` zum Entfernen alter Installationen | Fertig |
-| `.deb`-Pakete für Debian 12/13 und Ubuntu 22.04/24.04/26.04 (CPack) | Fertig |
-| `.rpm`-Pakete für Fedora 43/44 (CPack) | Fertig |
-| GitHub-Release mit Changelog per GitHub Actions bei Tag-Push | Fertig |
-| Lizenzdatei (`LICENSE`, GPL-2.0-only) und `AUTHORS` | Fertig |
+| Arch Linux – AUR package `linux-g13-driver-git` | Done |
+| Version tags (`v1.0.0` Java version, `v2.0.0` Qt6) | Done |
+| `make remove-legacy` to remove old installations | Done |
+| `.deb` packages for Debian 12/13 and Ubuntu 22.04/24.04/26.04 (CPack) | Done |
+| `.rpm` packages for Fedora 43/44 (CPack) | Done |
+| GitHub release with changelog via GitHub Actions on tag push | Done |
+| License file (`LICENSE`, GPL-2.0-only) and `AUTHORS` | Done |
 
 ---
 
-## Technologie-Stack (Übersicht)
+## Technology stack (overview)
 
-| Schicht | Technologie |
+| Layer | Technology |
 |---|---|
-| Sprache | C++23 |
-| Build | CMake 3.20+ (`GNUInstallDirs`), Makefile als Komfort-Wrapper |
+| Language | C++23 |
+| Build | CMake 3.20+ (`GNUInstallDirs`), Makefile as a convenience wrapper |
 | USB | libusb-1.0 |
-| Tastatur-Ereignisse | uinput / `linux/input.h` |
-| Geräteerkennung | Polling über libusb (1 s) |
-| GUI | Qt6 (Widgets, Network für die Einzelinstanz), Qt Linguist für Übersetzungen |
-| Dienst | systemd-User-Unit, udev-Regel mit `uaccess` |
+| Keyboard events | uinput / `linux/input.h` |
+| Device detection | Polling via libusb (1 s) |
+| GUI | Qt6 (Widgets, Network for the single instance), Qt Linguist for translations |
+| Service | systemd user unit, udev rule with `uaccess` |

@@ -1,12 +1,12 @@
 #!/bin/sh
 #
-# Baut ein .deb (Debian/Ubuntu) bzw. .rpm (Fedora) fuer das laufende System.
-# Gedacht fuer einen frischen Container der Zieldistribution (als root):
+# Builds a .deb (Debian/Ubuntu) or .rpm (Fedora) for the running system.
+# Intended for a fresh container of the target distribution (as root):
 #
 #   docker run --rm -v "$PWD:/src" -w /src debian:13 g13-driver/packaging/build-package.sh dist
 #
-# Argument: Ausgabeverzeichnis (Standard: dist/ im Repository)
-# Optional: G13_PACKAGE_VERSION, z. B. 2.1.0 (Standard: aus dem Git-Tag)
+# Argument: output directory (default: dist/ in the repository)
+# Optional: G13_PACKAGE_VERSION, e.g. 2.1.0 (default: from the git tag)
 #
 set -eu
 
@@ -24,9 +24,9 @@ case "$ID" in
         apt-get install -y -q --no-install-recommends \
             build-essential cmake pkg-config git ca-certificates file dpkg-dev \
             libusb-1.0-0-dev qt6-base-dev qt6-tools-dev qt6-tools-dev-tools qt6-l10n-tools libgl-dev
-        # libgl-dev: Qt 6.2 (Ubuntu 22.04) findet Qt6::Gui sonst nicht (WrapOpenGL)
+        # libgl-dev: otherwise Qt 6.2 (Ubuntu 22.04) does not find Qt6::Gui (WrapOpenGL)
         GENERATOR=DEB
-        # z. B. 1~debian13 oder 1~ubuntu24.04 – eindeutige Dateinamen je System
+        # e.g. 1~debian13 or 1~ubuntu24.04 - unique file names per system
         RELEASE="1~${ID}${VERSION_ID}"
         ;;
     fedora)
@@ -34,15 +34,15 @@ case "$ID" in
             gcc-c++ make cmake pkgconf-pkg-config git rpm-build \
             libusb1-devel qt6-qtbase-devel qt6-qttools-devel
         GENERATOR=RPM
-        RELEASE="1"          # %{?dist} (z. B. .fc44) haengt CPack an
+        RELEASE="1"          # CPack appends %{?dist} (e.g. .fc44)
         ;;
     *)
-        echo "Nicht unterstuetzte Distribution: $ID" >&2
+        echo "Unsupported distribution: $ID" >&2
         exit 1
         ;;
 esac
 
-# Repository gehoert im Container einem anderen Benutzer -> fuer git describe freigeben
+# In the container the repository belongs to another user -> allow it for git describe
 git config --global --add safe.directory '*'
 
 set -- -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=/usr -DBUILD_TESTS=OFF \

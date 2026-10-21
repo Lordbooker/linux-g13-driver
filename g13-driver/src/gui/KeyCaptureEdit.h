@@ -1,26 +1,26 @@
 #pragma once
 #include <QLineEdit>
 
-// Eingabezeile, die eine einzelne Taste erfasst: hineinklicken, Taste druecken.
-// Gespeichert wird der Linux-Input-Keycode (wie im Treiber). Erfasst werden auch
-// Tasten, die sonst die Oberflaeche bedienen (Tab, Enter, Esc, Strg+S, ...).
+// Input field that captures a single key: click into it, press a key.
+// The Linux input keycode is stored (as in the driver). Keys that otherwise
+// control the user interface (Tab, Enter, Esc, Ctrl+S, ...) are captured too.
 class KeyCaptureEdit : public QLineEdit {
     Q_OBJECT
 public:
     explicit KeyCaptureEdit(QWidget *parent = nullptr);
 
-    // Linux-Keycode der erfassten Taste, 0 = keine Taste.
+    // Linux keycode of the captured key, 0 = no key.
     int keyCode() const { return m_keyCode; }
     void setKeyCode(int code);
     void clearKey() { setKeyCode(0); }
 
-    // Linux-Keycode aus QKeyEvent::nativeScanCode() (XKB-Keycode = Linux-Keycode + 8),
-    // 0 wenn das System keinen Scancode liefert.
+    // Linux keycode from QKeyEvent::nativeScanCode() (XKB keycode = Linux keycode + 8),
+    // 0 if the system does not provide a scan code.
     static int linuxKeyCode(quint32 nativeScanCode);
 
 signals:
-    // withModifiers: beim Druecken waren Strg/Shift/Alt/Super gehalten. Erfasst
-    // wird trotzdem nur die eine Taste (der Treiber sendet genau einen Tastencode).
+    // withModifiers: Ctrl/Shift/Alt/Super were held during the press. Only the
+    // single key is captured anyway (the driver sends exactly one key code).
     void keyCaptured(int code, bool withModifiers);
 
 protected:

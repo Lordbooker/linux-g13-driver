@@ -4,8 +4,7 @@ After=graphical-session.target
 
 [Service]
 Type=simple
-# Standard-Pfad für Paket-Installationen.
-# Wird bei "make install-user" via sed automatisch angepasst.
+# Path for package installations and "make install" (PREFIX=/usr).
 ExecStart=/usr/bin/linux-g13-driver
 Restart=on-failure
 RestartSec=5

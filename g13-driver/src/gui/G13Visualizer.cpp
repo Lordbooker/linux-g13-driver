@@ -13,14 +13,14 @@
 #include <QToolTip>
 
 namespace {
-// Joystick im Originalbild: Mittelpunkt, Radius des Knopfes (TOP) und des Rings.
+// Joystick in the original image: center, radius of the knob (TOP) and of the ring.
 constexpr QPointF StickCenter{440.0, 421.0};
 constexpr qreal   StickInner = 11.0;
 constexpr qreal   StickOuter = 33.0;
 }
 
 // ---------------------------------------------------------------------------
-// Aufbau
+// Setup
 // ---------------------------------------------------------------------------
 G13Visualizer::G13Visualizer(QWidget *parent) : QWidget(parent)
 {
@@ -28,22 +28,22 @@ G13Visualizer::G13Visualizer(QWidget *parent) : QWidget(parent)
     setMouseTracking(true);
     setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
 
-    // Alle Masse in Pixeln des Originalbildes resources/g13.gif (491 x 710).
+    // All dimensions in pixels of the original image resources/g13.gif (491 x 710).
 
-    // Tasten unter dem LCD
+    // Keys below the LCD
     addEllipse("BD", {120, 120}, 11);
     addRect("L1", 161, 115, 37, 13);
     addRect("L2", 205, 115, 37, 13);
     addRect("L3", 249, 115, 37, 13);
     addRect("L4", 293, 115, 36, 13);
 
-    // Profil-Reihe
+    // Profile row
     addRect("M1", 101, 146, 68, 18);
     addRect("M2", 173, 146, 70, 18);
     addRect("M3", 249, 146, 71, 18);
     addRect("MR", 324, 146, 66, 18);
 
-    // G-Tasten, Reihe 1 (7 Tasten)
+    // G keys, row 1 (7 keys)
     addRect("G1",  54, 187, 53, 34);
     addRect("G2", 116, 187, 44, 34);
     addRect("G3", 170, 187, 43, 34);
@@ -52,7 +52,7 @@ G13Visualizer::G13Visualizer(QWidget *parent) : QWidget(parent)
     addRect("G6", 330, 186, 43, 34);
     addRect("G7", 383, 184, 52, 34);
 
-    // Reihe 2 (7 Tasten)
+    // Row 2 (7 keys)
     addRect("G8",   50, 232, 56, 38);
     addRect("G9",  112, 237, 47, 35);
     addRect("G10", 167, 240, 48, 35);
@@ -61,19 +61,19 @@ G13Visualizer::G13Visualizer(QWidget *parent) : QWidget(parent)
     addRect("G13", 331, 236, 49, 35);
     addRect("G14", 386, 230, 54, 37);
 
-    // Reihe 3 (5 Tasten)
+    // Row 3 (5 keys)
     addRect("G15",  87, 289, 65, 36);
     addRect("G16", 165, 292, 45, 34);
     addRect("G17", 222, 293, 45, 34);
     addRect("G18", 279, 292, 46, 34);
     addRect("G19", 335, 288, 65, 36);
 
-    // Reihe 4 (3 Tasten)
+    // Row 4 (3 keys)
     addRect("G20", 127, 342, 80, 36);
     addRect("G21", 220, 345, 50, 34);
     addRect("G22", 280, 342, 77, 36);
 
-    // Daumentasten und Joystick
+    // Thumb keys and joystick
     addRect("LEFT", 364, 392, 28, 76);
     addRect("DOWN", 398, 470, 80, 30);
     addEllipse("TOP", StickCenter, StickInner);
@@ -82,7 +82,7 @@ G13Visualizer::G13Visualizer(QWidget *parent) : QWidget(parent)
     addStickSector("STICK_LEFT",  135);
     addStickSector("STICK_DOWN",  225);
 
-    // Belegungen neu einlesen, wenn sich Dateien aendern (GUI oder Editor).
+    // Reload the bindings when files change (GUI or text editor).
     const QString dir = QFileInfo(bindingFilePath()).absolutePath();
     QDir().mkpath(dir);
     m_watcher = new QFileSystemWatcher(this);
@@ -107,8 +107,8 @@ void G13Visualizer::addEllipse(const QString &name, QPointF center, qreal radius
     m_areas.append({name, path});
 }
 
-// Viertelkreis-Ring um den Joystick; startAngle in Grad, gegen den
-// Uhrzeigersinn ab 3 Uhr (Qt-Konvention).
+// Quarter ring around the joystick; startAngle in degrees, counterclockwise
+// from 3 o'clock (Qt convention).
 void G13Visualizer::addStickSector(const QString &name, qreal startAngle)
 {
     const QRectF outer(StickCenter.x() - StickOuter, StickCenter.y() - StickOuter,
@@ -129,7 +129,7 @@ QSize G13Visualizer::sizeHint() const
 }
 
 // ---------------------------------------------------------------------------
-// Geometrie
+// Geometry
 // ---------------------------------------------------------------------------
 QTransform G13Visualizer::imageToWidget() const
 {
@@ -156,7 +156,7 @@ QString G13Visualizer::keyAt(const QPointF &widgetPos) const
 }
 
 // ---------------------------------------------------------------------------
-// Zeichnen
+// Painting
 // ---------------------------------------------------------------------------
 void G13Visualizer::paintEvent(QPaintEvent *)
 {
@@ -173,14 +173,14 @@ void G13Visualizer::paintEvent(QPaintEvent *)
     p.setTransform(t);
     p.drawPixmap(0, 0, m_image);
 
-    const qreal px = 1.0 / t.m11();    // 1 Bildschirmpixel in Bildkoordinaten
+    const qreal px = 1.0 / t.m11();    // 1 screen pixel in image coordinates
 
     for (const Area &area : m_areas) {
         const bool configurable = G13Keys::isConfigurable(area.name);
         const bool selected     = area.name == m_selected;
         const bool hover        = area.name == m_hover;
 
-        // Fuellung; die L-Taste des aktiven Profils ist dauerhaft markiert.
+        // Fill; the L key of the active profile is always highlighted.
         const bool activeProfile = area.name == QString("L%1").arg(m_profile + 1);
         if (activeProfile)
             p.fillPath(area.path, QColor(255, 170, 0, 140));
@@ -189,7 +189,7 @@ void G13Visualizer::paintEvent(QPaintEvent *)
         else if (hover)
             p.fillPath(area.path, QColor(0, 200, 255, 60));
 
-        // Umrandung
+        // Outline
         QPen pen;
         pen.setWidthF((selected ? 2.0 : 1.0) * px);
         if (selected)
@@ -206,11 +206,11 @@ void G13Visualizer::paintEvent(QPaintEvent *)
         p.setBrush(Qt::NoBrush);
         p.drawPath(area.path);
 
-        // Belegt-Markierung: gruener Punkt oben rechts
+        // Bound marker: green dot at the top right
         if (m_bound.contains(area.name)) {
             const QRectF r = area.path.boundingRect();
             const qreal radius = 2.5;
-            // Joystick-Segmente: Mitte des Segments; sonst Ecke oben rechts.
+            // Joystick segments: center of the segment; otherwise top right corner.
             const bool round = area.name.startsWith("STICK_") || area.name == "TOP";
             const QPointF dot = round ? r.center()
                                       : QPointF(r.right() - radius - 2, r.top() + radius + 2);
@@ -222,7 +222,7 @@ void G13Visualizer::paintEvent(QPaintEvent *)
 }
 
 // ---------------------------------------------------------------------------
-// Maus
+// Mouse
 // ---------------------------------------------------------------------------
 void G13Visualizer::mouseMoveEvent(QMouseEvent *event)
 {
@@ -277,7 +277,7 @@ bool G13Visualizer::event(QEvent *event)
 }
 
 // ---------------------------------------------------------------------------
-// Profil und Belegungen
+// Profile and bindings
 // ---------------------------------------------------------------------------
 void G13Visualizer::setProfile(int profile)
 {
@@ -295,7 +295,7 @@ void G13Visualizer::reloadBindings()
 {
     const QString path = bindingFilePath();
 
-    // Datei (neu) beobachten: Editoren ersetzen Dateien oft statt sie zu aendern.
+    // (Re)watch the file: editors often replace files instead of modifying them.
     if (QFile::exists(path) && !m_watcher->files().contains(path)) {
         if (!m_watcher->files().isEmpty())
             m_watcher->removePaths(m_watcher->files());
