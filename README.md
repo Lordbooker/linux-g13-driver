@@ -1,5 +1,19 @@
 # G13 Linux Driver & Config Tool
 
+> [!IMPORTANT]
+> **Project status: completed.** No further development is planned.
+>
+> Since **Linux 6.19** the kernel supports the G13 itself (driver `hid-lg-g15`: keys,
+> thumbstick and LEDs). This project is therefore mainly relevant for systems with a
+> **kernel older than 6.19**.
+>
+> For current kernels, use the successor project
+> **[gkey-config](https://github.com/Lordbooker/gkey-config)**, a configuration tool for
+> Logitech G keyboards that builds on the kernel driver.
+>
+> This driver still works on Linux 6.19 and newer: it takes the G13 over from the kernel
+> driver while it is running and hands it back when it stops.
+
 A user-space driver and configuration tool for the **Logitech G13** gameboard on Linux.
 
 The original project is over 10 years old. This fork modernizes it:
