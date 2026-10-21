@@ -33,7 +33,7 @@ const QHash<QString, QString> &fileKeys()
 
 const QSet<QString> &locked()
 {
-    // L1-L4 schalten im Treiber die vier Profile um (bindings-0..3).
+    // In the driver L1-L4 switch between the four profiles (bindings-0..3).
     static const QSet<QString> set = {"L1", "L2", "L3", "L4"};
     return set;
 }
@@ -67,7 +67,7 @@ bool isConfigurable(const QString &keyName)
 
 QString displayName(const QString &keyName)
 {
-    // Texte werden erst beim Abruf uebersetzt (Sprache steht beim Start fest).
+    // Texts are translated on access (the language is fixed at startup).
     static const QHash<QString, const char *> names = {
         {"LEFT",        QT_TRANSLATE_NOOP("G13Keys", "Left thumb key")},
         {"DOWN",        QT_TRANSLATE_NOOP("G13Keys", "Lower thumb key")},

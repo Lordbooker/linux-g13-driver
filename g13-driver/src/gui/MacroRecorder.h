@@ -13,8 +13,8 @@ class QListWidgetItem;
 class QPushButton;
 class QSpinBox;
 
-// Makro-Editor: Tastenfolgen aufnehmen, als Ereignisliste bearbeiten und
-// im Treiberformat (kd./ku./d.) in ~/.config/g13/macro-<id>.properties speichern.
+// Macro editor: record key sequences, edit them as a list of events and save
+// them in the driver format (kd./ku./d.) to ~/.config/g13/macro-<id>.properties.
 class MacroRecorder : public QWidget {
     Q_OBJECT
 public:
@@ -45,12 +45,12 @@ private slots:
 private:
     using Event = MacroSequence::Event;
 
-    // Aufnahme
+    // Recording
     void startRecording();
     void stopRecording();
     void recordKey(int keyCode, bool pressed);
 
-    // Liste
+    // List
     QList<Event> events() const;
     void setEvents(const QList<Event> &list);
     void insertEvent(const Event &ev);
@@ -58,7 +58,7 @@ private:
     static void applyToItem(QListWidgetItem *item, const Event &ev);
     static Event eventFromItem(const QListWidgetItem *item);
 
-    // Datei
+    // File
     void loadFromFile();
     bool saveToFile();
     QString macroFilePath() const;
@@ -72,7 +72,7 @@ private:
 
     bool          m_recording = false;
     QElapsedTimer m_sinceLastEvent;
-    QList<int>    m_pressedKeys;     // waehrend der Aufnahme gedrueckte Tasten
+    QList<int>    m_pressedKeys;     // keys pressed during the recording
 
     QSpinBox    *spnId;
     QPushButton *btnLoad;

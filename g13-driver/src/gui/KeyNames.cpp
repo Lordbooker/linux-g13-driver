@@ -9,7 +9,7 @@ namespace KeyNames {
 
 namespace {
 
-// Namen nach US-Tastenposition (linux/input-event-codes.h).
+// Names by US key position (linux/input-event-codes.h).
 const QHash<int, QString> &baseNames()
 {
     static const QHash<int, QString> names = {
@@ -51,7 +51,7 @@ const QHash<int, QString> &baseNames()
 
 constexpr const char *SettingsGroup = "KeyLabels";
 
-// Beschriftungen des eigenen Layouts (Keycode -> Text), aus den Einstellungen geladen.
+// Labels of the user's own layout (keycode -> text), loaded from the settings.
 QHash<int, QString> &learnedLabels()
 {
     static QHash<int, QString> labels = [] {
@@ -70,7 +70,7 @@ QHash<int, QString> &learnedLabels()
     return labels;
 }
 
-// Beschriftung fuer Tottasten (erzeugen allein keinen Text, z. B. ^ und ´).
+// Labels for dead keys (they produce no text on their own, e.g. ^ and ´).
 QString deadKeyLabel(int qtKey)
 {
     switch (qtKey) {
@@ -101,8 +101,8 @@ void learnLabel(int code, const QKeyEvent *event)
 {
     if (code <= 0 || !event)
         return;
-    // Mit Modifiern (Shift, AltGr, ...) liefert die Taste ein anderes Zeichen;
-    // Ziffernblock-Tasten (KeypadModifier) behalten ihre Namen (Num1, ...).
+    // With modifiers (Shift, AltGr, ...) the key produces a different character;
+    // keypad keys (KeypadModifier) keep their names (Num1, ...).
     if (event->modifiers() != Qt::NoModifier)
         return;
 

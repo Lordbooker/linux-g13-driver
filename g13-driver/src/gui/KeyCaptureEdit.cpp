@@ -6,7 +6,7 @@
 
 KeyCaptureEdit::KeyCaptureEdit(QWidget *parent) : QLineEdit(parent)
 {
-    setReadOnly(true);                      // kein Texteingabe-Cursor, kein Einfuegen
+    setReadOnly(true);                      // no text cursor, no pasting
     setFocusPolicy(Qt::StrongFocus);
     setPlaceholderText(tr("Click here and press a key"));
     setToolTip(tr("Click into the field and press a key on your keyboard."));
@@ -35,13 +35,13 @@ bool KeyCaptureEdit::event(QEvent *event)
 {
     switch (event->type()) {
     case QEvent::ShortcutOverride:
-        // Akzeptieren unterdrueckt Shortcuts (z. B. Strg+S); das KeyPress folgt.
+        // Accepting suppresses shortcuts (e.g. Ctrl+S); the KeyPress follows.
         event->accept();
         return true;
 
     case QEvent::KeyPress: {
-        // Vor QWidget::event abfangen, damit auch Tab/Backtab erfasst werden
-        // statt den Fokus zu wechseln.
+        // Intercept before QWidget::event, so Tab/Backtab are captured as well
+        // instead of moving the focus.
         auto *keyEvent = static_cast<QKeyEvent *>(event);
         if (!keyEvent->isAutoRepeat()) {
             const int code = linuxKeyCode(keyEvent->nativeScanCode());
@@ -50,7 +50,7 @@ bool KeyCaptureEdit::event(QEvent *event)
                 setKeyCode(code);
                 const Qt::KeyboardModifiers held = keyEvent->modifiers()
                     & (Qt::ControlModifier | Qt::ShiftModifier | Qt::AltModifier | Qt::MetaModifier);
-                // Beim Druecken des Modifiers selbst ist er bereits gesetzt -> ignorieren
+                // When the modifier itself is pressed it is already set -> ignore it
                 const bool isModifierKey = keyEvent->key() == Qt::Key_Control
                     || keyEvent->key() == Qt::Key_Shift || keyEvent->key() == Qt::Key_Alt
                     || keyEvent->key() == Qt::Key_Meta || keyEvent->key() == Qt::Key_Super_L
@@ -71,5 +71,5 @@ bool KeyCaptureEdit::event(QEvent *event)
 
 void KeyCaptureEdit::contextMenuEvent(QContextMenuEvent *event)
 {
-    event->accept();                        // kein Kopieren/Einfuegen-Menue
+    event->accept();                        // no copy/paste menu
 }

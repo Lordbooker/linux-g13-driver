@@ -13,13 +13,13 @@
 
 namespace {
 
-// Name fuer die Einzelinstanz-Pruefung (pro Benutzer).
+// Name for the single instance check (per user).
 QString instanceName()
 {
     return QString("g13-gui-%1").arg(getuid());
 }
 
-// Laeuft bereits eine Instanz? Dann dieser die Nachricht schicken.
+// Is an instance already running? Then send it the message.
 bool notifyRunningInstance(const QByteArray &message)
 {
     QLocalSocket socket;
@@ -32,15 +32,15 @@ bool notifyRunningInstance(const QByteArray &message)
     return true;
 }
 
-// Wie lange im Tray-Modus auf einen System-Tray gewartet wird. Beim Anmelden
-// startet der Autostart oft, bevor die Taskleiste bereit ist.
+// How long tray mode waits for a system tray. At login the autostart often
+// runs before the panel is ready.
 constexpr int TrayWaitSeconds = 30;
 
-// Laedt die Uebersetzungen passend zur Systemsprache (QLocale::system(), also
-// LANGUAGE/LC_ALL/LC_MESSAGES/LANG). Die eigenen Uebersetzungen sind im Programm
-// eingebettet (:/i18n/g13-gui_<sprache>.qm); fehlt eine Sprache, bleibt es bei
-// den englischen Texten aus dem Quelltext. Qts eigene Uebersetzungen (z. B.
-// Standard-Schaltflaechen wie "Cancel") werden geladen, sofern installiert.
+// Loads the translations for the system language (QLocale::system(), i.e.
+// LANGUAGE/LC_ALL/LC_MESSAGES/LANG). The own translations are embedded in the
+// program (:/i18n/g13-gui_<language>.qm); if a language is missing, the English
+// texts from the source code are used. Qt's own translations (e.g. standard
+// buttons like "Cancel") are loaded if installed.
 void installTranslations(QApplication &app)
 {
     const QLocale locale;
@@ -63,12 +63,12 @@ int main(int argc, char *argv[])
     app.setApplicationName("G13 Config Tool");
     app.setApplicationVersion(G13_VERSION);
     app.setOrganizationName("linux-g13-project");
-    app.setDesktopFileName("g13-gui");          // Zuordnung zu g13-gui.desktop (Icon unter Wayland)
+    app.setDesktopFileName("g13-gui");          // link to g13-gui.desktop (icon on Wayland)
     app.setWindowIcon(MainWindow::appIcon());
     installTranslations(app);
 
-    // Fenster schliessen beendet die App nicht, solange das Tray-Symbol aktiv ist
-    // (siehe MainWindow::closeEvent).
+    // Closing the window does not quit the app while the tray icon is active
+    // (see MainWindow::closeEvent).
     app.setQuitOnLastWindowClosed(false);
 
     QCommandLineParser parser;
@@ -82,12 +82,12 @@ int main(int argc, char *argv[])
     parser.process(app);
     const bool trayOnly = parser.isSet(trayOption);
 
-    // Einzelinstanz: Laeuft g13-gui schon (z. B. im Tray), dort das Fenster
-    // oeffnen bzw. beim Autostart nichts tun.
+    // Single instance: if g13-gui is already running (e.g. in the tray), open
+    // the window there, or do nothing when started by autostart.
     if (notifyRunningInstance(trayOnly ? "tray" : "show"))
         return 0;
 
-    QLocalServer::removeServer(instanceName());   // Reste nach einem Absturz
+    QLocalServer::removeServer(instanceName());   // leftovers after a crash
     QLocalServer server;
     server.listen(instanceName());
 
@@ -107,8 +107,8 @@ int main(int argc, char *argv[])
     if (!trayOnly) {
         w.showWindow();
     } else if (!w.hasTray()) {
-        // Auf die Taskleiste warten; ohne Tray (z. B. GNOME ohne Erweiterung)
-        // still beenden, statt bei jeder Anmeldung ein Fenster zu oeffnen.
+        // Wait for the panel; without a tray (e.g. GNOME without the extension)
+        // exit silently instead of opening a window at every login.
         auto *timer = new QTimer(&app);
         QObject::connect(timer, &QTimer::timeout, &app, [timer, &w, attempts = 0]() mutable {
             if (w.setupTrayIcon()) {

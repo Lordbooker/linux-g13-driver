@@ -1,12 +1,12 @@
-# Baut .deb- und .rpm-Pakete fuer alle unterstuetzten Distributionen.
+# Builds .deb and .rpm packages for all supported distributions.
 #
-# - Push eines Tags "v*" (z. B. v2.1.0): Pakete bauen und als GitHub-Release
-#   mit Aenderungsliste veroeffentlichen.
-# - Manuell ("Run workflow" im Actions-Tab): nur bauen; die Pakete stehen als
-#   Artefakte des Laufs zum Testen bereit, es wird kein Release angelegt.
+# - Push of a tag "v*" (e.g. v2.1.0): build the packages and publish them as a
+#   GitHub release with a list of changes.
+# - Manually ("Run workflow" in the Actions tab): build only; the packages are
+#   available as artifacts of the run for testing, no release is created.
 #
-# Gebaut wird mit g13-driver/packaging/build-package.sh im Container der
-# jeweiligen Distribution (gleiches Skript wie fuer lokale Builds).
+# Packages are built with g13-driver/packaging/build-package.sh inside a
+# container of the respective distribution (same script as for local builds).
 
 name: Release packages
 
@@ -37,8 +37,8 @@ jobs:
           - { name: fedora44,    image: "fedora:44" }
 
     steps:
-      # git vor dem Checkout installieren, damit die volle Historie samt Tags
-      # (fuer die Versionsnummer) ausgecheckt wird.
+      # Install git before the checkout so that the full history including tags
+      # (needed for the version number) is checked out.
       - name: Install git
         run: |
           if command -v apt-get >/dev/null; then
@@ -104,7 +104,7 @@ jobs:
             echo
             echo "| System | Package |"
             echo "|---|---|"
-            # GitHub ersetzt "~" in Dateinamen von Release-Assets durch "."
+            # GitHub replaces "~" in file names of release assets with "."
             echo "| Debian 12 / 13 | \`linux-g13-driver_*.debian12_amd64.deb\` / \`*.debian13_amd64.deb\` |"
             echo "| Ubuntu 22.04 / 24.04 / 26.04 (and Linux Mint, Pop!_OS, ...) | \`linux-g13-driver_*.ubuntuXX.04_amd64.deb\` |"
             echo "| Fedora 43 / 44 (and Nobara, ...) | \`linux-g13-driver-*.fc43.x86_64.rpm\` / \`*.fc44.x86_64.rpm\` |"

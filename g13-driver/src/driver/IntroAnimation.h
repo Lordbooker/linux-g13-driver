@@ -5,18 +5,17 @@
 #include <vector>
 
 /**
- * @brief Startanimation fuer das G13-LCD (160x43, 1 Bit).
+ * @brief Start animation for the G13 LCD (160x43, 1 bit).
  *
- * Eine Flammenwand steigt von unten auf, verbrennt das Firmware-Logo, bedeckt
- * kurz das ganze Display und zieht sich wieder zurueck. Dabei wird das Endbild
- * (Tux und "G13") freigegeben. Die Flammen entstehen aus einem Hitzefeld nach
- * dem Prinzip des klassischen Doom-Feuers und werden mit einem 4x4-Bayer-Raster
- * auf 1 Bit gebracht.
+ * A flame wall rises from the bottom, burns the firmware logo, briefly covers
+ * the whole display and recedes again, revealing the final image (Tux and
+ * "G13"). The flames come from a heat field following the principle of the
+ * classic Doom fire and are reduced to 1 bit with a 4x4 Bayer dither.
  *
- * Der Zufall ist fest geseedet (mulberry32), die Animation ist daher bei jedem
- * Lauf gleich und Bild fuer Bild identisch mit der Vorschau "G13 Flammen-Intro".
+ * The random generator has a fixed seed (mulberry32), so the animation is the
+ * same on every run and identical frame by frame to the preview "G13 Flammen-Intro".
  *
- * Die Klasse rechnet nur; das Senden an das Geraet uebernimmt G13.
+ * The class only computes frames; sending them to the device is done by G13.
  */
 class IntroAnimation {
 public:
@@ -26,23 +25,23 @@ public:
 
     IntroAnimation();
 
-    /// Anzahl der Animationsbilder (ohne das abschliessende Endbild).
+    /// Number of animation frames (without the final image).
     static int frameCount();
 
-    /// Naechstes Bild berechnen.
+    /// Compute the next frame.
     void step();
     bool finished() const { return frame_ >= frameCount(); }
     int  frame() const { return frame_; }
 
-    /// Aktuelles Bild: out[y * Width + x] = 1 bedeutet Pixel an (dunkel).
+    /// Current frame: out[y * Width + x] = 1 means pixel on (dark).
     void compose(uint8_t *out) const;
 
-    /// Pixel der festen Bilder (1 = an).
+    /// Pixels of the fixed images (1 = on).
     static bool firmwarePixel(int x, int y);
     static bool finalPixel(int x, int y);
 
 private:
-    static constexpr int FieldHeight = Height + 4;   // unsichtbare Zeilen unter dem Display
+    static constexpr int FieldHeight = Height + 4;   // invisible rows below the display
     static constexpr int MaxHeat     = 48;
 
     double random();
@@ -50,10 +49,10 @@ private:
 
     uint32_t rngState_;
     std::vector<int>     heat_;     // Width * FieldHeight
-    std::vector<uint8_t> burned_;   // Width * Height: hier ist das Firmware-Logo verbrannt
-    std::vector<double>  top_;      // Oberkante des Wandkoerpers je Spalte
-    std::vector<double>  cool_;     // Abkuehlung je Spalte (ergibt die Flammenzungen)
-    bool swapped_ = false;          // Endbild statt Firmware-Logo als Grund
+    std::vector<uint8_t> burned_;   // Width * Height: the firmware logo has burned here
+    std::vector<double>  top_;      // top edge of the wall body per column
+    std::vector<double>  cool_;     // cooling per column (creates the flame tongues)
+    bool swapped_ = false;          // final image instead of firmware logo as background
     int  frame_   = 0;
 };
 

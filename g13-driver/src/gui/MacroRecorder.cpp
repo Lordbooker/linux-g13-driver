@@ -25,18 +25,18 @@
 namespace {
 constexpr int RoleType  = Qt::UserRole;
 constexpr int RoleValue = Qt::UserRole + 1;
-constexpr int MaxMacroId = 199;      // Treiber: G13_MAX_MACROS = 200
+constexpr int MaxMacroId = 199;      // driver: G13_MAX_MACROS = 200
 constexpr int MaxDelayMs = 60000;
 }
 
 // ---------------------------------------------------------------------------
-// Aufbau
+// Setup
 // ---------------------------------------------------------------------------
 MacroRecorder::MacroRecorder(QWidget *parent) : QWidget(parent)
 {
     auto *root = new QVBoxLayout(this);
 
-    // --- Makro-Auswahl ------------------------------------------------------
+    // --- Macro selection ----------------------------------------------------
     auto *idBox    = new QGroupBox(tr("Macro"), this);
     auto *idLayout = new QFormLayout(idBox);
     spnId = new QSpinBox(this);
@@ -51,7 +51,7 @@ MacroRecorder::MacroRecorder(QWidget *parent) : QWidget(parent)
     idLayout->addRow(tr("Name:"), editName);
     root->addWidget(idBox);
 
-    // --- Ablauf (Aufnahme + Liste) -----------------------------------------
+    // --- Sequence (recording + list) ----------------------------------------
     auto *seqBox    = new QGroupBox(tr("Sequence"), this);
     auto *seqLayout = new QGridLayout(seqBox);
 
@@ -83,7 +83,7 @@ MacroRecorder::MacroRecorder(QWidget *parent) : QWidget(parent)
     seqLayout->setColumnStretch(1, 1);
     root->addWidget(seqBox, 1);
 
-    // --- Manuell bearbeiten -------------------------------------------------
+    // --- Manual editing -----------------------------------------------------
     auto *editBox    = new QGroupBox(tr("Insert and adjust manually"), this);
     auto *editLayout = new QGridLayout(editBox);
 
@@ -112,7 +112,7 @@ MacroRecorder::MacroRecorder(QWidget *parent) : QWidget(parent)
     editLayout->setColumnStretch(1, 1);
     root->addWidget(editBox);
 
-    // --- Speichern ----------------------------------------------------------
+    // --- Save ---------------------------------------------------------------
     auto *saveRow = new QHBoxLayout();
     lblStatus = new QLabel("", this);
     lblStatus->setWordWrap(true);
@@ -121,7 +121,7 @@ MacroRecorder::MacroRecorder(QWidget *parent) : QWidget(parent)
     saveRow->addWidget(btnSave);
     root->addLayout(saveRow);
 
-    // --- Signale ------------------------------------------------------------
+    // --- Signals ------------------------------------------------------------
     connect(btnLoad,   &QPushButton::clicked, this, &MacroRecorder::onLoadClicked);
     connect(btnSave,   &QPushButton::clicked, this, &MacroRecorder::onSaveClicked);
     connect(btnRecord, &QPushButton::clicked, this, &MacroRecorder::onRecordToggled);
@@ -148,7 +148,7 @@ MacroRecorder::~MacroRecorder()
 }
 
 // ---------------------------------------------------------------------------
-// Makro-Auswahl
+// Macro selection
 // ---------------------------------------------------------------------------
 void MacroRecorder::setMacroId(int id)
 {
@@ -173,7 +173,7 @@ void MacroRecorder::onLoadClicked()
 
 void MacroRecorder::onSaveClicked()
 {
-    // Gespeichert wird unter der aktuell eingestellten ID.
+    // Saved under the currently selected ID.
     m_macroId = spnId->value();
     saveToFile();
 }
@@ -190,7 +190,7 @@ bool MacroRecorder::confirmDiscardChanges()
 }
 
 // ---------------------------------------------------------------------------
-// Aufnahme
+// Recording
 // ---------------------------------------------------------------------------
 void MacroRecorder::onRecordToggled()
 {
@@ -206,8 +206,8 @@ void MacroRecorder::startRecording()
     m_pressedKeys.clear();
     m_sinceLastEvent.invalidate();
 
-    // Anwendungsweiter Filter: Tasten werden abgefangen, bevor Widgets oder
-    // Shortcuts (z. B. Ctrl+S) sie verarbeiten.
+    // Application-wide filter: keys are intercepted before widgets or
+    // shortcuts (e.g. Ctrl+S) process them.
     qApp->installEventFilter(this);
 
     btnRecord->setChecked(true);
@@ -221,7 +221,7 @@ void MacroRecorder::stopRecording()
     qApp->removeEventFilter(this);
     m_recording = false;
 
-    // Noch gedrueckte Tasten loslassen, sonst haengen sie beim Abspielen.
+    // Release keys that are still pressed, otherwise they get stuck during playback.
     const QList<int> stillPressed = m_pressedKeys;
     for (int code : stillPressed)
         recordKey(code, false);
@@ -243,7 +243,7 @@ bool MacroRecorder::eventFilter(QObject *watched, QEvent *event)
 
     switch (event->type()) {
     case QEvent::ShortcutOverride:
-        // Akzeptieren unterdrueckt Shortcuts; das KeyPress folgt danach.
+        // Accepting suppresses shortcuts; the KeyPress follows.
         event->accept();
         return true;
 
@@ -251,7 +251,7 @@ bool MacroRecorder::eventFilter(QObject *watched, QEvent *event)
     case QEvent::KeyRelease: {
         auto *keyEvent = static_cast<QKeyEvent *>(event);
         if (keyEvent->isAutoRepeat())
-            return true;   // Tastenwiederholung ignorieren
+            return true;   // ignore auto-repeat
 
         const int code = KeyCaptureEdit::linuxKeyCode(keyEvent->nativeScanCode());
         if (code <= 0) {
@@ -261,7 +261,7 @@ bool MacroRecorder::eventFilter(QObject *watched, QEvent *event)
         if (event->type() == QEvent::KeyPress)
             KeyNames::learnLabel(code, keyEvent);
         recordKey(code, event->type() == QEvent::KeyPress);
-        return true;       // Taste nicht an die Oberflaeche weitergeben
+        return true;       // do not pass the key on to the user interface
     }
 
     default:
@@ -276,8 +276,8 @@ void MacroRecorder::recordKey(int keyCode, bool pressed)
             return;
         m_pressedKeys << keyCode;
     } else {
-        // Loslassen ohne vorheriges Druecken (z. B. die Taste, mit der die
-        // Aufnahme gestartet wurde) wird ignoriert.
+        // A release without a previous press (e.g. the key that started the
+        // recording) is ignored.
         if (!m_pressedKeys.removeOne(keyCode))
             return;
     }
@@ -297,7 +297,7 @@ void MacroRecorder::recordKey(int keyCode, bool pressed)
 }
 
 // ---------------------------------------------------------------------------
-// Liste bearbeiten
+// List editing
 // ---------------------------------------------------------------------------
 void MacroRecorder::applyToItem(QListWidgetItem *item, const Event &ev)
 {
@@ -343,7 +343,7 @@ void MacroRecorder::appendEvent(const Event &ev)
     updateButtons();
 }
 
-// Fuegt hinter der aktuellen Zeile ein (oder am Ende, wenn nichts gewaehlt ist).
+// Inserts after the current row (or at the end if nothing is selected).
 void MacroRecorder::insertEvent(const Event &ev)
 {
     const int current = listEvents->currentRow();
@@ -465,7 +465,7 @@ void MacroRecorder::onApplyDelayToAll()
 
 void MacroRecorder::onSelectionChanged()
 {
-    // Einzelne gewaehlte Wartezeit in das Eingabefeld uebernehmen.
+    // Copy a single selected delay into the input field.
     const auto selected = listEvents->selectedItems();
     if (selected.size() == 1) {
         const Event ev = eventFromItem(selected.first());
@@ -506,7 +506,7 @@ void MacroRecorder::setDirty(bool dirty)
 }
 
 // ---------------------------------------------------------------------------
-// Datei
+// File
 // ---------------------------------------------------------------------------
 QString MacroRecorder::macroFilePath() const
 {
@@ -551,7 +551,7 @@ void MacroRecorder::loadFromFile()
         lblStatus->setText(tr("Macro %1 loaded (entries: %2).")
                                .arg(m_macroId).arg(parsed.events.size()));
     } else {
-        // Ungueltige Eintraege werden beim naechsten Speichern entfernt.
+        // Invalid entries are removed with the next save.
         setDirty(true);
         lblStatus->setText(tr("Macro %1 loaded. Invalid entries ignored: %2 (e.g. “%3”). "
                               "They will be removed when saving.")
@@ -583,7 +583,7 @@ bool MacroRecorder::saveToFile()
     const QString path = macroFilePath();
     QDir().mkpath(QFileInfo(path).absolutePath());
 
-    // QSaveFile schreibt atomar: der Treiber sieht nie eine halb geschriebene Datei.
+    // QSaveFile writes atomically: the driver never sees a half-written file.
     QSaveFile f(path);
     if (!f.open(QIODevice::WriteOnly | QIODevice::Text)) {
         lblStatus->setText(tr("Error: could not write the file."));

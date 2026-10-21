@@ -14,9 +14,9 @@
 #include "G13.h"
 #include "Output.h"
 
-// --- Globale Zustandsvariablen ---
+// --- Global state ---
 
-// Zustand eines Geraete-Threads.
+// State of a device thread.
 enum class HandlerState { Running, Finished, OpenFailed };
 
 struct DeviceHandler {
@@ -24,26 +24,26 @@ struct DeviceHandler {
     std::shared_ptr<std::atomic<HandlerState>> state;
 };
 
-// Wartezeit, bevor ein Geraet nach fehlgeschlagenem Oeffnen erneut versucht wird
-// (z. B. weil die udev-Rechte beim Einstecken noch nicht gesetzt waren).
+// Delay before a device is retried after opening it failed
+// (e.g. because the udev permissions were not set yet when it was plugged in).
 static constexpr auto OpenRetryDelay = std::chrono::seconds(5);
 
 static std::mutex              g13_map_mutex;
 static std::map<uint16_t, DeviceHandler> g13_instances;
 static std::map<uint16_t, std::chrono::steady_clock::time_point> retry_after;
-// Nicht static: wird in G13.cpp per extern abgefragt.
+// Not static: read in G13.cpp via extern.
 volatile sig_atomic_t         daemon_keep_running = 1;
 static libusb_context        *ctx = nullptr;
 static std::thread             device_thread;
 
-// --- Hilfsfunktion ---
+// --- Helper ---
 static uint16_t get_device_key(libusb_device *dev) {
     return static_cast<uint16_t>(
         (libusb_get_bus_number(dev) << 8) | libusb_get_device_address(dev)
     );
 }
 
-// --- G13-Geraet-Handler (laeuft in eigenem Thread) ---
+// --- G13 device handler (runs in its own thread) ---
 static void executeG13(libusb_device *dev,
                        std::shared_ptr<std::atomic<HandlerState>> state) {
     bool opened = false;
@@ -51,16 +51,16 @@ static void executeG13(libusb_device *dev,
         G13 g13(dev);
         opened = g13.isLoaded();
         g13.start();
-    } // RAII: G13-Destruktor gibt USB-Ressourcen frei
+    } // RAII: the G13 destructor releases the USB resources
 
     libusb_unref_device(dev);
-    // Als letzte Aktion: der Management-Thread raeumt den Eintrag danach ab.
+    // Last action: the management thread cleans up the entry afterwards.
     state->store(opened ? HandlerState::Finished : HandlerState::OpenFailed);
 }
 
-// Beendete Geraete-Threads joinen und aus der Liste entfernen, damit ein
-// wieder eingestecktes oder zuvor fehlgeschlagenes Geraet erneut erkannt wird.
-// Muss mit gehaltenem g13_map_mutex aufgerufen werden.
+// Join finished device threads and remove them from the list, so that a
+// replugged or previously failed device is detected again.
+// Must be called with g13_map_mutex held.
 static void reap_finished_handlers() {
     for (auto it = g13_instances.begin(); it != g13_instances.end(); ) {
         const HandlerState s = it->second.state->load();
@@ -82,7 +82,7 @@ static void reap_finished_handlers() {
     }
 }
 
-// --- Geraete-Erkennung ---
+// --- Device detection ---
 static void find_and_manage_devices() {
     libusb_device **devs = nullptr;
     ssize_t count = libusb_get_device_list(ctx, &devs);
@@ -103,7 +103,7 @@ static void find_and_manage_devices() {
                 continue;
             if (auto r = retry_after.find(key); r != retry_after.end()) {
                 if (now < r->second)
-                    continue;                  // Wartezeit nach Fehlschlag laeuft noch
+                    continue;                  // retry delay after a failure still running
                 retry_after.erase(r);
             }
 
@@ -116,7 +116,7 @@ static void find_and_manage_devices() {
     libusb_free_device_list(devs, 1);
 }
 
-// --- Geraete-Management-Loop ---
+// --- Device management loop ---
 static void device_management_thread_loop() {
     while (daemon_keep_running) {
         find_and_manage_devices();
@@ -124,13 +124,13 @@ static void device_management_thread_loop() {
     }
 }
 
-// --- Sauberes Herunterfahren ---
-// Laeuft im Haupt-Thread, nachdem der Geraete-Management-Thread beendet ist.
-// Alle Geraete-Threads werden gejoint, bevor uinput und libusb freigegeben werden.
+// --- Clean shutdown ---
+// Runs in the main thread after the device management thread has finished.
+// All device threads are joined before uinput and libusb are released.
 static void shutdown_driver() {
     syslog(LOG_INFO, "Shutting down driver...");
 
-    // Threads unter Lock aus der Map nehmen, aber ausserhalb des Locks joinen.
+    // Take the threads out of the map under the lock, but join them outside of it.
     std::map<uint16_t, DeviceHandler> handlers;
     {
         std::lock_guard<std::mutex> lock(g13_map_mutex);
@@ -147,13 +147,13 @@ static void shutdown_driver() {
     closelog();
 }
 
-// Signal-Handler setzt nur das Flag (async-signal-safe).
-// Das eigentliche Herunterfahren erfolgt in main().
+// The signal handler only sets the flag (async-signal-safe).
+// The actual shutdown happens in main().
 static void signal_handler(int /*signum*/) {
     daemon_keep_running = 0;
 }
 
-// --- Einstiegspunkt ---
+// --- Entry point ---
 int main(int /*argc*/, char * /*argv*/[]) {
     openlog("linux-g13-driver", LOG_PID | LOG_CONS, LOG_USER);
     syslog(LOG_INFO, "G13 driver starting (version %s)...", G13_VERSION);

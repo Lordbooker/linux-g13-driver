@@ -5,16 +5,16 @@
 #include <cmath>
 
 static_assert(IntroAnimation::Width == INTRO_WIDTH && IntroAnimation::Height == INTRO_HEIGHT,
-              "Bitmaps passen nicht zur Displaygroesse");
+              "Bitmaps do not match the display size");
 
 namespace {
 
-// Zeitplan in Sekunden (identisch mit der Vorschau)
-constexpr double THold    = 1.6;   // Firmware-Logo stehen lassen
-constexpr double TRise    = 2.4;   // Flammenwand steigt
-constexpr double TCover   = 0.6;   // Display ganz bedeckt, Logo wird getauscht
-constexpr double TRecede  = 2.6;   // Wand zieht sich zurueck
-constexpr double TSettle  = 1.6;   // Glut verlischt
+// Schedule in seconds (identical to the preview)
+constexpr double THold    = 1.6;   // keep showing the firmware logo
+constexpr double TRise    = 2.4;   // flame wall rises
+constexpr double TCover   = 0.6;   // display fully covered, logo is swapped
+constexpr double TRecede  = 2.6;   // wall recedes
+constexpr double TSettle  = 1.6;   // embers die out
 constexpr double TRiseEnd   = THold + TRise;
 constexpr double TCoverEnd  = TRiseEnd + TCover;
 constexpr double TRecedeEnd = TCoverEnd + TRecede;
@@ -22,7 +22,7 @@ constexpr double TTotal     = TRecedeEnd + TSettle;
 
 constexpr uint32_t Seed = 1313;
 
-// 4x4-Bayer-Matrix fuer das Raster
+// 4x4 Bayer matrix for dithering
 constexpr double bayer(int x, int y) {
     constexpr int m[16] = {0, 8, 2, 10, 12, 4, 14, 6, 3, 11, 1, 9, 15, 7, 13, 5};
     return (m[(y & 3) * 4 + (x & 3)] + 0.5) / 16.0;
@@ -54,7 +54,7 @@ int IntroAnimation::frameCount() {
 bool IntroAnimation::firmwarePixel(int x, int y) { return bitmapPixel(intro_firmware_logo, x, y); }
 bool IntroAnimation::finalPixel(int x, int y)    { return bitmapPixel(intro_final_logo, x, y); }
 
-// mulberry32: liefert dieselbe Folge wie die Vorschau (JavaScript)
+// mulberry32: yields the same sequence as the preview (JavaScript)
 double IntroAnimation::random() {
     rngState_ += 0x6D2B79F5u;
     uint32_t t = (rngState_ ^ (rngState_ >> 15)) * (1u | rngState_);
@@ -62,7 +62,7 @@ double IntroAnimation::random() {
     return static_cast<double>(t ^ (t >> 14)) / 4294967296.0;
 }
 
-// Hoehe des heissen Wandkoerpers in Zeilen von unten; <= 0: keine Wand.
+// Height of the hot wall body in rows from the bottom; <= 0: no wall.
 double IntroAnimation::wallLevel(double t) const {
     const double full = FieldHeight + 6;
     if (t < THold)      return -1;
@@ -77,7 +77,7 @@ void IntroAnimation::step() {
     const double level = wallLevel(t);
     const double ph    = frame_ * 0.3;
 
-    // Wandkoerper: unterhalb der (leicht wogenden) Oberkante maximal heiss
+    // Wall body: maximum heat below the (slightly waving) top edge
     for (int x = 0; x < Width; ++x) {
         if (level > 0) {
             const double wave = std::sin(x * 0.09 + ph) * 1.6 + std::sin(x * 0.23 - ph * 1.4) * 1.0;
@@ -88,13 +88,13 @@ void IntroAnimation::step() {
         for (int y = std::max(0, static_cast<int>(std::ceil(top_[x]))); y < FieldHeight; ++y)
             heat_[y * Width + x] = MaxHeat - static_cast<int>(random() * 6);
         if (top_[x] >= FieldHeight) {
-            // Die unterste Zeile wird nie von unten nachgespeist: ohne Wand abkuehlen lassen
+            // The bottom row is never fed from below: let it cool down without a wall
             int &bottom = heat_[(FieldHeight - 1) * Width + x];
             bottom = bottom > 6 ? bottom - 6 : 0;
         }
     }
 
-    // Abkuehlung je Spalte: wandernde Muster ergeben hohe und niedrige Zungen
+    // Cooling per column: moving patterns produce high and low flame tongues
     for (int x = 0; x < Width; ++x) {
         const double n = 0.5 + 0.5 * (std::sin(x * 0.42 + ph * 1.9) * 0.55
                                     + std::sin(x * 0.97 - ph * 2.7) * 0.3
@@ -102,8 +102,8 @@ void IntroAnimation::step() {
         cool_[x] = 2 + n * n * 11;
     }
 
-    // Hitze nach oben ausbreiten (mit seitlichem Versatz und zufaelligem Abkuehlen).
-    // Drei Teilschritte pro Bild, damit die Zungen schneller wachsen als die Wand steigt.
+    // Spread heat upwards (with sideways offset and random cooling).
+    // Three substeps per frame, so the tongues grow faster than the wall rises.
     for (int sub = 0; sub < 3; ++sub) {
         for (int y = 1; y < FieldHeight; ++y) {
             for (int x = 0; x < Width; ++x) {
@@ -111,7 +111,7 @@ void IntroAnimation::step() {
                 const int r = static_cast<int>(random() * 3);
                 const int dx = std::clamp(x - r + 1, 0, Width - 1);
                 if (y - 1 >= top_[dx])
-                    continue;                                   // Ziel liegt im Wandkoerper
+                    continue;                                   // target is inside the wall body
                 int &dst = heat_[(y - 1) * Width + dx];
                 if (p == 0) {
                     dst = 0;
@@ -123,7 +123,7 @@ void IntroAnimation::step() {
         }
     }
 
-    // Das Firmware-Logo verbrennt, wo die Flammen heiss genug sind
+    // The firmware logo burns where the flames are hot enough
     for (int i = 0; i < Width * Height; ++i) {
         if (heat_[i] > MaxHeat * 0.35)
             burned_[i] = 1;
@@ -134,7 +134,7 @@ void IntroAnimation::step() {
     ++frame_;
 }
 
-// Helle Flammen auf dunklem Grund (Darstellung wie die Firmware)
+// Bright flames on a dark background (same look as the firmware)
 void IntroAnimation::compose(uint8_t *out) const {
     for (int y = 0; y < Height; ++y) {
         for (int x = 0; x < Width; ++x) {

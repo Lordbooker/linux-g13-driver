@@ -1,7 +1,7 @@
-# Logitech G13 und uinput fuer den angemeldeten Benutzer freigeben.
+# Grant the logged-in user access to the Logitech G13 and uinput.
 #
-# "uaccess" vergibt die Rechte per ACL nur an den Benutzer der aktiven lokalen
-# Sitzung (systemd-logind), nicht an alle Benutzer und Dienste. Das Tag wird von
-# 73-seat-late.rules ausgewertet; diese Datei muss deshalb VOR 73 einsortiert sein.
+# "uaccess" grants access via ACL only to the user of the active local session
+# (systemd-logind), not to all users and services. The tag is evaluated by
+# 73-seat-late.rules, so this file must be sorted BEFORE 73.
 SUBSYSTEM=="usb", ATTR{idVendor}=="046d", ATTR{idProduct}=="c21c", TAG+="uaccess"
 KERNEL=="uinput", SUBSYSTEM=="misc", MODE="0660", OPTIONS+="static_node=uinput", TAG+="uaccess"

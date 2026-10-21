@@ -32,8 +32,8 @@ static QMap<QString, QString> readProps(const QString &path)
 static bool writeProps(const QString &path, const QMap<QString, QString> &map)
 {
     QDir().mkpath(QFileInfo(path).absolutePath());
-    // QSaveFile schreibt in eine temporaere Datei und benennt sie atomar um:
-    // der Treiber liest so nie eine leere oder halb geschriebene Datei.
+    // QSaveFile writes to a temporary file and renames it atomically, so the
+    // driver never reads an empty or half-written file.
     QSaveFile f(path);
     if (!f.open(QIODevice::WriteOnly | QIODevice::Text))
         return false;

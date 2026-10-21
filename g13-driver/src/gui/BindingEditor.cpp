@@ -17,7 +17,7 @@
 #include <QMap>
 
 // ---------------------------------------------------------------------------
-// Datei-Hilfsfunktionen
+// File helpers
 // ---------------------------------------------------------------------------
 static QMap<QString, QString> readProps(const QString &path)
 {
@@ -40,8 +40,8 @@ static QMap<QString, QString> readProps(const QString &path)
 static bool writeProps(const QString &path, const QMap<QString, QString> &map)
 {
     QDir().mkpath(QFileInfo(path).absolutePath());
-    // QSaveFile schreibt in eine temporaere Datei und benennt sie atomar um:
-    // der Treiber liest so nie eine leere oder halb geschriebene Datei.
+    // QSaveFile writes to a temporary file and renames it atomically, so the
+    // driver never reads an empty or half-written file.
     QSaveFile f(path);
     if (!f.open(QIODevice::WriteOnly | QIODevice::Text))
         return false;
@@ -60,7 +60,7 @@ BindingEditor::BindingEditor(QWidget *parent) : QWidget(parent)
 {
     auto *root = new QVBoxLayout(this);
 
-    // Kopfzeile
+    // Header
     auto *infoBox    = new QGroupBox(tr("Current selection"), this);
     auto *infoLayout = new QFormLayout(infoBox);
     lblProfile = new QLabel("1 (L1)", this);
@@ -73,7 +73,7 @@ BindingEditor::BindingEditor(QWidget *parent) : QWidget(parent)
     infoLayout->addRow(tr("Key:"),     lblKey);
     root->addWidget(infoBox);
 
-    // Typ-Auswahl
+    // Action type selection
     auto *typeBox    = new QGroupBox(tr("Action type"), this);
     auto *typeLayout = new QVBoxLayout(typeBox);
     cmbType = new QComboBox(this);
@@ -83,10 +83,10 @@ BindingEditor::BindingEditor(QWidget *parent) : QWidget(parent)
     typeLayout->addWidget(cmbType);
     root->addWidget(typeBox);
 
-    // Stack: 3 Seiten
+    // Stack: 3 pages
     stack = new QStackedWidget(this);
 
-    // Seite 0 – Tastencode
+    // Page 0 - key code
     auto *pageKey       = new QWidget();
     auto *pageKeyLayout = new QFormLayout(pageKey);
     editKey = new KeyCaptureEdit(pageKey);
@@ -106,13 +106,13 @@ BindingEditor::BindingEditor(QWidget *parent) : QWidget(parent)
     });
     stack->addWidget(pageKey);
 
-    // Seite 1 – Makro
+    // Page 1 - macro
     auto *pageMacro       = new QWidget();
     auto *pageMacroLayout = new QFormLayout(pageMacro);
     spnMacroId = new QSpinBox(pageMacro);
     spnMacroId->setRange(0, 199);
-    // Wiederholungsmodus wie im Treiber (MacroAction):
-    //   0 = einmal ausfuehren, 1 = wiederholen solange gedrueckt, n>1 = n-mal
+    // Repeat mode as in the driver (MacroAction):
+    //   0 = run once, 1 = repeat while held, n>1 = run n times
     cmbRepeatMode = new QComboBox(pageMacro);
     cmbRepeatMode->addItem(tr("Run once"));
     cmbRepeatMode->addItem(tr("Repeat while held"));
@@ -133,12 +133,12 @@ BindingEditor::BindingEditor(QWidget *parent) : QWidget(parent)
     pageMacroLayout->addRow(lblRepeatHint);
     stack->addWidget(pageMacro);
 
-    // Seite 2 – Keine Aktion (Platzhalter)
+    // Page 2 - no action (placeholder)
     stack->addWidget(new QWidget());
 
     root->addWidget(stack);
 
-    // Speichern
+    // Save
     btnSave = new QPushButton(tr("Save"), this);
     btnSave->setEnabled(false);
     root->addWidget(btnSave);
@@ -180,14 +180,14 @@ void BindingEditor::setKey(const QString &keyName)
     lblStatus->clear();
     loadFromFile();
     if (cmbType->currentIndex() == 0)
-        editKey->setFocus();        // direkt Taste druecken koennen
+        editKey->setFocus();        // so a key can be pressed right away
 }
 
 void BindingEditor::onTypeChanged(int index)
 {
     stack->setCurrentIndex(index);
     if (index == 0 && isVisible())
-        editKey->setFocus();        // direkt Taste druecken koennen
+        editKey->setFocus();        // so a key can be pressed right away
 }
 
 void BindingEditor::onSaveClicked()
@@ -258,7 +258,7 @@ void BindingEditor::saveToFile()
         break;
     case 1: {
         const int mode = cmbRepeatMode->currentIndex();
-        const int repeats = mode == 2 ? spnRepeats->value() : mode;   // 0 bzw. 1
+        const int repeats = mode == 2 ? spnRepeats->value() : mode;   // 0 or 1
         props[fileKey] = QString("m,%1,%2").arg(spnMacroId->value()).arg(repeats);
         break;
     }

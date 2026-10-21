@@ -2,25 +2,25 @@
 #include <QString>
 #include <QStringList>
 
-// Zuordnung der Tasten im G13-Bild zu den Schluesseln der bindings-*.properties.
-// Die Datei-Schluessel sind die Bit-Positionen aus driver/Constants.h:
-//   G0..G21  = physische Tasten G1..G22
-//   G24      = BD, G29..G32 = M1/M2/M3/MR, G33/G34/G35 = Daumentasten LEFT/DOWN/TOP
-//   L1..L4 (Bits 25..28) schalten die Profile um und sind nicht belegbar.
-//   G36..G39 = Joystick hoch/links/rechts/runter (siehe G13::parse_joystick)
-// Wird von G13Visualizer und BindingEditor gemeinsam genutzt.
+// Mapping of the keys in the G13 image to the keys of bindings-*.properties.
+// The file keys are the bit positions from driver/Constants.h:
+//   G0..G21  = physical keys G1..G22
+//   G24      = BD, G29..G32 = M1/M2/M3/MR, G33/G34/G35 = thumb keys LEFT/DOWN/TOP
+//   L1..L4 (bits 25..28) switch the profiles and cannot be bound.
+//   G36..G39 = joystick up/left/right/down (see G13::parse_joystick)
+// Shared by G13Visualizer and BindingEditor.
 namespace G13Keys {
 
-// Alle Tastennamen, die das Bild kennt.
+// All key names known to the image.
 const QStringList &all();
 
-// Datei-Schluessel (z. B. "G4" fuer die Taste "G5"); leer, wenn unbekannt.
+// File key (e.g. "G4" for the key "G5"); empty if unknown.
 QString fileKey(const QString &keyName);
 
-// Die Profiltasten L1..L4 sind nicht frei belegbar.
+// The profile keys L1..L4 cannot be bound.
 bool isConfigurable(const QString &keyName);
 
-// Anzeigename, z. B. "Joystick ↑" fuer "STICK_UP".
+// Display name, e.g. "Joystick ↑" for "STICK_UP".
 QString displayName(const QString &keyName);
 
 }

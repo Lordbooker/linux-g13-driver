@@ -2,7 +2,7 @@
 set -e
 
 if [ "$1" = "configure" ]; then
-    # udev-Regel fuer G13 und uinput aktivieren (in Containern ggf. ohne udev)
+    # Activate the udev rule for the G13 and uinput (containers may have no udev)
     if command -v udevadm >/dev/null 2>&1; then
         udevadm control --reload-rules 2>/dev/null || true
         udevadm trigger --subsystem-match=usb --attr-match=idVendor=046d --attr-match=idProduct=c21c 2>/dev/null || true

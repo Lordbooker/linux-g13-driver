@@ -33,8 +33,8 @@ ICON_SRC    := src/resources/icons
 # =============================================================================
 # Main Workflow
 # =============================================================================
-# "make" baut nur und veraendert das System nicht. Build-Abhaengigkeiten
-# installiert bei Bedarf "make deps" (fragt per sudo nach).
+# "make" only builds and does not change the system. Build dependencies can
+# be installed with "make deps" (asks for sudo).
 all: build-driver
 	@echo "Build complete."
 	@echo " -> Run 'sudo make install' to install system-wide."
@@ -42,7 +42,7 @@ all: build-driver
 deps:
 	@bash $(SCRIPT_DIR)/install_deps.sh
 
-# Alter Name, bleibt fuer bestehende Anleitungen erhalten
+# Old name, kept for existing instructions
 dependencies: deps
 
 # Uses CMake to build both targets (Driver + GUI)
@@ -68,14 +68,14 @@ install:
 	# UDEV
 	install -d $(DESTDIR)$(UDEVDIR)
 	install -m 644 $(UDEV_SRC) $(DESTDIR)$(UDEVDIR)/70-g13.rules
-	# Fruehere Versionen installierten 99-g13.rules (mit MODE=0666) - entfernen
+	# Earlier versions installed 99-g13.rules (with MODE=0666) - remove it
 	rm -f $(DESTDIR)$(UDEVDIR)/99-g13.rules
 	
 	# Systemd
 	install -d $(DESTDIR)$(SYSTEMDDIR)
 	install -m 644 $(SERVICE_SRC) $(DESTDIR)$(SYSTEMDDIR)/g13.service
 	
-	# Menueeintrag, Tray-Autostart, Icons
+	# Menu entry, tray autostart, icons
 	install -Dm 644 $(DESKTOP_SRC) $(DESTDIR)$(APPDIR)/g13-gui.desktop
 	install -Dm 644 $(TRAY_SRC) $(DESTDIR)$(AUTOSTARTDIR)/g13-gui-tray.desktop
 	install -Dm 644 $(ICON_SRC)/g13-gui.svg $(DESTDIR)$(ICONDIR)/scalable/apps/g13-gui.svg
@@ -83,7 +83,7 @@ install:
 		install -Dm 644 $(ICON_SRC)/g13-gui-$$s.png $(DESTDIR)$(ICONDIR)/$${s}x$${s}/apps/g13-gui.png; \
 	done
 	
-	# Dokumentation und Lizenz
+	# Documentation and license
 	install -d $(DESTDIR)$(DOCDIR)
 	install -m 644 ../README.md ../LICENSE ../AUTHORS $(DESTDIR)$(DOCDIR)/
 	

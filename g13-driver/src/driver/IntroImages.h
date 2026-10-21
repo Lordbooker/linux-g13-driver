@@ -1,11 +1,11 @@
-// Bitmaps fuer die Startanimation des LCD (160x43, 1 Bit).
-// Je Zeile 160 Pixel in 20 Bytes, hoechstes Bit = linkes Pixel; 1 = Pixel an (dunkel).
+// Bitmaps for the LCD start animation (160x43, 1 bit).
+// 160 pixels per row in 20 bytes, most significant bit = left pixel; 1 = pixel on (dark).
 //
-// Erzeugt mit der Vorschau "G13 Flammen-Intro" (Darstellung dunkel, Schrift
-// Black Ops One, Stil kursiv mit Speedlines). Das Firmware-Logo wurde aus einem
-// Foto des G13-Displays ausgelesen.
+// Generated with the preview "G13 Flammen-Intro" (dark mode, font Black Ops One,
+// italic style with speed lines). The firmware logo was extracted from a photo
+// of the G13 display.
 //
-// Tux: Larry Ewing (lewing@isc.tamu.edu), erstellt mit The GIMP.
+// Tux: Larry Ewing (lewing@isc.tamu.edu), created with The GIMP.
 #pragma once
 
 #include <cstdint>
@@ -14,7 +14,7 @@ inline constexpr int INTRO_WIDTH     = 160;
 inline constexpr int INTRO_HEIGHT    = 43;
 inline constexpr int INTRO_ROW_BYTES = INTRO_WIDTH / 8;
 
-// Logo, das die G13-Firmware ohne Treiber anzeigt (hell auf dunkel)
+// Logo shown by the G13 firmware without a driver (bright on dark)
 inline constexpr uint8_t intro_firmware_logo[INTRO_HEIGHT][INTRO_ROW_BYTES] = {
     {0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff},
     {0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff},
@@ -61,7 +61,7 @@ inline constexpr uint8_t intro_firmware_logo[INTRO_HEIGHT][INTRO_ROW_BYTES] = {
     {0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff},
 };
 
-// Endbild: Tux und "G13"
+// Final image: Tux and "G13"
 inline constexpr uint8_t intro_final_logo[INTRO_HEIGHT][INTRO_ROW_BYTES] = {
     {0xff, 0xff, 0x9f, 0x9f, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff},
     {0xff, 0xff, 0x7f, 0xef, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff},
