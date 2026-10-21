@@ -5,8 +5,10 @@ import os
 import sys
 from datetime import datetime
 
-# Path to the Named Pipe (Must match the path in the C++ driver)
-PIPE_PATH = "/tmp/g13-lcd"
+# Path to the named pipe. Must match ConfigPath::getFifoPath() in the driver:
+# $XDG_RUNTIME_DIR/g13-lcd, or /tmp/g13-lcd if XDG_RUNTIME_DIR is not set.
+_runtime_dir = os.environ.get("XDG_RUNTIME_DIR")
+PIPE_PATH = os.path.join(_runtime_dir, "g13-lcd") if _runtime_dir else "/tmp/g13-lcd"
 
 def create_bar(percent, length=10):
     """Creates a simple ASCII loading bar."""
