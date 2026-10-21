@@ -1,4 +1,4 @@
-# G13 Linux Driver & Config Tool (Modernized Fork)
+# G13 Linux Driver & Config Tool
 
 A user-space driver and configuration tool for the **Logitech G13** gameboard on Linux.
 
