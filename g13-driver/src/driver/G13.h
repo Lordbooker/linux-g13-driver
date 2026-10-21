@@ -18,10 +18,13 @@
 
 class G13 {
 private:
+    void reattach_kernel_driver();
+
     std::vector<std::unique_ptr<G13Action>> actions;
 
     libusb_device        *device = nullptr;
     libusb_device_handle *handle = nullptr;
+    bool                  kernel_driver_detached = false;  // beim Beenden wieder anhaengen
     int                   uinput_file;   
 
     int                   loaded = 0;

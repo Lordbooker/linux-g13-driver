@@ -67,13 +67,18 @@ G13::G13(libusb_device *device) {
     }
 
     if (libusb_kernel_driver_active(handle, 0) == 1) {
-        if (libusb_detach_kernel_driver(handle, 0) == 0) {
+        const int rc = libusb_detach_kernel_driver(handle, 0);
+        if (rc == 0) {
+            kernel_driver_detached = true;
             syslog(LOG_INFO, "Kernel driver detached");
+        } else {
+            syslog(LOG_WARNING, "Could not detach kernel driver: %s", libusb_error_name(rc));
         }
     }
 
     if (libusb_claim_interface(handle, 0) < 0) {
         syslog(LOG_ERR, "Cannot claim interface");
+        reattach_kernel_driver();
         libusb_close(handle);
         handle = nullptr;
         return;
@@ -97,7 +102,20 @@ G13::~G13() {
     cleanup_fifo(); 
     if (!this->loaded) return;
     libusb_release_interface(this->handle, 0);
+    reattach_kernel_driver();
     libusb_close(this->handle);
+}
+
+// Den beim Start geloesten Kernel-Treiber (z. B. hid-lg-g15) wieder anhaengen,
+// damit der G13 nach dem Beenden des Treibers ohne Umstecken weiter funktioniert.
+void G13::reattach_kernel_driver() {
+    if (!kernel_driver_detached || !handle) return;
+    kernel_driver_detached = false;
+    const int rc = libusb_attach_kernel_driver(handle, 0);
+    if (rc == 0)
+        syslog(LOG_INFO, "Kernel driver reattached");
+    else if (rc != LIBUSB_ERROR_NO_DEVICE)   // Geraet abgezogen: nichts zu tun
+        syslog(LOG_WARNING, "Could not reattach kernel driver: %s", libusb_error_name(rc));
 }
 
 void G13::start() {
