@@ -21,9 +21,13 @@ Thumbs.db
 *.o
 *.d
 
-# Build directories
+# Build directories and packages
+/build/
+/dist/
 g13-driver/src/build/
 g13-driver/build/
+g13-driver/packaging/arch/*/
+g13-driver/packaging/arch/*.pkg.tar.*
 
 
 

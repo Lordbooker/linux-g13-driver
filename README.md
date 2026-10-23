@@ -114,17 +114,18 @@ docker run --rm -v "$PWD:/src" -w /src debian:13 g13-driver/packaging/build-pack
 ```
 
 Releases are built automatically by GitHub Actions (`.github/workflows/release.yml`): pushing
-a tag such as `v2.1.0` builds the packages for all supported systems and publishes them as a
-GitHub release with a list of changes. The workflow can also be started manually from the
-*Actions* tab to build test packages without publishing a release.
+a tag such as `v2.6.3` builds the packages for all supported systems, publishes them as a
+GitHub release with a list of changes and updates the AUR package. Every push to `dev` builds
+test packages. See [CONTRIBUTING.md](CONTRIBUTING.md) for the branches, the checks and the
+release steps.
 
 CMake options:
 
 | Option | Default | Meaning |
 |---|---|---|
 | `BUILD_CONFIG_TOOL` | `ON` | Build the Qt6 config tool `g13-gui` |
-| `BUILD_TESTS` | `OFF` | Build tests (requires GoogleTest; no tests exist yet) |
 | `ENABLE_SANITIZERS` | `OFF` | ASan/UBSan, only for `CMAKE_BUILD_TYPE=Debug` |
+| `G13_WERROR` | `OFF` | Treat compiler warnings as errors (used by CI) |
 
 ## Upgrading from the old Version (GTK tray / Java config tool)
 
@@ -367,7 +368,8 @@ Key codes are Linux input event codes, see `docs/Eventcodes_for_Mapping.pdf` or
 | `1` | repeat while the key is held |
 | `>1` | run the given number of times |
 
-Pressing the key again while a macro is running stops it.
+Pressing the key again while a macro is running stops it. A stopped macro releases the keys it
+pressed, and keys still held at the end of a macro (a `kd.` without `ku.`) are released as well.
 
 ### `macro-<0..199>.properties`
 
