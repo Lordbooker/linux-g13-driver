@@ -1,4 +1,5 @@
 #include "MainWindow.h"
+#include "PropertiesFile.h"
 #include "ui_MainWindow.h"
 
 #include "G13Visualizer.h"
@@ -15,12 +16,6 @@
 #include <QApplication>
 #include <QProcess>
 #include <QTimer>
-#include <QDir>
-#include <QFile>
-#include <QFileInfo>
-#include <QSaveFile>
-#include <QStandardPaths>
-#include <QTextStream>
 
 MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent)
@@ -82,68 +77,20 @@ void MainWindow::setupToolbar()
 // ---------------------------------------------------------------------------
 namespace {
 
-QString settingsFilePath()
-{
-    return QStandardPaths::writableLocation(QStandardPaths::ConfigLocation)
-           + "/g13/settings.properties";
-}
-
 // Reads a value; if the key is missing, defaultValue applies.
 QString readSetting(const QString &key, const QString &defaultValue)
 {
-    QFile f(settingsFilePath());
-    if (!f.open(QIODevice::ReadOnly | QIODevice::Text))
-        return defaultValue;
-    QString value = defaultValue;
-    QTextStream in(&f);
-    while (!in.atEnd()) {
-        const QString line = in.readLine().trimmed();
-        if (line.isEmpty() || line.startsWith('#'))
-            continue;
-        const int eq = line.indexOf('=');
-        if (eq > 0 && line.left(eq).trimmed() == key)
-            value = line.mid(eq + 1).trimmed();
-    }
-    return value;
+    return PropertiesFile::read(PropertiesFile::settingsPath()).value(key, defaultValue);
 }
 
 // Sets a value and leaves all other lines (including comments) unchanged.
 bool writeSetting(const QString &key, const QString &value)
 {
-    QStringList lines;
-    QFile in(settingsFilePath());
-    if (in.open(QIODevice::ReadOnly | QIODevice::Text)) {
-        QTextStream ts(&in);
-        while (!ts.atEnd())
-            lines << ts.readLine();
-        in.close();
-    } else {
-        lines << "# G13 settings - edited by g13-gui";
-    }
-    bool replaced = false;
-    for (QString &line : lines) {
-        const QString t = line.trimmed();
-        const int eq = t.indexOf('=');
-        if (!t.startsWith('#') && eq > 0 && t.left(eq).trimmed() == key) {
-            line = key + "=" + value;
-            replaced = true;
-        }
-    }
-    if (!replaced)
-        lines << key + "=" + value;
-
-    QDir().mkpath(QFileInfo(settingsFilePath()).absolutePath());
-    QSaveFile out(settingsFilePath());
-    if (!out.open(QIODevice::WriteOnly | QIODevice::Text))
-        return false;
-    QTextStream ts(&out);
-    for (const QString &line : lines)
-        ts << line << "\n";
-    ts.flush();
-    return out.commit();
+    return PropertiesFile::update(PropertiesFile::settingsPath(), {{key, value}},
+                                  "# G13 settings - edited by g13-gui");
 }
 
-}
+} // namespace
 
 void MainWindow::setupOptionsMenu()
 {
@@ -175,7 +122,7 @@ void MainWindow::setupOptionsMenu()
 QIcon MainWindow::appIcon()
 {
     QIcon fallback;
-    for (int size : {22, 32, 48, 64, 128, 256})
+    for (const int size : {22, 32, 48, 64, 128, 256})
         fallback.addFile(QString(":/icons/g13-gui-%1.png").arg(size), QSize(size, size));
     // Prefer the installed theme icon (hicolor/g13-gui), else the embedded one.
     return QIcon::fromTheme("g13-gui", fallback);

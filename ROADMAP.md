@@ -31,8 +31,8 @@ packaged open source solution. Status: version 2.6.
 |---|---|
 | C++ standard **C++23**, CMake **3.20+** | Done |
 | **GTK3 / AppIndicator removed from the daemon** – pure background service | Done |
-| Build options `BUILD_CONFIG_TOOL`, `BUILD_TESTS`, `ENABLE_SANITIZERS`; `GNUInstallDirs` | Done |
-| Warning-free build (`-Wall -Wextra`) | Done |
+| Build options `BUILD_CONFIG_TOOL`, `ENABLE_SANITIZERS`, `G13_WERROR`; `GNUInstallDirs` | Done |
+| Warning-free build (`-Wall -Wextra -Wpedantic -Wshadow`, `-Werror` in CI) | Done |
 | Clean shutdown: the signal handler only sets a flag, all device threads are joined | Done |
 | Bindings are reset before every load (keys not listed have no function) | Done |
 | No stuck keys on profile switch/live reload; profile switch only on key press | Done |
@@ -40,6 +40,10 @@ packaged open source solution. Status: version 2.6.
 | USB read errors: pause, throttled logging, release and reopen after a series of errors | Done |
 | Invalid `color` values, init errors and LCD character 127 no longer cause crashes/UB | Done |
 | In-kernel driver (`hid-lg-g15`, Linux 6.19+) is reattached when the driver stops | Done |
+| Macros: no lost stop on a quick release, keys released on stop, delays end immediately | Done |
+| uinput: all keyboard key codes, no joystick axes; held keys released when a device goes away | Done |
+| LCD pipe only accepted if it belongs to the user; no configuration fallback in `/tmp` | Done |
+| Code review with clang-tidy and cppcheck: no findings | Done |
 
 ---
 
@@ -94,7 +98,6 @@ interface (IPC). The tray menu controls the driver via `systemctl --user`.
 
 | Item | Description |
 |---|---|
-| Macros block when stopped | When a running macro is stopped or replaced, the reading thread waits until the end of the current delay step (`d.<ms>`). |
 | Several G13 | Several devices share one LCD pipe and the same configuration files. |
 | Macro files | Changes to `macro-*.properties` only take effect the next time the bindings are loaded. |
 
@@ -103,24 +106,22 @@ interface (IPC). The tray menu controls the driver via `systemctl --user`.
 | Task | Description |
 |---|---|
 | Hotplug without polling | Device detection via libusb hotplug instead of polling every second |
-| Joystick absolute mode | Present in the driver, but not configurable |
+| Joystick as analog axes | Offer the stick as a gamepad stick instead of four keys |
 | LCD plugins | Clock, system load, "now playing" etc. via the FIFO |
 | Profile switching from outside | e.g. via D-Bus from the GUI or other programs |
 | Per-app profiles | Automatic profile switch depending on the active window |
 
 ---
 
-## Phase 5 – Tests & quality assurance (open)
+## Phase 5 – Tests & quality assurance
 
-There are no automated tests in the repository yet.
-
-| Task | Tool |
+| Task | Status |
 |---|---|
-| Unit tests for the binding parser and the macro engine | GoogleTest |
-| Driver tests against a simulated G13 (libusb/uinput mock) | GoogleTest |
-| Static analysis | `clang-tidy`, `cppcheck` |
-| Memory sanitizers | `-fsanitize=address,undefined` (via `ENABLE_SANITIZERS`) |
-| CI pipeline | GitHub Actions: build and tests on every push |
+| CI pipeline: build on Arch, Fedora and Debian testing with `-Werror` on every push and pull request | Done |
+| Static analysis in CI: `clang-tidy` (`.clang-tidy`), `cppcheck`, `shellcheck`, `actionlint` | Done |
+| Memory sanitizers via `ENABLE_SANITIZERS` (`-fsanitize=address,undefined`) | Available |
+| Unit tests for the binding parser and the macro engine | Open |
+| Driver tests against a simulated G13 (libusb/uinput mock) | Open |
 
 ---
 
@@ -128,7 +129,7 @@ There are no automated tests in the repository yet.
 
 | Task | Status |
 |---|---|
-| Arch Linux – AUR package `linux-g13-driver-git` | Done |
+| Arch Linux – AUR package `linux-g13-driver-git`, published by the release workflow | Done |
 | Version tags (`v1.0.0` Java version, `v2.0.0` Qt6) | Done |
 | `make remove-legacy` to remove old installations | Done |
 | `.deb` packages for Debian 12/13 and Ubuntu 22.04/24.04/26.04 (CPack) | Done |

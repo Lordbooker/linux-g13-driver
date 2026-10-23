@@ -20,6 +20,7 @@ class MacroRecorder : public QWidget {
 public:
     explicit MacroRecorder(QWidget *parent = nullptr);
     ~MacroRecorder() override;
+    Q_DISABLE_COPY_MOVE(MacroRecorder)
 
 public slots:
     void setMacroId(int id);

@@ -1,4 +1,5 @@
 #pragma once
+#include <cstdint>
 #include <QList>
 #include <QString>
 #include <QStringList>
@@ -12,7 +13,7 @@
 namespace MacroSequence {
 
 struct Event {
-    enum class Type { KeyDown, KeyUp, Delay };
+    enum class Type : std::uint8_t { KeyDown, KeyUp, Delay };
     Type type  = Type::Delay;
     int  value = 0;   // keycode or milliseconds
 

@@ -45,7 +45,6 @@ private:
 
     QTransform imageToWidget() const;
     QString keyAt(const QPointF &widgetPos) const;
-    QString bindingFilePath() const;
     void reloadBindings();
 
     QPixmap      m_image;

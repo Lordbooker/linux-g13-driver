@@ -1,15 +1,13 @@
 #include "G13Visualizer.h"
+#include "PropertiesFile.h"
 #include "G13Keys.h"
 
 #include <QDir>
 #include <QFile>
-#include <QFileInfo>
 #include <QFileSystemWatcher>
 #include <QHelpEvent>
 #include <QMouseEvent>
 #include <QPainter>
-#include <QStandardPaths>
-#include <QTextStream>
 #include <QToolTip>
 
 namespace {
@@ -83,7 +81,7 @@ G13Visualizer::G13Visualizer(QWidget *parent) : QWidget(parent)
     addStickSector("STICK_DOWN",  225);
 
     // Reload the bindings when files change (GUI or text editor).
-    const QString dir = QFileInfo(bindingFilePath()).absolutePath();
+    const QString dir = PropertiesFile::configDir();
     QDir().mkpath(dir);
     m_watcher = new QFileSystemWatcher(this);
     m_watcher->addPath(dir);
@@ -139,7 +137,7 @@ QTransform G13Visualizer::imageToWidget() const
                              height() / qreal(m_image.height()));
     const qreal dx = (width()  - m_image.width()  * scale) / 2.0;
     const qreal dy = (height() - m_image.height() * scale) / 2.0;
-    return QTransform(scale, 0, 0, scale, dx, dy);
+    return {scale, 0, 0, scale, dx, dy};
 }
 
 QString G13Visualizer::keyAt(const QPointF &widgetPos) const
@@ -158,7 +156,7 @@ QString G13Visualizer::keyAt(const QPointF &widgetPos) const
 // ---------------------------------------------------------------------------
 // Painting
 // ---------------------------------------------------------------------------
-void G13Visualizer::paintEvent(QPaintEvent *)
+void G13Visualizer::paintEvent(QPaintEvent * /*event*/)
 {
     QPainter p(this);
     p.setRenderHint(QPainter::Antialiasing);
@@ -246,7 +244,7 @@ void G13Visualizer::mousePressEvent(QMouseEvent *event)
     emit keySelected(key);
 }
 
-void G13Visualizer::leaveEvent(QEvent *)
+void G13Visualizer::leaveEvent(QEvent * /*event*/)
 {
     if (!m_hover.isEmpty()) {
         m_hover.clear();
@@ -285,15 +283,9 @@ void G13Visualizer::setProfile(int profile)
     reloadBindings();
 }
 
-QString G13Visualizer::bindingFilePath() const
-{
-    return QStandardPaths::writableLocation(QStandardPaths::ConfigLocation)
-           + QString("/g13/bindings-%1.properties").arg(m_profile);
-}
-
 void G13Visualizer::reloadBindings()
 {
-    const QString path = bindingFilePath();
+    const QString path = PropertiesFile::bindingsPath(m_profile);
 
     // (Re)watch the file: editors often replace files instead of modifying them.
     if (QFile::exists(path) && !m_watcher->files().contains(path)) {
@@ -303,20 +295,10 @@ void G13Visualizer::reloadBindings()
     }
 
     QSet<QString> boundFileKeys;
-    QFile f(path);
-    if (f.open(QIODevice::ReadOnly | QIODevice::Text)) {
-        QTextStream in(&f);
-        while (!in.atEnd()) {
-            const QString line = in.readLine().trimmed();
-            if (line.isEmpty() || line.startsWith('#'))
-                continue;
-            const int eq = line.indexOf('=');
-            if (eq < 0)
-                continue;
-            const QString value = line.mid(eq + 1).trimmed();
-            if (value.startsWith("p,") || value.startsWith("m,"))
-                boundFileKeys.insert(line.left(eq).trimmed());
-        }
+    const auto values = PropertiesFile::read(path);
+    for (auto it = values.cbegin(); it != values.cend(); ++it) {
+        if (it.value().startsWith("p,") || it.value().startsWith("m,"))
+            boundFileKeys.insert(it.key());
     }
 
     m_bound.clear();

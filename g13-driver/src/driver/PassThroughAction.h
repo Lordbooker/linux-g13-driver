@@ -1,41 +1,24 @@
-#ifndef __PASS_THROUGH_ACTION_H__
-#define __PASS_THROUGH_ACTION_H__
+#ifndef G13_DRIVER_PASSTHROUGHACTION_H
+#define G13_DRIVER_PASSTHROUGHACTION_H
 
 #include "G13Action.h"
 
 /**
- * @class PassThroughAction
- * @brief A concrete G13Action that simulates a single standard keyboard key press.
- *
- * When triggered, this action sends a key-down event to the kernel, and when
- * released, it sends a key-up event, effectively "passing through" the press.
+ * @brief Sends a single key: pressed while the G13 key is pressed.
  */
 class PassThroughAction : public G13Action {
-private:
-    /** The Linux keycode that this action will send. */
-	int keycode;
+public:
+    /// @param keycode Linux input key code (linux/input-event-codes.h)
+    explicit PassThroughAction(int keycode) : m_keycode(keycode) {}
+
+    [[nodiscard]] int keyCode() const { return m_keycode; }
 
 protected:
-    /** @brief Overridden to send the key press event. */
-	void key_down() override;
-    /** @brief Overridden to send the key release event. */
-	void key_up() override;
+    void key_down() override;
+    void key_up() override;
 
-public:
-    /**
-     * @brief Constructor.
-     * @param code The Linux keycode for this action.
-     */
-	PassThroughAction(int code);
-
-    /** @brief Virtual destructor. */
-	virtual ~PassThroughAction();
-
-    /** @brief Gets the current keycode. */
-	int getKeyCode() const;
-
-    /** @brief Sets a new keycode. */
-	void setKeyCode(int code);
+private:
+    int m_keycode;
 };
 
-#endif
+#endif // G13_DRIVER_PASSTHROUGHACTION_H

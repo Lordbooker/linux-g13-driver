@@ -1,136 +1,97 @@
-#include <vector>
-#include <sys/stat.h>
-#include <stdio.h>
-#include <string.h>
-#include <signal.h>
-#include <stdlib.h>
-#include <unistd.h>
-#include <iomanip>
-#include <linux/uinput.h>
-#include <fcntl.h>
-#include <mutex>
-#include <sys/time.h> // for gettimeofday
-#include <syslog.h> //  Logging
-
 #include "Output.h"
 #include "Constants.h"
 
-using namespace std;
+#include <fcntl.h>
+#include <linux/uinput.h>
+#include <sys/ioctl.h>
+#include <syslog.h>
+#include <unistd.h>
 
-// Initialization of static class members.
-int UInput::file = -1;
-std::mutex UInput::plock;
+#include <cerrno>
+#include <cstring>
+#include <system_error>
 
-/**
- * @brief Sends a single input event to the virtual uinput device.
- */
-void UInput::send_event(int type, int code, int val) {
-	if (file < 0) {
-		return;
-	}
+int UInput::s_fd = -1;
+bool UInput::s_writeErrorLogged = false;
+std::mutex UInput::s_mutex;
 
-    // Modern C++ RAII lock (replaces pthread_mutex_lock/unlock)
-	const std::lock_guard<std::mutex> lock(plock);
+namespace {
 
-	struct input_event event;
-	memset(&event, 0, sizeof(event));
-	gettimeofday(&event.time, nullptr); // Set the event timestamp.
-	event.type = type;
-	event.code = code;
-	event.value = val;
+bool enableKey(int fd, int code)
+{
+    // NOLINTNEXTLINE(cppcoreguidelines-pro-type-vararg): ioctl is variadic
+    return ioctl(fd, UI_SET_KEYBIT, code) == 0;
+}
 
-	// Write the event structure to the uinput file descriptor.
-	if (write(file, &event, sizeof(event)) < 0) {
-        // Optional: Error handling if write fails
+} // namespace
+
+bool UInput::create_uinput()
+{
+    const std::lock_guard<std::mutex> lock(s_mutex);
+    if (s_fd >= 0)
+        return true;
+
+    const int fd = ::open("/dev/uinput", O_WRONLY | O_NONBLOCK | O_CLOEXEC);
+    if (fd < 0) {
+        syslog(LOG_ERR, "Could not open /dev/uinput: %s", std::generic_category().message(errno).c_str());
+        return false;
     }
-}
 
-/**
- * @brief Flushes any buffered data.
- */
-void UInput::flush() {
-    if (file < 0) return;
-	const std::lock_guard<std::mutex> lock(plock);
-	fsync(file);
-}
+    // Keyboard keys only (KEY_ESC..KEY_MICMUTE and KEY_OK..KEY_MAX without the
+    // button ranges): with buttons or axes the device would be classified as
+    // a mouse or joystick.
+    bool ok = ioctl(fd, UI_SET_EVBIT, EV_KEY) == 0;   // NOLINT(cppcoreguidelines-pro-type-vararg)
+    for (int code = KEY_ESC; ok && code < BTN_MISC; ++code)
+        ok = enableKey(fd, code);
+    for (int code = KEY_OK; ok && code < BTN_TRIGGER_HAPPY; ++code)
+        ok = enableKey(fd, code);
 
-/**
- * @brief Closes and destroys the virtual uinput device.
- */
-void UInput::close_uinput() {
-    if (file >= 0) {
-        // Destroy the uinput device via ioctl before closing the file.
-        ioctl(file, UI_DEV_DESTROY);
-        close(file);
-        file = -1; 
+    uinput_setup setup{};
+    setup.id.bustype = BUS_USB;
+    setup.id.vendor = G13_VENDOR_ID;
+    setup.id.product = G13_PRODUCT_ID;
+    setup.id.version = 1;
+    std::strncpy(setup.name, "G13", UINPUT_MAX_NAME_SIZE - 1);
+
+    ok = ok && ioctl(fd, UI_DEV_SETUP, &setup) == 0     // NOLINT(cppcoreguidelines-pro-type-vararg)
+            && ioctl(fd, UI_DEV_CREATE) == 0;           // NOLINT(cppcoreguidelines-pro-type-vararg)
+    if (!ok) {
+        syslog(LOG_ERR, "Could not create the uinput device: %s", std::generic_category().message(errno).c_str());
+        ::close(fd);
+        return false;
     }
+    s_fd = fd;
+    s_writeErrorLogged = false;
+    return true;
 }
 
-/**
- * @brief Creates and configures the virtual uinput device.
- */
-bool UInput::create_uinput() {
-	struct uinput_user_dev uinp;
-	const char* dev_uinput_fname =
-			access("/dev/input/uinput", F_OK) == 0 ? "/dev/input/uinput" :
-			access("/dev/uinput", F_OK) == 0 ? "/dev/uinput" : 0;
+void UInput::close_uinput()
+{
+    const std::lock_guard<std::mutex> lock(s_mutex);
+    if (s_fd < 0)
+        return;
+    ioctl(s_fd, UI_DEV_DESTROY);   // NOLINT(cppcoreguidelines-pro-type-vararg)
+    ::close(s_fd);
+    s_fd = -1;
+}
 
-	if (!dev_uinput_fname) {
-		syslog(LOG_ERR, "Could not find an uinput device");
-		return false;
-	}
+void UInput::send_event(int type, int code, int value)
+{
+    const std::lock_guard<std::mutex> lock(s_mutex);
+    if (s_fd < 0)
+        return;
 
-	if (access(dev_uinput_fname, W_OK) != 0) {
-		syslog(LOG_ERR, "%s doesn't grant write permissions", dev_uinput_fname);
-		return false;
-	}
+    input_event event{};
+    event.type = static_cast<__u16>(type);
+    event.code = static_cast<__u16>(code);
+    event.value = value;   // the kernel sets the timestamp
 
-	file = open(dev_uinput_fname, O_WRONLY | O_NDELAY);
-	if (file < 0) {
-		syslog(LOG_ERR, "Could not open uinput");
-		return false;
-	}
-
-	// Configure the virtual device.
-	memset(&uinp, 0, sizeof(uinp));
-	const char name[] = "G13";
-	snprintf(uinp.name, UINPUT_MAX_NAME_SIZE, "%s", name);
-
-	uinp.id.version = 1;
-	uinp.id.bustype = BUS_USB;
-	uinp.id.product = G13_PRODUCT_ID;
-	uinp.id.vendor = G13_VENDOR_ID;
-	uinp.absmin[ABS_X] = 0;   
-	uinp.absmin[ABS_Y] = 0;   
-	uinp.absmax[ABS_X] = 0xff;
-	uinp.absmax[ABS_Y] = 0xff;
-
-	// Enable event types
-	ioctl(file, UI_SET_EVBIT, EV_KEY);
-	ioctl(file, UI_SET_EVBIT, EV_ABS);
-	ioctl(file, UI_SET_MSCBIT, MSC_SCAN);
-	ioctl(file, UI_SET_ABSBIT, ABS_X);
-	ioctl(file, UI_SET_ABSBIT, ABS_Y);
-
-	// Enable all possible key codes
-	for (int i = 0; i < 256; i++)
-		ioctl(file, UI_SET_KEYBIT, i);
-	ioctl(file, UI_SET_KEYBIT, BTN_THUMB);
-
-	// Write configuration
-	int retcode = write(file, &uinp, sizeof(uinp));
-	if (retcode < 0) {
-		syslog(LOG_ERR, "Could not write to uinput device (%d)", retcode);
-        close(file); file = -1;
-		return false;
-	}
-
-	// Create device
-	retcode = ioctl(file, UI_DEV_CREATE);
-	if (retcode) {
-		syslog(LOG_ERR, "Error creating uinput device for G13");
-        close(file); file = -1;
-		return false;
-	}
-	return true;
+    if (::write(s_fd, &event, sizeof(event)) != static_cast<ssize_t>(sizeof(event))) {
+        // Log once per series, otherwise every key press would flood the log.
+        if (!s_writeErrorLogged)
+            syslog(LOG_ERR, "Could not send input event: %s", std::generic_category().message(errno).c_str());
+        s_writeErrorLogged = true;
+        return;
+    }
+    s_writeErrorLogged = false;
 }
