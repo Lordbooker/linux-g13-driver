@@ -1,126 +1,157 @@
-#include <string.h>
-#include <vector>
-#include <memory>
-#include <sstream>
-#include <thread>
-#include <syslog.h> // Logging
-
 #include "MacroAction.h"
+#include "Output.h"
 
-/**
- * @brief The main loop for macro execution.
- */
-void MacroAction::execute_macro_loop() {
-    _should_stop = false;
+#include <linux/input.h>
+#include <syslog.h>
 
-    // Case: Run Once (_repeats == 0)
-    if (_repeats == 0) {
-        for (const auto& event : _events) {
-            if (_should_stop) break; // Check interrupt
-            event->execute();
-        }
-        _is_macro_running = false;
+#include <algorithm>
+#include <charconv>
+#include <chrono>
+#include <sstream>
+
+MacroAction::MacroAction(const std::string &sequence, int repeats)
+    : m_repeats(std::max(repeats, RunOnce))
+{
+    std::stringstream stream(sequence);
+    std::string token;
+    while (std::getline(stream, token, ',')) {
+        if (token.empty())
+            continue;
+        Step step{};
+        if (parseStep(token, step))
+            m_steps.push_back(step);
+        else
+            syslog(LOG_WARNING, "Invalid macro step ignored: %s", token.c_str());
+    }
+}
+
+MacroAction::~MacroAction()
+{
+    stopAndJoin();
+}
+
+bool MacroAction::parseStep(const std::string &token, Step &step)
+{
+    struct Prefix {
+        const char *text;
+        Step::Type type;
+    };
+    static constexpr Prefix prefixes[] = {
+        {"kd.", Step::Type::KeyDown},
+        {"ku.", Step::Type::KeyUp},
+        {"d.", Step::Type::Delay},
+    };
+    for (const auto &prefix : prefixes) {
+        const std::string_view text(prefix.text);
+        if (!token.starts_with(text))
+            continue;
+        const char *first = token.data() + text.size();
+        const char *last = token.data() + token.size();
+        int value = 0;
+        const auto [end, error] = std::from_chars(first, last, value);
+        if (error != std::errc() || end != last || value < 0)
+            return false;
+        if (prefix.type != Step::Type::Delay && (value == 0 || value > KEY_MAX))
+            return false;
+        step = Step{prefix.type, value};
+        return true;
+    }
+    return false;
+}
+
+void MacroAction::key_down()
+{
+    if (m_running) {
+        // Pressing the key again stops a running macro.
+        stopAndJoin();
         return;
     }
+    if (m_steps.empty())
+        return;
 
-    // Case: Repeating macros
-    int current_repeats = 0;
-    while (!_should_stop) {
-        for (const auto& event : _events) {
-            if (_should_stop) break;
-            event->execute();
-        }
-
-        if (_should_stop) break;
-
-        // Fixed number of repeats
-        if (_repeats > 1) {
-            current_repeats++;
-            if (current_repeats >= _repeats) {
-                break;
-            }
-        }
-        // If _repeats == 1, loop continues until key_up sets _should_stop
+    if (m_thread.joinable())
+        m_thread.join();   // previous run has finished, only clean up
+    {
+        const std::lock_guard<std::mutex> lock(m_mutex);
+        m_stop = false;   // reset before the thread starts, so a quick key_up is not lost
     }
-
-    _is_macro_running = false;
-}
-
-std::unique_ptr<MacroAction::Event> MacroAction::tokenToEvent(const std::string& token) {
-    if (token.empty()) return nullptr;
-
+    m_running = true;
     try {
-        if (token.rfind("kd.", 0) == 0) {
-            return std::make_unique<KeyDownEvent>(std::stoi(token.substr(3)));
-        }
-        if (token.rfind("ku.", 0) == 0) {
-            return std::make_unique<KeyUpEvent>(std::stoi(token.substr(3)));
-        }
-        if (token.rfind("d.", 0) == 0) {
-            return std::make_unique<WaitEvent>(std::stoi(token.substr(2)));
-        }
-    } catch (...) {
-        syslog(LOG_ERR, "MacroAction::tokenToEvent: Error parsing token: %s", token.c_str());
-    }
-    return nullptr;
-}
-
-MacroAction::MacroAction(const std::string& sequence)
-    : _repeats(0), _is_macro_running(false), _should_stop(false) {
-
-    std::stringstream ss(sequence);
-    std::string token;
-    while (std::getline(ss, token, ',')) {
-        if (!token.empty()) {
-            auto event = tokenToEvent(token);
-            if (event) _events.push_back(std::move(event));
-        }
+        m_thread = std::thread(&MacroAction::run, this);
+    } catch (const std::system_error &e) {
+        m_running = false;
+        syslog(LOG_ERR, "Could not start macro thread: %s", e.what());
     }
 }
 
-MacroAction::~MacroAction() {
-    // RAII: Ensure thread is stopped and joined before destruction
-    _should_stop = true;
-    if (_macro_thread.joinable()) {
-        _macro_thread.join();
-    }
+void MacroAction::key_up()
+{
+    if (m_repeats == RepeatWhileHeld)
+        requestStop();
 }
 
-void MacroAction::key_down() {
-    if (isPressed()) {
-        if (_is_macro_running) {
-            // Toggle behavior: Stop if running
-            _should_stop = true;
-            if (_macro_thread.joinable()) {
-                _macro_thread.join();
-            }
-            return;
+void MacroAction::requestStop()
+{
+    {
+        const std::lock_guard<std::mutex> lock(m_mutex);
+        m_stop = true;
+    }
+    m_wakeup.notify_all();
+}
+
+void MacroAction::stopAndJoin()
+{
+    requestStop();
+    if (m_thread.joinable())
+        m_thread.join();
+}
+
+void MacroAction::run()
+{
+    std::vector<int> pressed;   // keys pressed by this macro and not released yet
+    int runs = 0;
+    while (runSteps(pressed)) {
+        ++runs;
+        if (m_repeats == RunOnce || (m_repeats > RepeatWhileHeld && runs >= m_repeats))
+            break;
+    }
+
+    // Release what is still held (macro stopped in the middle, or a sequence
+    // without its ku. steps), otherwise the keys stay pressed in the system.
+    for (const int keycode : pressed) {
+        UInput::send_event(EV_KEY, keycode, 0);
+        UInput::send_event(EV_SYN, SYN_REPORT, 0);
+    }
+    m_running = false;
+}
+
+bool MacroAction::runSteps(std::vector<int> &pressed)
+{
+    for (const Step &step : m_steps) {
+        std::unique_lock<std::mutex> lock(m_mutex);
+        if (m_stop)
+            return false;
+        switch (step.type) {
+        case Step::Type::Delay:
+            if (m_wakeup.wait_for(lock, std::chrono::milliseconds(step.value),
+                                  [this] { return m_stop; }))
+                return false;
+            break;
+        case Step::Type::KeyDown:
+            lock.unlock();
+            UInput::send_event(EV_KEY, step.value, 1);
+            UInput::send_event(EV_SYN, SYN_REPORT, 0);
+            if (std::ranges::find(pressed, step.value) == pressed.end())
+                pressed.push_back(step.value);
+            break;
+        case Step::Type::KeyUp:
+            lock.unlock();
+            UInput::send_event(EV_KEY, step.value, 0);
+            UInput::send_event(EV_SYN, SYN_REPORT, 0);
+            std::erase(pressed, step.value);
+            break;
         }
-
-        if (_events.empty()) return;
-
-        _is_macro_running = true;
-        
-        // Clean up previous thread if necessary (should be handled, but safe-guard)
-        if (_macro_thread.joinable()) {
-            _macro_thread.join();
-        }
-
-        // Start new thread
-        _macro_thread = std::thread(&MacroAction::execute_macro_loop, this);
     }
-}
-
-void MacroAction::key_up() {
-    if (_repeats == 1) {
-       _should_stop = true;
-    }
-}
-
-int MacroAction::getRepeats() const {
-    return _repeats;
-}
-
-void MacroAction::setRepeats(int repeats) {
-    this->_repeats = repeats;
+    const std::lock_guard<std::mutex> lock(m_mutex);
+    return !m_stop;
 }

@@ -1,710 +1,731 @@
-#include <iostream> 
-#include <fstream>
-#include <vector>
-#include <sys/stat.h>
-#include <stdio.h>
-#include <string.h>
-#include <signal.h>
-#include <stdlib.h>
-#include <unistd.h>
-#include <libusb-1.0/libusb.h>
-#include <iomanip>
-#include <linux/uinput.h>
-#include <fcntl.h>
-#include <algorithm>
-#include <sstream>
-#include <istream>
-#include <chrono> 
-#include <thread>
-#include <syslog.h> 
-
-#include "Constants.h"
 #include "G13.h"
-#include "G13Action.h"
-#include "PassThroughAction.h"
+
+#include "ConfigPath.h"
+#include "Font.h"
+#include "IntroAnimation.h"
 #include "MacroAction.h"
 #include "Output.h"
-#include "Font.h"
-#include "ConfigPath.h" // NEW: Include Helper
-#include "IntroAnimation.h"
+#include "PassThroughAction.h"
 
-extern volatile sig_atomic_t daemon_keep_running;
-const int G13_MAX_MACROS = 200;
+#include <fcntl.h>
+#include <linux/input.h>
+#include <sys/stat.h>
+#include <syslog.h>
+#include <unistd.h>
 
-// bmRequestType for HID class requests to the interface (LCD init, color).
+#include <algorithm>
+#include <cerrno>
+#include <charconv>
+#include <chrono>
+#include <fstream>
+#include <sstream>
+#include <string_view>
+#include <system_error>
+#include <vector>
+
+namespace {
+
+constexpr int G13_MAX_MACROS = 200;   // macro-0 .. macro-199
+
+// LCD geometry: 160 x 43 visible pixels; the buffer has 6 pages of 8 rows.
+constexpr int LCD_WIDTH = 160;
+constexpr int LCD_BUFFER_ROWS = 48;
+constexpr int LCD_LINE_HEIGHT = 8;
+constexpr int LCD_CHAR_WIDTH = FONT_COLUMNS + 1;
+
+// LCD transfer: report 0x03, 31 unused header bytes, then the image.
+constexpr unsigned char LCD_REPORT_ID = 0x03;
+constexpr std::size_t LCD_HEADER_SIZE = 32;
+constexpr std::size_t LCD_TRANSFER_SIZE = LCD_HEADER_SIZE + G13_LCD_BUFFER_SIZE;
+
+// HID class requests to the interface (LCD init, backlight color).
 // Built explicitly as uint8_t: combining two libusb enums of different types
 // directly is deprecated since C++20 (-Wdeprecated-enum-enum-conversion).
-constexpr uint8_t G13_HID_CLASS_REQUEST =
-    static_cast<uint8_t>(LIBUSB_REQUEST_TYPE_CLASS) |
-    static_cast<uint8_t>(LIBUSB_RECIPIENT_INTERFACE);
+constexpr std::uint8_t HID_CLASS_REQUEST =
+    static_cast<std::uint8_t>(LIBUSB_REQUEST_TYPE_CLASS) |
+    static_cast<std::uint8_t>(LIBUSB_RECIPIENT_INTERFACE);
+constexpr std::uint8_t HID_SET_REPORT = 0x09;
+constexpr std::uint16_t LCD_INIT_REPORT = 0x0300;
+constexpr std::uint16_t BACKLIGHT_REPORT = 0x0307;
+constexpr unsigned int USB_TIMEOUT_MS = 1000;
+constexpr unsigned int KEY_READ_TIMEOUT_MS = 100;
 
 // After this many consecutive USB read errors (about 100 ms pause each) the
 // device is released; the device thread opens it again afterwards.
-const int G13_MAX_CONSECUTIVE_READ_ERRORS = 50;
+constexpr int MAX_CONSECUTIVE_READ_ERRORS = 50;
 
-std::string trim_string(const std::string& str) {
-    const std::string whitespace = " \t\n\r\f\v";
-    size_t start = str.find_first_not_of(whitespace);
-    if (start == std::string::npos) return "";
-    size_t end = str.find_last_not_of(whitespace);
-    return str.substr(start, end - start + 1);
+// Joystick: positions 0..255 per axis; outside of 97..159 a direction counts as pressed.
+constexpr int STICK_LOW = 96;
+constexpr int STICK_HIGH = 160;
+
+// Input report: byte 1/2 = stick X/Y, bytes 3..7 = key bits 0..39 (see Constants.h).
+constexpr std::size_t REPORT_STICK_X = 1;
+constexpr std::size_t REPORT_STICK_Y = 2;
+constexpr std::size_t REPORT_KEY_OFFSET = 3;
+
+constexpr const char *DEFAULT_BINDINGS = R"(# Default G13 key bindings
+G0=p,k.1
+G1=p,k.79
+G2=p,k.80
+G3=p,k.81
+G4=p,k.75
+G5=p,k.76
+G6=p,k.46
+G7=p,k.15
+G8=p,k.2
+G9=p,k.3
+G10=p,k.4
+G11=p,k.5
+G12=p,k.6
+G13=p,k.7
+G14=p,k.8
+G15=p,k.9
+G16=p,k.10
+G17=p,k.16
+G18=p,k.18
+G19=p,k.42
+G20=p,k.50
+G21=p,k.57
+G29=p,k.59
+G30=p,k.60
+G31=p,k.61
+G32=p,k.62
+G33=p,k.71
+G34=p,k.72
+G35=p,k.11
+G36=p,k.17
+G37=p,k.30
+G38=p,k.32
+G39=p,k.31
+color=0,0,255
+)";
+
+std::string trim(std::string_view text)
+{
+    constexpr std::string_view whitespace = " \t\n\r\f\v";
+    const auto first = text.find_first_not_of(whitespace);
+    if (first == std::string_view::npos)
+        return {};
+    const auto last = text.find_last_not_of(whitespace);
+    return std::string(text.substr(first, last - first + 1));
 }
 
-G13::G13(libusb_device *device) {
-    this->device = device;
-    this->loaded = 0;
-    this->bindings = 0;
-    this->stick_mode = STICK_KEYS;
+// Parses the whole text as a decimal integer.
+bool parseInt(std::string_view text, int &value)
+{
+    const char *last = text.data() + text.size();
+    const auto [end, error] = std::from_chars(text.data(), last, value);
+    return error == std::errc() && end == last && !text.empty();
+}
 
-    actions.resize(G13_NUM_KEYS);
-    for (int i = 0; i < G13_NUM_KEYS; i++) {
-        actions[i] = std::make_unique<G13Action>();
-    }
+// Splits "key=value" (both trimmed); false for empty lines, comments and lines without '='.
+bool splitProperty(const std::string &line, std::string &key, std::string &value)
+{
+    const std::string trimmed = trim(line);
+    if (trimmed.empty() || trimmed.front() == '#')
+        return false;
+    const auto eq = trimmed.find('=');
+    if (eq == std::string::npos)
+        return false;
+    key = trim(std::string_view(trimmed).substr(0, eq));
+    value = trim(std::string_view(trimmed).substr(eq + 1));
+    return true;
+}
 
-    if (libusb_open(device, &handle) != 0) {
-        syslog(LOG_ERR, "Error opening G13 device");
+std::vector<std::string> splitList(const std::string &text)
+{
+    std::vector<std::string> parts;
+    std::stringstream stream(text);
+    std::string part;
+    while (std::getline(stream, part, ','))
+        parts.push_back(trim(part));
+    return parts;
+}
+
+// Text for errno (thread-safe, unlike strerror()).
+std::string errnoText()
+{
+    return std::generic_category().message(errno);
+}
+
+bool isProfileKey(int key)
+{
+    return key >= G13_KEY_L1 && key <= G13_KEY_L4;
+}
+
+bool isBindableKey(int key)
+{
+    return (key >= G13_KEY_G1 && key <= G13_KEY_G22) || key == G13_KEY_BD
+        || (key >= G13_KEY_M1 && key <= G13_STICK_DOWN);
+}
+
+} // namespace
+
+// ---------------------------------------------------------------------------
+// Device
+// ---------------------------------------------------------------------------
+
+G13::G13(libusb_device *device, const std::atomic<bool> &keepRunning)
+    : m_keepRunning(keepRunning)
+{
+    reset_actions();
+
+    const int openResult = libusb_open(device, &m_handle);
+    if (openResult != 0) {
+        syslog(LOG_ERR, "Error opening G13 device: %s", libusb_error_name(openResult));
+        m_handle = nullptr;
         return;
     }
 
-    if (libusb_kernel_driver_active(handle, 0) == 1) {
-        const int rc = libusb_detach_kernel_driver(handle, 0);
+    if (libusb_kernel_driver_active(m_handle, G13_INTERFACE) == 1) {
+        const int rc = libusb_detach_kernel_driver(m_handle, G13_INTERFACE);
         if (rc == 0) {
-            kernel_driver_detached = true;
+            m_kernelDriverDetached = true;
             syslog(LOG_INFO, "Kernel driver detached");
         } else {
             syslog(LOG_WARNING, "Could not detach kernel driver: %s", libusb_error_name(rc));
         }
     }
 
-    if (libusb_claim_interface(handle, 0) < 0) {
-        syslog(LOG_ERR, "Cannot claim interface");
+    const int claimResult = libusb_claim_interface(m_handle, G13_INTERFACE);
+    if (claimResult != 0) {
+        syslog(LOG_ERR, "Cannot claim interface: %s", libusb_error_name(claimResult));
         reattach_kernel_driver();
-        libusb_close(handle);
-        handle = nullptr;
+        libusb_close(m_handle);
+        m_handle = nullptr;
         return;
     }
 
     syslog(LOG_INFO, "Initializing G13 display...");
-    unsigned char lcd_init_payload[] = { 0x01 };
-    libusb_control_transfer(handle,
-        G13_HID_CLASS_REQUEST, 0x09, 0x0300, 0x0000,
-        lcd_init_payload, sizeof(lcd_init_payload), 1000);
+    std::array<unsigned char, 1> lcdInit = {0x01};
+    const int initResult = libusb_control_transfer(
+        m_handle, HID_CLASS_REQUEST, HID_SET_REPORT, LCD_INIT_REPORT, G13_INTERFACE,
+        lcdInit.data(), static_cast<std::uint16_t>(lcdInit.size()), USB_TIMEOUT_MS);
+    if (initResult < 0)
+        syslog(LOG_WARNING, "LCD initialization failed: %s", libusb_error_name(initResult));
 
+    m_loaded = true;
     setColor(128, 128, 128);
-    clear_lcd_buffer();
-    this->loaded = 1;
-
     init_fifo();
 }
 
-G13::~G13() {
+G13::~G13()
+{
     stop_intro();
-    cleanup_fifo(); 
-    if (!this->loaded) return;
-    libusb_release_interface(this->handle, 0);
+    cleanup_fifo();
+    reset_actions();   // release held keys and stop macros (e.g. device unplugged while a key was down)
+    if (!m_loaded)
+        return;
+    libusb_release_interface(m_handle, G13_INTERFACE);
     reattach_kernel_driver();
-    libusb_close(this->handle);
+    libusb_close(m_handle);
 }
 
 // Reattach the kernel driver detached at startup (e.g. hid-lg-g15), so the G13
 // keeps working after the driver stops, without replugging.
-void G13::reattach_kernel_driver() {
-    if (!kernel_driver_detached || !handle) return;
-    kernel_driver_detached = false;
-    const int rc = libusb_attach_kernel_driver(handle, 0);
+void G13::reattach_kernel_driver()
+{
+    if (!m_kernelDriverDetached || m_handle == nullptr)
+        return;
+    m_kernelDriverDetached = false;
+    const int rc = libusb_attach_kernel_driver(m_handle, G13_INTERFACE);
     if (rc == 0)
         syslog(LOG_INFO, "Kernel driver reattached");
     else if (rc != LIBUSB_ERROR_NO_DEVICE)   // device unplugged: nothing to do
         syslog(LOG_WARNING, "Could not reattach kernel driver: %s", libusb_error_name(rc));
 }
 
-void G13::start() {
-    if (!this->loaded) return;
+void G13::start()
+{
+    if (!m_loaded)
+        return;
     loadBindings();
-    keepGoing = true;
     start_intro();
 
-    while (keepGoing && daemon_keep_running) {
+    while (m_keepRunning) {
         check_for_config_update();
         check_fifo();
-
-        if (read() == -4) {
-            break; 
-        }
+        if (read() == ReadResult::Stop)
+            break;
     }
     stop_intro();
 }
 
-void G13::stop() {
-    if (!this->loaded) return;
-    keepGoing = false;
-}
-
-// --- Live-Reload Implementation ---
-void G13::check_for_config_update() {
-    // NEW: Use ConfigPath helper
-    std::string filename = ConfigPath::getBindingPath(bindings);
-    
-    struct stat file_stat;
-    if (stat(filename.c_str(), &file_stat) != 0)
-        return;
-    // Check for inequality instead of "newer": a clock set back or a file
-    // created later also trigger a reload this way.
-    const bool changed = !config_mtime_known
-        || file_stat.st_mtim.tv_sec  != last_config_mtime.tv_sec
-        || file_stat.st_mtim.tv_nsec != last_config_mtime.tv_nsec;
-    if (changed) {
-        syslog(LOG_INFO, "Config file change detected. Reloading...");
-        loadBindings();
+bool G13::setColor(int red, int green, int blue)
+{
+    std::array<unsigned char, 5> report = {5, static_cast<unsigned char>(red),
+                                           static_cast<unsigned char>(green),
+                                           static_cast<unsigned char>(blue), 0};
+    const int result = libusb_control_transfer(
+        m_handle, HID_CLASS_REQUEST, HID_SET_REPORT, BACKLIGHT_REPORT, G13_INTERFACE,
+        report.data(), static_cast<std::uint16_t>(report.size()), USB_TIMEOUT_MS);
+    if (result < 0) {
+        syslog(LOG_WARNING, "Could not set the backlight color: %s", libusb_error_name(result));
+        return false;
     }
+    return true;
 }
 
-void G13::remember_config_mtime(const std::string &filename) {
-    struct stat file_stat;
-    config_mtime_known = stat(filename.c_str(), &file_stat) == 0;
-    if (config_mtime_known)
-        last_config_mtime = file_stat.st_mtim;
+G13::ReadResult G13::read()
+{
+    std::array<unsigned char, G13_REPORT_SIZE> report{};
+    int size = 0;
+    const int error = libusb_interrupt_transfer(
+        m_handle, LIBUSB_ENDPOINT_IN | G13_KEY_ENDPOINT, report.data(),
+        static_cast<int>(report.size()), &size, KEY_READ_TIMEOUT_MS);
+
+    if (error == LIBUSB_ERROR_NO_DEVICE) {
+        syslog(LOG_ERR, "G13 device disconnected.");
+        return ReadResult::Stop;
+    }
+
+    if (error != 0 && error != LIBUSB_ERROR_TIMEOUT) {
+        ++m_readErrorCount;
+        // Log only the first error of a series or a new error type.
+        if (m_readErrorCount == 1 || error != m_lastReadError)
+            syslog(LOG_ERR, "Error while reading keys: %s", libusb_error_name(error));
+        m_lastReadError = error;
+
+        if (m_readErrorCount >= MAX_CONSECUTIVE_READ_ERRORS) {
+            syslog(LOG_ERR, "%d consecutive read errors, releasing device (will be reopened).",
+                   m_readErrorCount);
+            m_readErrorCount = 0;
+            m_lastReadError = 0;
+            return ReadResult::Stop;
+        }
+        // Short pause instead of an immediate retry (otherwise full CPU load and log flood).
+        std::this_thread::sleep_for(std::chrono::milliseconds(KEY_READ_TIMEOUT_MS));
+        return ReadResult::Retry;
+    }
+
+    if (m_readErrorCount > 0) {
+        syslog(LOG_INFO, "Reading keys works again after %d error(s).", m_readErrorCount);
+        m_readErrorCount = 0;
+        m_lastReadError = 0;
+    }
+
+    if (static_cast<std::size_t>(size) == report.size()) {
+        parse_joystick(report.data());
+        parse_keys(report.data());
+    }
+    return ReadResult::Ok;
 }
 
-std::unique_ptr<Macro> G13::loadMacro(int num) {
-    // NEW: Use ConfigPath helper
-    std::string filename = ConfigPath::getMacroPath(num);
-    std::ifstream file(filename);
+// ---------------------------------------------------------------------------
+// Keys and bindings
+// ---------------------------------------------------------------------------
 
-    if (!file.is_open()) return nullptr;
+void G13::parse_joystick(const unsigned char *report)
+{
+    const int x = report[REPORT_STICK_X];
+    const int y = report[REPORT_STICK_Y];
+    set_key(G13_STICK_UP, y <= STICK_LOW);
+    set_key(G13_STICK_DOWN, y >= STICK_HIGH);
+    set_key(G13_STICK_LEFT, x <= STICK_LOW);
+    set_key(G13_STICK_RIGHT, x >= STICK_HIGH);
+}
 
-    auto macro = std::make_unique<Macro>();
-    macro->setId(num);
-    std::string macro_name, macro_sequence;
+void G13::parse_keys(const unsigned char *report)
+{
+    for (int key = 0; key <= G13_KEY_TOP; ++key) {
+        const unsigned byte = report[REPORT_KEY_OFFSET + static_cast<std::size_t>(key / 8)];
+        const bool pressed = ((byte >> static_cast<unsigned>(key % 8)) & 1U) != 0;
 
-    std::string line;
-    while (getline(file, line)) {
-        std::string trimmed_line = trim_string(line);
-        if (!trimmed_line.empty() && trimmed_line[0] != '#') {
-            size_t eq_pos = trimmed_line.find('=');
-            if (eq_pos != std::string::npos) {
-                std::string key = trim_string(trimmed_line.substr(0, eq_pos));
-                std::string value = trim_string(trimmed_line.substr(eq_pos + 1));
-                if (key == "name") macro_name = value;
-                else if (key == "sequence") macro_sequence = value;
+        if (isProfileKey(key)) {
+            // Switch only on press (edge), not with every report while the key is held.
+            const auto index = static_cast<std::size_t>(key - G13_KEY_L1);
+            if (pressed && !m_profileKeyDown.at(index)) {
+                m_profile = static_cast<int>(index);
+                loadBindings();
             }
-        }
-    }
-    macro->setName(macro_name);
-    macro->setSequence(macro_sequence);
-    return macro;
-}
-
-void G13::parse_bindings_from_stream(std::istream& stream) {
-    // (Logic remains identical to previous version, omitted for brevity but preserved)
-    std::string line;
-    while (std::getline(stream, line)) {
-        std::string trimmed_line = trim_string(line);
-        if (trimmed_line.empty() || trimmed_line[0] == '#') continue;
-        size_t eq_pos = trimmed_line.find('=');
-        if (eq_pos == std::string::npos) continue;
-        std::string key = trim_string(trimmed_line.substr(0, eq_pos));
-        std::string value = trim_string(trimmed_line.substr(eq_pos + 1));
-
-        if (key == "color") {
-            // Invalid values are ignored (previously std::stoi threw an
-            // exception outside the try block and terminated the daemon).
-            try {
-                std::stringstream ss(value);
-                std::string segment;
-                int rgb[3];
-                int count = 0;
-                while (count < 3 && std::getline(ss, segment, ',')) {
-                    size_t used = 0;
-                    const std::string s = trim_string(segment);
-                    rgb[count] = std::stoi(s, &used);
-                    if (used != s.size()) throw std::invalid_argument("color");
-                    ++count;
-                }
-                if (count == 3 &&
-                    rgb[0] >= 0 && rgb[0] <= 255 &&
-                    rgb[1] >= 0 && rgb[1] <= 255 &&
-                    rgb[2] >= 0 && rgb[2] <= 255) {
-                    setColor(rgb[0], rgb[1], rgb[2]);
-                } else {
-                    syslog(LOG_WARNING, "Invalid color value ignored: %s", value.c_str());
-                }
-            } catch (...) {
-                syslog(LOG_WARNING, "Invalid color value ignored: %s", value.c_str());
-            }
-        }
-        else if (!key.empty() && key.rfind("G", 0) == 0) {
-            try {
-                int gKey = std::stoi(key.substr(1));
-                std::stringstream ss(value);
-                std::string type;
-                if (!std::getline(ss, type, ',')) continue;
-                type = trim_string(type);
-
-                if (type == "p") { 
-                    std::string keytype_str;
-                    if (!std::getline(ss, keytype_str, ',')) continue;
-                    keytype_str = trim_string(keytype_str);
-                    if (keytype_str.rfind("k.", 0) == 0) {
-                        int keycode = std::stoi(keytype_str.substr(2));
-                        if (gKey >= 0 && gKey < G13_NUM_KEYS) {
-                             actions[gKey] = std::make_unique<PassThroughAction>(keycode);
-                        }
-                    }
-                }
-                else if (type == "m") { 
-                    std::string macroId_str, repeats_str;
-                    if (!std::getline(ss, macroId_str, ',') || !std::getline(ss, repeats_str, ',')) continue;
-                    int macroId = std::stoi(trim_string(macroId_str));
-                    int repeats = std::stoi(trim_string(repeats_str));
-
-                    if (macroId >= 0 && macroId < G13_MAX_MACROS) {
-                        auto macro = loadMacro(macroId);
-                        if (macro && gKey >= 0 && gKey < G13_NUM_KEYS) {
-                            actions[gKey] = std::make_unique<MacroAction>(macro->getSequence());
-                            static_cast<MacroAction*>(actions[gKey].get())->setRepeats(repeats);
-                        }
-                    }
-                }
-            } catch (...) {}
+            m_profileKeyDown.at(index) = pressed;
+        } else if (isBindableKey(key)) {
+            set_key(key, pressed);
         }
     }
 }
 
-// Releases all pressed keys and removes all bindings.
-// Called before every load:
-//  - Keys that are not listed in the (new) profile have no function
-//    (previously they kept the binding of the previous profile or of a line
-//    removed from the file).
-//  - Pressed keys are released so they do not get stuck in the system.
-//  - Running macros are stopped when replaced (MacroAction destructor).
-void G13::reset_actions() {
-    for (auto &action : actions) {
+void G13::set_key(int key, bool pressed)
+{
+    const auto &action = m_actions.at(static_cast<std::size_t>(key));
+    if (action)
+        action->set(pressed);
+}
+
+// Releases all pressed keys and removes all bindings. Called before every load:
+//  - keys that are not listed in the (new) profile have no function,
+//  - pressed keys are released so they do not get stuck in the system,
+//  - running macros are stopped (MacroAction destructor).
+void G13::reset_actions()
+{
+    for (auto &action : m_actions) {
         if (action && action->isPressed())
-            action->set(0);
+            action->set(false);
         action = std::make_unique<G13Action>();
     }
 }
 
-void G13::loadBindings() {
+void G13::loadBindings()
+{
     reset_actions();
-
-    // NEW: Use ConfigPath helper
-    std::string filename = ConfigPath::getBindingPath(bindings);
+    const std::string filename = ConfigPath::getBindingPath(m_profile);
 
     // Remember the timestamp BEFORE reading: if the file changes meanwhile,
     // check_for_config_update() notices it and loads again.
     remember_config_mtime(filename);
 
     std::ifstream file(filename);
-    if (!file.is_open()) {
-        syslog(LOG_WARNING, "Config file not found: %s. Creating defaults.", filename.c_str());
-        
-        // --- Create Default File ---
-        // If the file doesn't exist, we write the default settings to it
-        // so the user has something to edit in ~/.config/g13/
-        std::ofstream outfile(filename);
-        if (outfile.is_open()) {
-             const std::string default_bindings = R"RAW(
-# Default G13 Key Bindings
-G19=p,k.42
-G18=p,k.18
-G17=p,k.16
-G16=p,k.10
-G9=p,k.3
-G15=p,k.9
-G8=p,k.2
-G14=p,k.8
-G7=p,k.15
-G13=p,k.7
-G12=p,k.6
-G6=p,k.46
-G11=p,k.5
-G5=p,k.76
-G10=p,k.4
-G4=p,k.75
-G3=p,k.81
-G2=p,k.80
-G1=p,k.79
-G0=p,k.1
-G39=p,k.31
-color=0,0,255
-G38=p,k.32
-G37=p,k.30
-G36=p,k.17
-G35=p,k.11
-G34=p,k.72
-G33=p,k.71
-G32=p,k.62
-G31=p,k.61
-G30=p,k.60
-G29=p,k.59
-G21=p,k.57
-G20=p,k.50
-)RAW";
-            outfile << default_bindings;
-            outfile.close();
-            remember_config_mtime(filename);   // otherwise later changes have no effect
-            
-            // Now parse what we just wrote
-            std::stringstream ss(default_bindings);
-            parse_bindings_from_stream(ss);
-        } else {
-            syslog(LOG_ERR, "Could not create config file: %s", filename.c_str());
-        }
-    }
-    else {
+    if (file.is_open()) {
         syslog(LOG_INFO, "Loading config file: %s", filename.c_str());
         parse_bindings_from_stream(file);
-        file.close();
-    }
-}
-
-void G13::setColor(int red, int green, int blue) {
-    unsigned char usb_data[] = { 5, (unsigned char)red, (unsigned char)green, (unsigned char)blue, 0 };
-    libusb_control_transfer(handle, G13_HID_CLASS_REQUEST, 9, 0x307, 0, usb_data, 5, 1000);
-}
-
-int G13::read() {
-    // (Existing read implementation)
-    unsigned char buffer[G13_REPORT_SIZE];
-    int size = 0;
-    int error = libusb_interrupt_transfer(handle, LIBUSB_ENDPOINT_IN | G13_KEY_ENDPOINT, buffer, G13_REPORT_SIZE, &size, 100);
-
-    if (error == LIBUSB_ERROR_NO_DEVICE) {
-        syslog(LOG_ERR, "G13 device disconnected.");
-        return -4; 
-    }
-    
-    if (error && error != LIBUSB_ERROR_TIMEOUT) {
-        ++read_error_count;
-        // Log only the first error of a series or a new error type.
-        if (read_error_count == 1 || error != last_read_error) {
-            syslog(LOG_ERR, "Error while reading keys: %s", libusb_error_name(error));
-        }
-        last_read_error = error;
-
-        if (read_error_count >= G13_MAX_CONSECUTIVE_READ_ERRORS) {
-            syslog(LOG_ERR, "%d consecutive read errors, releasing device (will be reopened).",
-                   read_error_count);
-            read_error_count = 0;
-            last_read_error = 0;
-            return -4;
-        }
-        // Short pause instead of an immediate retry (otherwise full CPU load and log flood).
-        std::this_thread::sleep_for(std::chrono::milliseconds(100));
-        return -1;
-    }
-
-    if (read_error_count > 0) {
-        syslog(LOG_INFO, "Reading keys works again after %d error(s).", read_error_count);
-        read_error_count = 0;
-        last_read_error = 0;
-    }
-
-    if (size == G13_REPORT_SIZE) {
-        parse_joystick(buffer);
-        parse_keys(buffer);
-        UInput::send_event(EV_SYN, SYN_REPORT, 0);
-    }
-    return 0;
-}
-
-void G13::parse_joystick(unsigned char *buf) {
-    // (Existing implementation)
-    int stick_x = buf[1];
-    int stick_y = buf[2];
-
-    if (stick_mode == STICK_ABSOLUTE) {
-        UInput::send_event(EV_ABS, ABS_X, stick_x);
-        UInput::send_event(EV_ABS, ABS_Y, stick_y);
-    } else if (stick_mode == STICK_KEYS) {
-        int pressed[4];
-        if (stick_y <= 96) { pressed[0] = 1; pressed[3] = 0; }
-        else if (stick_y >= 160) { pressed[0] = 0; pressed[3] = 1; }
-        else { pressed[0] = 0; pressed[3] = 0; }
-
-        if (stick_x <= 96) { pressed[1] = 1; pressed[2] = 0; }
-        else if (stick_x >= 160) { pressed[1] = 0; pressed[2] = 1; }
-        else { pressed[1] = 0; pressed[2] = 0; }
-
-        int codes[4] = {36, 37, 38, 39};
-        for (int i = 0; i < 4; i++) {
-            if (actions[codes[i]]) actions[codes[i]]->set(pressed[i]);
-        }
-    }
-}
-
-void G13::parse_key(int key, unsigned char *byte) {
-    // (Existing implementation)
-    if (key < 0 || key >= G13_NUM_KEYS) return;
-
-    unsigned char actual_byte = byte[key / 8];
-    unsigned char mask = 1 << (key % 8);
-    int pressed = actual_byte & mask;
-
-    switch (key) {
-    case 25: case 26: case 27: case 28: {
-        // Switch only on press (edge). Previously the profile was reloaded with
-        // every USB report while the key was held.
-        const int index = key - 25;
-        const bool down = pressed != 0;
-        if (down && !profile_key_down[index]) {
-            bindings = index;
-            loadBindings();
-        }
-        profile_key_down[index] = down;
-        return;
-    }
-    case 36: case 37: case 38: case 39:
         return;
     }
 
-    if (actions[key]) {
-        actions[key]->set(pressed);
+    // No file yet: write the defaults so the user has something to edit.
+    syslog(LOG_WARNING, "Config file not found: %s. Creating defaults.", filename.c_str());
+    std::ofstream out(filename);
+    if (out << DEFAULT_BINDINGS) {
+        out.close();
+        remember_config_mtime(filename);   // otherwise later changes have no effect
+    } else {
+        syslog(LOG_ERR, "Could not create config file: %s", filename.c_str());
+    }
+    std::stringstream defaults(DEFAULT_BINDINGS);
+    parse_bindings_from_stream(defaults);
+}
+
+void G13::parse_bindings_from_stream(std::istream &stream)
+{
+    std::string line;
+    std::string key;
+    std::string value;
+    while (std::getline(stream, line)) {
+        if (!splitProperty(line, key, value))
+            continue;
+        if (!parse_binding(key, value))
+            syslog(LOG_WARNING, "Invalid binding ignored: %s", trim(line).c_str());
     }
 }
 
-void G13::parse_keys(unsigned char *buf) {
-    // (Existing implementation)
-    parse_key(G13_KEY_G1, buf + 3);
-    parse_key(G13_KEY_G2, buf + 3);
-    parse_key(G13_KEY_G3, buf + 3);
-    parse_key(G13_KEY_G4, buf + 3);
-    parse_key(G13_KEY_G5, buf + 3);
-    parse_key(G13_KEY_G6, buf + 3);
-    parse_key(G13_KEY_G7, buf + 3);
-    parse_key(G13_KEY_G8, buf + 3);
-    parse_key(G13_KEY_G9, buf + 3);
-    parse_key(G13_KEY_G10, buf + 3);
-    parse_key(G13_KEY_G11, buf + 3);
-    parse_key(G13_KEY_G12, buf + 3);
-    parse_key(G13_KEY_G13, buf + 3);
-    parse_key(G13_KEY_G14, buf + 3);
-    parse_key(G13_KEY_G15, buf + 3);
-    parse_key(G13_KEY_G16, buf + 3);
-    parse_key(G13_KEY_G17, buf + 3);
-    parse_key(G13_KEY_G18, buf + 3);
-    parse_key(G13_KEY_G19, buf + 3);
-    parse_key(G13_KEY_G20, buf + 3);
-    parse_key(G13_KEY_G21, buf + 3);
-    parse_key(G13_KEY_G22, buf + 3);
-    parse_key(G13_KEY_BD, buf + 3);
-    parse_key(G13_KEY_L1, buf + 3);
-    parse_key(G13_KEY_L2, buf + 3);
-    parse_key(G13_KEY_L3, buf + 3);
-    parse_key(G13_KEY_L4, buf + 3);
-    parse_key(G13_KEY_M1, buf + 3);
-    parse_key(G13_KEY_M2, buf + 3);
-    parse_key(G13_KEY_M3, buf + 3);
-    parse_key(G13_KEY_MR, buf + 3);
-    parse_key(G13_KEY_LEFT, buf + 3);
-    parse_key(G13_KEY_DOWN, buf + 3);
-    parse_key(G13_KEY_TOP, buf + 3);
-    parse_key(G13_KEY_LIGHT, buf + 3);
+bool G13::parse_binding(const std::string &key, const std::string &value)
+{
+    if (key == "color") {
+        const auto parts = splitList(value);
+        std::array<int, 3> rgb{};
+        if (parts.size() != rgb.size())
+            return false;
+        for (std::size_t i = 0; i < rgb.size(); ++i) {
+            if (!parseInt(parts[i], rgb.at(i)) || rgb.at(i) < 0 || rgb.at(i) > 255)
+                return false;
+        }
+        setColor(rgb[0], rgb[1], rgb[2]);
+        return true;
+    }
+
+    int gKey = -1;
+    if (!key.starts_with('G') || !parseInt(std::string_view(key).substr(1), gKey) || gKey < 0
+        || gKey >= G13_NUM_KEYS)
+        return false;
+    if (!isBindableKey(gKey))
+        return true;   // e.g. G22/G23 from old default files or L1..L4: silently ignored
+    auto &action = m_actions.at(static_cast<std::size_t>(gKey));
+
+    const auto parts = splitList(value);
+    if (parts.size() == 2 && parts[0] == "p" && parts[1].starts_with("k.")) {
+        int keycode = 0;
+        if (!parseInt(std::string_view(parts[1]).substr(2), keycode) || keycode <= 0
+            || keycode > KEY_MAX)
+            return false;
+        action = std::make_unique<PassThroughAction>(keycode);
+        return true;
+    }
+    if (parts.size() == 3 && parts[0] == "m") {
+        int macroId = 0;
+        int repeats = 0;
+        if (!parseInt(parts[1], macroId) || !parseInt(parts[2], repeats) || macroId < 0
+            || macroId >= G13_MAX_MACROS || repeats < 0)
+            return false;
+        const auto sequence = loadMacroSequence(macroId);
+        if (!sequence) {
+            syslog(LOG_WARNING, "Macro file %s not found.",
+                   ConfigPath::getMacroPath(macroId).c_str());
+            return true;   // the binding itself is valid
+        }
+        action = std::make_unique<MacroAction>(*sequence, repeats);
+        return true;
+    }
+    return false;
 }
 
-void G13::clear_lcd_buffer() {
-    memset(this->lcd_buffer, 0, G13_LCD_BUFFER_SIZE);
+std::optional<std::string> G13::loadMacroSequence(int macroId)
+{
+    std::ifstream file(ConfigPath::getMacroPath(macroId));
+    if (!file.is_open())
+        return std::nullopt;
+
+    std::string sequence;
+    std::string line;
+    std::string key;
+    std::string value;
+    while (std::getline(file, line)) {
+        if (splitProperty(line, key, value) && key == "sequence")
+            sequence = value;
+    }
+    return sequence;
 }
 
-void G13::set_pixel(int x, int y, bool on) {
-    if (x < 0 || x >= 160 || y < 0 || y >= 48) return;
-    int index = x + (y / 8) * 160;
-    int bit = y % 8;
-    if (on) this->lcd_buffer[index] |= (1 << bit);
-    else this->lcd_buffer[index] &= ~(1 << bit);
+// ---------------------------------------------------------------------------
+// Live reload
+// ---------------------------------------------------------------------------
+
+void G13::check_for_config_update()
+{
+    const std::string filename = ConfigPath::getBindingPath(m_profile);
+    struct stat fileStat {};
+    if (stat(filename.c_str(), &fileStat) != 0)
+        return;
+    // Check for inequality instead of "newer": a clock set back or a file
+    // created later also trigger a reload this way.
+    const bool changed = !m_configMtimeKnown
+        || fileStat.st_mtim.tv_sec != m_configMtime.tv_sec
+        || fileStat.st_mtim.tv_nsec != m_configMtime.tv_nsec;
+    if (changed) {
+        syslog(LOG_INFO, "Config file change detected. Reloading...");
+        loadBindings();
+    }
 }
 
-bool G13::write_lcd() {
-    if (!this->loaded) return false;
+void G13::remember_config_mtime(const std::string &filename)
+{
+    struct stat fileStat {};
+    m_configMtimeKnown = stat(filename.c_str(), &fileStat) == 0;
+    if (m_configMtimeKnown)
+        m_configMtime = fileStat.st_mtim;
+}
 
-    unsigned char transfer_buffer[992];
-    memset(transfer_buffer, 0, sizeof(transfer_buffer));
-    transfer_buffer[0] = 0x03; 
+// ---------------------------------------------------------------------------
+// LCD
+// ---------------------------------------------------------------------------
 
-    memcpy(transfer_buffer + 32, this->lcd_buffer, G13_LCD_BUFFER_SIZE);
+void G13::clear_lcd_buffer()
+{
+    m_lcdBuffer.fill(0);
+}
 
-    int actual_length;
-    int error = libusb_interrupt_transfer(
-        this->handle, 
-        G13_LCD_ENDPOINT | LIBUSB_ENDPOINT_OUT, 
-        transfer_buffer, 
-        sizeof(transfer_buffer), 
-        &actual_length, 
-        1000 
-    );
+void G13::set_pixel(int x, int y, bool on)
+{
+    if (x < 0 || x >= LCD_WIDTH || y < 0 || y >= LCD_BUFFER_ROWS)
+        return;
+    const auto index = static_cast<std::size_t>(x) + (static_cast<std::size_t>(y / 8) * LCD_WIDTH);
+    const auto mask = static_cast<unsigned char>(1U << static_cast<unsigned>(y % 8));
+    if (on)
+        m_lcdBuffer.at(index) |= mask;
+    else
+        m_lcdBuffer.at(index) &= static_cast<unsigned char>(~mask);
+}
 
-    if (error) {
+bool G13::write_lcd()
+{
+    if (!m_loaded)
+        return false;
+
+    std::array<unsigned char, LCD_TRANSFER_SIZE> transfer{};
+    transfer[0] = LCD_REPORT_ID;
+    std::ranges::copy(m_lcdBuffer, transfer.begin() + LCD_HEADER_SIZE);
+
+    int transferred = 0;
+    const int error = libusb_interrupt_transfer(m_handle, G13_LCD_ENDPOINT | LIBUSB_ENDPOINT_OUT,
+                                                transfer.data(), static_cast<int>(transfer.size()),
+                                                &transferred, USB_TIMEOUT_MS);
+    if (error != 0) {
         syslog(LOG_ERR, "LCD write error: %s", libusb_error_name(error));
         return false;
     }
     return true;
 }
 
-// --- Start animation ---
+void G13::write_char(int x, int y, char c)
+{
+    int code = static_cast<unsigned char>(c);
+    if (code < FONT_FIRST_CHAR || code > FONT_LAST_CHAR)
+        code = ' ';
+    const auto first = static_cast<std::size_t>(code - FONT_FIRST_CHAR) * FONT_COLUMNS;
+    for (int col = 0; col < FONT_COLUMNS; ++col) {
+        const unsigned bits = font_5x7.at(first + static_cast<std::size_t>(col));
+        for (int row = 0; row < FONT_ROWS; ++row) {
+            if (((bits >> static_cast<unsigned>(row)) & 1U) != 0)
+                set_pixel(x + col, y + row, true);
+        }
+    }
+}
+
+void G13::write_text(int x, int y, const std::string &text)
+{
+    for (const char c : text) {
+        write_char(x, y, c);
+        x += LCD_CHAR_WIDTH;
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Start animation
+// ---------------------------------------------------------------------------
 
 // Global setting "intro" in settings.properties (default: on).
-bool G13::intro_enabled() {
+bool G13::intro_enabled()
+{
     std::ifstream file(ConfigPath::getSettingsPath());
-    std::string line;
     bool enabled = true;
+    std::string line;
+    std::string key;
+    std::string value;
     while (std::getline(file, line)) {
-        line = trim_string(line);
-        if (line.empty() || line[0] == '#') continue;
-        const size_t eq = line.find('=');
-        if (eq == std::string::npos) continue;
-        if (trim_string(line.substr(0, eq)) == "intro")
-            enabled = trim_string(line.substr(eq + 1)) != "0";
+        if (splitProperty(line, key, value) && key == "intro")
+            enabled = value != "0";
     }
     return enabled;
 }
 
-void G13::draw_final_logo() {
+void G13::draw_final_logo()
+{
     clear_lcd_buffer();
-    for (int y = 0; y < IntroAnimation::Height; ++y)
+    for (int y = 0; y < IntroAnimation::Height; ++y) {
         for (int x = 0; x < IntroAnimation::Width; ++x)
             set_pixel(x, y, IntroAnimation::finalPixel(x, y));
-}
-
-void G13::start_intro() {
-    if (!intro_enabled()) {
-        std::lock_guard<std::mutex> lock(lcd_mutex);
-        draw_final_logo();
-        write_lcd();
-        return;
-    }
-    intro_stop = false;
-    try {
-        intro_thread = std::thread(&G13::run_intro, this);
-    } catch (const std::system_error &e) {
-        syslog(LOG_WARNING, "Could not start intro animation: %s", e.what());
-        std::lock_guard<std::mutex> lock(lcd_mutex);
-        draw_final_logo();
-        write_lcd();
     }
 }
 
-void G13::stop_intro() {
-    intro_stop = true;
-    if (intro_thread.joinable())
-        intro_thread.join();
+void G13::start_intro()
+{
+    if (intro_enabled()) {
+        m_introStop = false;
+        try {
+            m_introThread = std::thread(&G13::run_intro, this);
+            return;
+        } catch (const std::system_error &e) {
+            syslog(LOG_WARNING, "Could not start intro animation: %s", e.what());
+        }
+    }
+    const std::lock_guard<std::mutex> lock(m_lcdMutex);
+    draw_final_logo();
+    write_lcd();
 }
 
-void G13::run_intro() {
+void G13::stop_intro()
+{
+    m_introStop = true;
+    if (m_introThread.joinable())
+        m_introThread.join();
+}
+
+void G13::run_intro()
+{
     IntroAnimation intro;
-    uint8_t bits[IntroAnimation::Width * IntroAnimation::Height];
-    const auto frame_time = std::chrono::milliseconds(1000 / IntroAnimation::Fps);
+    std::vector<std::uint8_t> bits(static_cast<std::size_t>(IntroAnimation::Width)
+                                   * IntroAnimation::Height);
+    const auto frameTime = std::chrono::milliseconds(1000 / IntroAnimation::Fps);
     auto next = std::chrono::steady_clock::now();
 
-    for (int n = 0; n <= IntroAnimation::frameCount(); ++n) {
-        if (intro_stop || !daemon_keep_running) return;
-        if (n > 0) intro.step();
-        intro.compose(bits);
+    for (int frame = 0; frame <= IntroAnimation::frameCount(); ++frame) {
+        if (m_introStop || !m_keepRunning)
+            return;
+        if (frame > 0)
+            intro.step();
+        intro.compose(bits.data());
         {
-            std::lock_guard<std::mutex> lock(lcd_mutex);
-            if (intro_stop) return;   // e.g. text from the LCD pipe came first
-            for (int y = 0; y < IntroAnimation::Height; ++y)
-                for (int x = 0; x < IntroAnimation::Width; ++x)
-                    set_pixel(x, y, bits[y * IntroAnimation::Width + x] != 0);
-            if (!write_lcd()) return;   // device gone or similar; error is already logged
+            const std::lock_guard<std::mutex> lock(m_lcdMutex);
+            if (m_introStop)
+                return;   // e.g. text from the LCD pipe came first
+            for (int y = 0; y < IntroAnimation::Height; ++y) {
+                for (int x = 0; x < IntroAnimation::Width; ++x) {
+                    const auto i = (static_cast<std::size_t>(y) * IntroAnimation::Width) + static_cast<std::size_t>(x);
+                    set_pixel(x, y, bits[i] != 0);
+                }
+            }
+            if (!write_lcd())
+                return;   // device gone or similar; the error is already logged
         }
-        next += frame_time;
+        next += frameTime;
         std::this_thread::sleep_until(next);
     }
 
-    std::lock_guard<std::mutex> lock(lcd_mutex);
-    if (!intro_stop) {
+    const std::lock_guard<std::mutex> lock(m_lcdMutex);
+    if (!m_introStop) {
         draw_final_logo();
         write_lcd();
     }
 }
 
-void G13::write_char(int x, int y, char c) {
-    // (Existing implementation)
-    if (c < 32 || c > 126) c = 32; // font_5x7 contains the characters 32..126
-    int font_index = (c - 32) * 5;
-    for (int col = 0; col < 5; col++) {
-        uint8_t line = font_5x7[font_index + col];
-        for (int row = 0; row < 7; row++) {
-            if (line & (1 << row)) {
-                set_pixel(x + col, y + row, true);
-            }
-        }
-    }
-}
+// ---------------------------------------------------------------------------
+// LCD pipe
+// ---------------------------------------------------------------------------
 
-void G13::write_text(int x, int y, const std::string& text) {
-    int cursor_x = x;
-    for (char c : text) {
-        write_char(cursor_x, y, c);
-        cursor_x += 6; 
-    }
-}
+void G13::init_fifo()
+{
+    const std::string path = ConfigPath::getFifoPath();
 
-void G13::init_fifo() {
-    // NEW: Use ConfigPath helper
-    fifo_path = ConfigPath::getFifoPath();
-    fifo_fd = -1;
-
-    unlink(fifo_path.c_str());
-
-    // Only for the own user (usually located in /run/user/<uid>)
-    if (mkfifo(fifo_path.c_str(), 0600) != 0) {
-        syslog(LOG_ERR, "Failed to create FIFO at %s: %s", fifo_path.c_str(), strerror(errno));
+    // Remove a leftover pipe of an earlier run. In /tmp (no XDG_RUNTIME_DIR) a
+    // file of another user cannot be removed; it is rejected below.
+    ::unlink(path.c_str());
+    if (mkfifo(path.c_str(), 0600) != 0 && errno != EEXIST) {
+        syslog(LOG_ERR, "Failed to create FIFO at %s: %s", path.c_str(), errnoText().c_str());
         return;
     }
-    
-    chmod(fifo_path.c_str(), 0600);
 
-    fifo_fd = ::open(fifo_path.c_str(), O_RDWR | O_NONBLOCK);
-    
-    if (fifo_fd < 0) {
-        syslog(LOG_ERR, "Failed to open FIFO: %s", strerror(errno));
-    } else {
-        syslog(LOG_INFO, "LCD pipe created at %s", fifo_path.c_str());
+    // NOLINTNEXTLINE(cppcoreguidelines-pro-type-vararg, hicpp-signed-bitwise)
+    const int fd = ::open(path.c_str(), O_RDWR | O_NONBLOCK | O_NOFOLLOW | O_CLOEXEC);
+    if (fd < 0) {
+        syslog(LOG_ERR, "Failed to open FIFO %s: %s", path.c_str(), errnoText().c_str());
+        return;
+    }
+    // Only use a pipe that belongs to this user, and only for this user.
+    struct stat info {};
+    if (fstat(fd, &info) != 0 || !S_ISFIFO(info.st_mode) || info.st_uid != geteuid()
+        || fchmod(fd, 0600) != 0) {
+        syslog(LOG_ERR, "%s is not a pipe of this user, LCD pipe disabled.", path.c_str());
+        ::close(fd);
+        return;
+    }
+    m_fifoFd = fd;
+    m_fifoPath = path;
+    syslog(LOG_INFO, "LCD pipe created at %s", path.c_str());
+}
+
+void G13::cleanup_fifo()
+{
+    if (m_fifoFd >= 0) {
+        ::close(m_fifoFd);
+        m_fifoFd = -1;
+    }
+    if (!m_fifoPath.empty()) {
+        ::unlink(m_fifoPath.c_str());
+        m_fifoPath.clear();
     }
 }
 
-void G13::cleanup_fifo() {
-    if (fifo_fd >= 0) {
-        ::close(fifo_fd);
-        fifo_fd = -1;
-    }
-    // fifo_path is empty if the constructor aborted before init_fifo().
-    if (!fifo_path.empty()) {
-        unlink(fifo_path.c_str());
-    }
-}
+void G13::check_fifo()
+{
+    if (m_fifoFd < 0)
+        return;
 
-void G13::check_fifo() {
-    if (fifo_fd < 0) return;
+    std::array<char, 4096> buffer{};
+    const ssize_t bytesRead = ::read(m_fifoFd, buffer.data(), buffer.size());
+    if (bytesRead <= 0)
+        return;
 
-    char buffer[4096];
-    ssize_t bytesRead = ::read(fifo_fd, buffer, sizeof(buffer) - 1);
+    std::string input(buffer.data(), static_cast<std::size_t>(bytesRead));
+    if (input.ends_with('\n'))
+        input.pop_back();
 
-    if (bytesRead > 0) {
-        buffer[bytesRead] = '\0'; 
-        std::string input(buffer);
-        if (!input.empty() && input.back() == '\n') {
-            input.pop_back();
-        }
+    stop_intro();   // text from the pipe takes precedence over the start animation
+    const std::lock_guard<std::mutex> lock(m_lcdMutex);
+    clear_lcd_buffer();
 
-        stop_intro();   // text from the pipe takes precedence over the start animation
-        std::lock_guard<std::mutex> lock(lcd_mutex);
-        clear_lcd_buffer();
-        
-        std::stringstream ss(input);
-        std::string line;
-        int y = 0;
-        int line_height = 8; 
+    std::stringstream lines(input);
+    std::string line;
+    for (int y = 0; y + FONT_ROWS <= LCD_BUFFER_ROWS && std::getline(lines, line);
+         y += LCD_LINE_HEIGHT)
+        write_text(2, y, line);
 
-        while (std::getline(ss, line)) {
-            if (y + 7 > 48) break; 
-            write_text(2, y, line); 
-            y += line_height;
-        }
-
-        write_lcd();
-    }
+    write_lcd();
 }

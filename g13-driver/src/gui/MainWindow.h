@@ -1,6 +1,7 @@
 #ifndef MAINWINDOW_H
 #define MAINWINDOW_H
 
+#include <cstdint>
 #include <QMainWindow>
 #include <QSystemTrayIcon>
 #include <QCloseEvent>
@@ -15,7 +16,8 @@ class MainWindow : public QMainWindow {
 
 public:
     explicit MainWindow(QWidget *parent = nullptr);
-    ~MainWindow();
+    ~MainWindow() override;
+    Q_DISABLE_COPY_MOVE(MainWindow)
 
     // App icon (embedded PNGs in several sizes, theme icon preferred).
     static QIcon appIcon();
@@ -43,7 +45,7 @@ private slots:
     void onTrayActivated(QSystemTrayIcon::ActivationReason reason);
 
 private:
-    enum class DriverState { Unknown, Running, Stopped };
+    enum class DriverState : std::uint8_t { Unknown, Running, Stopped };
 
     void setupToolbar();
     void setupOptionsMenu();

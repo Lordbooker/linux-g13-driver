@@ -45,7 +45,7 @@ esac
 # In the container the repository belongs to another user -> allow it for git describe
 git config --global --add safe.directory '*'
 
-set -- -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=/usr -DBUILD_TESTS=OFF \
+set -- -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=/usr \
        -DG13_PACKAGE_RELEASE="$RELEASE"
 if [ -n "${G13_PACKAGE_VERSION:-}" ]; then
     set -- "$@" -DG13_PACKAGE_VERSION="$G13_PACKAGE_VERSION"
@@ -57,5 +57,5 @@ cmake --build "$BUILD_DIR" -j "$(nproc)"
 
 mkdir -p "$OUT_DIR"
 find "$BUILD_DIR" -maxdepth 1 \( -name '*.deb' -o -name '*.rpm' \) -exec cp {} "$OUT_DIR"/ \;
-echo "Pakete in $OUT_DIR:"
+echo "Packages in $OUT_DIR:"
 ls -1 "$OUT_DIR"

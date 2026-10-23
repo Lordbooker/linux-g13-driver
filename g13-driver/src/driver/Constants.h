@@ -1,93 +1,38 @@
-#ifndef __CONSTANTS_H__
-#define __CONSTANTS_H__
+#ifndef G13_DRIVER_CONSTANTS_H
+#define G13_DRIVER_CONSTANTS_H
 
-// USB device-specific constants for the Logitech G13
-#define G13_INTERFACE 0         // The interface number for the G13.
-#define G13_KEY_ENDPOINT 1      // The endpoint for reading key and joystick state.
-#define G13_LCD_ENDPOINT 2      // The endpoint for writing to the LCD screen.
-#define G13_KEY_READ_TIMEOUT 0  // Timeout for USB interrupt reads.
-#define G13_VENDOR_ID 0x046d    // Logitech's Vendor ID.
-#define G13_PRODUCT_ID 0xc21c   // The Product ID for the G13.
-#define G13_REPORT_SIZE 8       // Size of the input report from the G13 (in bytes).
-#define G13_LCD_BUFFER_SIZE 0x3c0 // Size of the buffer for the LCD screen.
-#define G13_NUM_KEYS 40         // Total number of logical keys, including stick directions.
+#include <cstddef>
+#include <cstdint>
 
-/**
- * @enum stick_mode_t
- * @brief Defines the operating modes for the G13's joystick.
- */
-enum stick_mode_t {
-    STICK_KEYS = 0,   // Joystick movement emulates key presses (e.g., W, A, S, D).
-    STICK_ABSOLUTE,   // Joystick provides absolute position values (like a gamepad).
-    /*STICK_RELATIVE,*/ // A possible future mode for relative mouse movement.
-};
+// USB constants of the Logitech G13.
+inline constexpr std::uint16_t G13_VENDOR_ID  = 0x046d;
+inline constexpr std::uint16_t G13_PRODUCT_ID = 0xc21c;
+inline constexpr int G13_INTERFACE    = 0;    // interface used for keys, LCD and backlight
+inline constexpr int G13_KEY_ENDPOINT = 1;    // interrupt IN: key and joystick state
+inline constexpr int G13_LCD_ENDPOINT = 2;    // interrupt OUT: LCD image
+inline constexpr std::size_t G13_REPORT_SIZE     = 8;      // input report size in bytes
+inline constexpr std::size_t G13_LCD_BUFFER_SIZE = 0x3c0;  // 160 x 48 pixels, 1 bit each
 
-/**
- * @enum stick_key_t
- * @brief Defines logical names for the four joystick directions.
- */
-enum stick_key_t { STICK_LEFT, STICK_UP, STICK_DOWN, STICK_RIGHT };
+// Logical keys. The numbers are the bit positions in bytes 3..7 of the input
+// report and also the keys in bindings-*.properties ("G0" ... "G39").
+inline constexpr int G13_NUM_KEYS = 40;
 
-/**
- * @enum G13_KEYS
- * @brief Defines the bit offset for each physical key within the G13's 8-byte input report.
- * The keys are grouped by which byte of the report they reside in (starting from byte 3).
- */
-enum G13_KEYS {
-    /* byte 3 of the report */
-    G13_KEY_G1 = 0,
-    G13_KEY_G2,
-    G13_KEY_G3,
-    G13_KEY_G4,
+inline constexpr int G13_KEY_G1 = 0;            // G1..G22 = bits 0..21
+inline constexpr int G13_KEY_G22 = 21;
+inline constexpr int G13_KEY_BD = 24;           // round button left of L1
+inline constexpr int G13_KEY_L1 = 25;           // L1..L4 = bits 25..28 (profile switch)
+inline constexpr int G13_KEY_L4 = 28;
+inline constexpr int G13_KEY_M1 = 29;           // M1, M2, M3, MR = bits 29..32
+inline constexpr int G13_KEY_MR = 32;
+inline constexpr int G13_KEY_LEFT = 33;         // thumb button left of the joystick
+inline constexpr int G13_KEY_DOWN = 34;         // thumb button below the joystick
+inline constexpr int G13_KEY_TOP = 35;          // joystick press
 
-    G13_KEY_G5,
-    G13_KEY_G6,
-    G13_KEY_G7,
-    G13_KEY_G8,
+// The joystick directions have no bit of their own; the driver derives them
+// from the stick position and uses the otherwise unused numbers 36..39.
+inline constexpr int G13_STICK_UP = 36;
+inline constexpr int G13_STICK_LEFT = 37;
+inline constexpr int G13_STICK_RIGHT = 38;
+inline constexpr int G13_STICK_DOWN = 39;
 
-    /* byte 4 of the report */
-    G13_KEY_G9,
-    G13_KEY_G10,
-    G13_KEY_G11,
-    G13_KEY_G12,
-
-    G13_KEY_G13,
-    G13_KEY_G14,
-    G13_KEY_G15,
-    G13_KEY_G16,
-
-    /* byte 5 of the report */
-    G13_KEY_G17,
-    G13_KEY_G18,
-    G13_KEY_G19,
-    G13_KEY_G20,
-
-    G13_KEY_G21,
-    G13_KEY_G22,
-    G13_KEY_UNDEF1,        // An undefined/unused bit.
-    G13_KEY_LIGHT_STATE,   // State of the backlight.
-
-    /* byte 6 of the report */
-    G13_KEY_BD,            // The "Backlight Dimmer" button.
-    G13_KEY_L1,            // The L1 display button.
-    G13_KEY_L2,            // The L2 display button.
-    G13_KEY_L3,            // The L3 display button.
-
-    G13_KEY_L4,            // The L4 display button.
-    G13_KEY_M1,            // The M1 profile button.
-    G13_KEY_M2,            // The M2 profile button.
-    G13_KEY_M3,            // The M3 profile button.
-
-    /* byte 7 of the report */
-    G13_KEY_MR,            // The "Macro Record" (MR) profile button.
-    G13_KEY_LEFT,          // Left thumb button.
-    G13_KEY_DOWN,          // Down thumb button.
-    G13_KEY_TOP,           // Top thumb button (joystick press).
-
-    G13_KEY_UNDEF3,        // An undefined/unused bit.
-    G13_KEY_LIGHT,         // Another backlight-related key.
-    G13_KEY_LIGHT2,        // Another backlight-related key.
-    G13_KEY_MISC_TOGGLE    // A miscellaneous toggle key.
-};
-
-#endif
+#endif // G13_DRIVER_CONSTANTS_H

@@ -1,55 +1,35 @@
-#ifndef CONFIGPATH_H
-#define CONFIGPATH_H
+#ifndef G13_DRIVER_CONFIGPATH_H
+#define G13_DRIVER_CONFIGPATH_H
 
 #include <string>
 
 /**
- * @class ConfigPath
- * @brief Helper class to handle XDG-compliant file paths.
- * * This class determines the correct location for configuration files 
- * according to the XDG Base Directory Specification.
- * It defaults to ~/.config/g13/ for user configurations.
+ * @brief Paths of the configuration files and of the LCD pipe.
+ *
+ * Configuration: $XDG_CONFIG_HOME/g13, else ~/.config/g13 (XDG Base Directory
+ * Specification). LCD pipe: $XDG_RUNTIME_DIR/g13-lcd, else /tmp/g13-lcd.
  */
 class ConfigPath {
 public:
-    /**
-     * @brief Gets the full path to a specific binding configuration file.
-     * @param bindingId The ID of the binding profile (e.g., 0, 1, 2).
-     * @return The absolute path string (e.g., "/home/user/.config/g13/bindings-0.properties").
-     */
+    ConfigPath() = delete;
+
+    /// Configuration directory; empty if no home directory can be determined.
+    static std::string getConfigDir();
+
+    /// bindings-<id>.properties (profile 0..3); creates the directory if needed.
     static std::string getBindingPath(int bindingId);
 
-    /**
-     * @brief Gets the full path to a specific macro file.
-     * @param macroId The ID of the macro.
-     * @return The absolute path string.
-     */
+    /// macro-<id>.properties; creates the directory if needed.
     static std::string getMacroPath(int macroId);
 
-    /**
-     * @brief Gets the full path to the global settings file (settings.properties).
-     * Holds settings that apply to all profiles, e.g. intro=0|1.
-     */
+    /// settings.properties (settings for all profiles, e.g. intro=0|1).
     static std::string getSettingsPath();
 
-    /**
-     * @brief Gets the full path to the FIFO pipe.
-     * @return The absolute path (e.g., "/run/user/1000/g13-lcd" or fallback to "/tmp/g13-lcd").
-     */
+    /// Path of the LCD pipe.
     static std::string getFifoPath();
 
-    /**
-     * @brief Ensures that the configuration directory exists.
-     * Creates it if it is missing.
-     */
-    static void ensureConfigDirExists();
-
 private:
-    /**
-     * @brief Internal helper to determine the user's config directory.
-     * Checks XDG_CONFIG_HOME or defaults to HOME/.config/g13.
-     */
-    static std::string getConfigDir();
+    static void ensureConfigDirExists();
 };
 
-#endif // CONFIGPATH_H
+#endif // G13_DRIVER_CONFIGPATH_H

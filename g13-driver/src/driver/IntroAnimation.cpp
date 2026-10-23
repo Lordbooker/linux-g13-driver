@@ -40,8 +40,8 @@ bool bitmapPixel(const uint8_t (&bitmap)[INTRO_HEIGHT][INTRO_ROW_BYTES], int x, 
 
 IntroAnimation::IntroAnimation()
     : rngState_(Seed),
-      heat_(Width * FieldHeight, 0),
-      burned_(Width * Height, 0),
+      heat_(static_cast<std::size_t>(Width) * FieldHeight, 0),
+      burned_(static_cast<std::size_t>(Width) * Height, 0),
       top_(Width, 0.0),
       cool_(Width, 0.0)
 {
@@ -56,9 +56,9 @@ bool IntroAnimation::finalPixel(int x, int y)    { return bitmapPixel(intro_fina
 
 // mulberry32: yields the same sequence as the preview (JavaScript)
 double IntroAnimation::random() {
-    rngState_ += 0x6D2B79F5u;
-    uint32_t t = (rngState_ ^ (rngState_ >> 15)) * (1u | rngState_);
-    t = (t + ((t ^ (t >> 7)) * (61u | t))) ^ t;
+    rngState_ += 0x6D2B79F5U;
+    uint32_t t = (rngState_ ^ (rngState_ >> 15)) * (1U | rngState_);
+    t = (t + ((t ^ (t >> 7)) * (61U | t))) ^ t;
     return static_cast<double>(t ^ (t >> 14)) / 4294967296.0;
 }
 

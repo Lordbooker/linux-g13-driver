@@ -1,11 +1,10 @@
 #include "MacroRecorder.h"
+#include "PropertiesFile.h"
 #include "KeyNames.h"
 #include "KeyCaptureEdit.h"
 
 #include <QApplication>
-#include <QDir>
 #include <QFile>
-#include <QFileInfo>
 #include <QFormLayout>
 #include <QGridLayout>
 #include <QGroupBox>
@@ -16,10 +15,7 @@
 #include <QListWidget>
 #include <QMessageBox>
 #include <QPushButton>
-#include <QSaveFile>
 #include <QSpinBox>
-#include <QStandardPaths>
-#include <QTextStream>
 #include <QVBoxLayout>
 
 namespace {
@@ -223,7 +219,7 @@ void MacroRecorder::stopRecording()
 
     // Release keys that are still pressed, otherwise they get stuck during playback.
     const QList<int> stillPressed = m_pressedKeys;
-    for (int code : stillPressed)
+    for (const int code : stillPressed)
         recordKey(code, false);
     m_pressedKeys.clear();
 
@@ -510,14 +506,12 @@ void MacroRecorder::setDirty(bool dirty)
 // ---------------------------------------------------------------------------
 QString MacroRecorder::macroFilePath() const
 {
-    return QStandardPaths::writableLocation(QStandardPaths::ConfigLocation)
-           + QString("/g13/macro-%1.properties").arg(m_macroId);
+    return PropertiesFile::macroPath(m_macroId);
 }
 
 void MacroRecorder::loadFromFile()
 {
-    QFile f(macroFilePath());
-    if (!f.open(QIODevice::ReadOnly | QIODevice::Text)) {
+    if (!QFile::exists(macroFilePath())) {
         editName->clear();
         setEvents({});
         setDirty(false);
@@ -525,22 +519,9 @@ void MacroRecorder::loadFromFile()
         return;
     }
 
-    QTextStream in(&f);
-    QString name, sequence;
-    while (!in.atEnd()) {
-        const QString line = in.readLine().trimmed();
-        if (line.isEmpty() || line.startsWith('#'))
-            continue;
-        const int eq = line.indexOf('=');
-        if (eq < 0)
-            continue;
-        const QString key = line.left(eq).trimmed();
-        const QString val = line.mid(eq + 1).trimmed();
-        if (key == "name")
-            name = val;
-        else if (key == "sequence")
-            sequence = val;
-    }
+    const auto values = PropertiesFile::read(macroFilePath());
+    const QString name = values.value("name");
+    const QString sequence = values.value("sequence");
 
     const MacroSequence::ParseResult parsed = MacroSequence::parse(sequence);
     editName->setText(name);
@@ -568,7 +549,7 @@ bool MacroRecorder::saveToFile()
     const QList<int> unreleased = MacroSequence::unreleasedKeys(list);
     if (!unreleased.isEmpty()) {
         QStringList names;
-        for (int code : unreleased)
+        for (const int code : unreleased)
             names << KeyNames::nameFor(code);
         const auto answer = QMessageBox::warning(
             this, tr("Key is not released"),
@@ -580,23 +561,12 @@ bool MacroRecorder::saveToFile()
             return false;
     }
 
-    const QString path = macroFilePath();
-    QDir().mkpath(QFileInfo(path).absolutePath());
-
-    // QSaveFile writes atomically: the driver never sees a half-written file.
-    QSaveFile f(path);
-    if (!f.open(QIODevice::WriteOnly | QIODevice::Text)) {
-        lblStatus->setText(tr("Error: could not write the file."));
-        return false;
-    }
-    QTextStream out(&f);
-    out << "# G13 macro - edited by g13-gui\n";
-    out << "name="     << editName->text().trimmed() << "\n";
-    out << "id="       << m_macroId << "\n";
-    out << "sequence=" << MacroSequence::serialize(list) << "\n";
-    out.flush();
-
-    if (!f.commit()) {
+    const QStringList lines = {
+        "name=" + editName->text().trimmed(),
+        QString("id=%1").arg(m_macroId),
+        "sequence=" + MacroSequence::serialize(list),
+    };
+    if (!PropertiesFile::write(macroFilePath(), "# G13 macro - edited by g13-gui", lines)) {
         lblStatus->setText(tr("Error: could not write the file."));
         return false;
     }

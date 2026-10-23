@@ -48,8 +48,8 @@ dependencies: deps
 # Uses CMake to build both targets (Driver + GUI)
 build-driver:
 	@echo "--- Building Driver & GUI (via CMake) ---"
-	mkdir -p $(BUILD_DIR)
-	cd $(BUILD_DIR) && cmake .. && make
+	cmake -S . -B $(BUILD_DIR) -DCMAKE_BUILD_TYPE=Release
+	cmake --build $(BUILD_DIR) -j "$$(nproc)"
 
 # Alias for compatibility
 build-gui: build-driver

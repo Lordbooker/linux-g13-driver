@@ -25,7 +25,6 @@ private:
     void loadFromFile();
     void saveToFile();
 
-    QString bindingFilePath() const;
 
     int     m_profile    = 0;
     QString m_currentKey;

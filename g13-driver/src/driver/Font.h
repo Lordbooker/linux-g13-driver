@@ -1,11 +1,18 @@
-#ifndef FONT_H
-#define FONT_H
+#ifndef G13_DRIVER_FONT_H
+#define G13_DRIVER_FONT_H
 
-#include <vector>
+#include <array>
+#include <cstddef>
 #include <cstdint>
 
-// Standard 5x7 ASCII Font (Offset 32, ASCII 32..127)
-static const std::vector<uint8_t> font_5x7 = {
+// 5x7 font for the printable ASCII characters 32..126, 5 columns per character,
+// lowest bit = top row.
+inline constexpr int FONT_FIRST_CHAR = 32;
+inline constexpr int FONT_LAST_CHAR = 126;
+inline constexpr int FONT_COLUMNS = 5;
+inline constexpr int FONT_ROWS = 7;
+
+inline constexpr std::array<std::uint8_t, static_cast<std::size_t>(FONT_LAST_CHAR - FONT_FIRST_CHAR + 1) * FONT_COLUMNS> font_5x7 = {
     0x00, 0x00, 0x00, 0x00, 0x00, // Space (32)
     0x00, 0x00, 0x5F, 0x00, 0x00, // !
     0x00, 0x07, 0x00, 0x07, 0x00, // "
@@ -103,4 +110,4 @@ static const std::vector<uint8_t> font_5x7 = {
     0x10, 0x08, 0x08, 0x10, 0x08  // ~
 };
 
-#endif
+#endif // G13_DRIVER_FONT_H

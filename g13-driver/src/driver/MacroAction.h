@@ -1,88 +1,67 @@
-#ifndef __MACRO_ACTION_H__
-#define __MACRO_ACTION_H__
-
-#include <linux/uinput.h>
-#include <vector>
-#include <string>
-#include <memory>       
-#include <thread>
-#include <atomic>
-#include <chrono>
+#ifndef G13_DRIVER_MACROACTION_H
+#define G13_DRIVER_MACROACTION_H
 
 #include "G13Action.h"
-#include "Output.h"
+
+#include <atomic>
+#include <condition_variable>
+#include <cstdint>
+#include <mutex>
+#include <string>
+#include <thread>
+#include <vector>
 
 /**
- * @class MacroAction
- * @brief A G13Action that executes a sequence of key presses, releases, and delays.
- * * Modernized to use std::thread and std::atomic for thread safety.
+ * @brief Plays a macro (key presses, releases and delays) in its own thread.
+ *
+ * Sequence format (as written by g13-gui): "kd.<code>,ku.<code>,d.<ms>,..."
+ *
+ * Repeat mode:
+ *  - 0: run once
+ *  - 1: repeat while the key is held
+ *  - n > 1: run n times
+ *
+ * Pressing the key again while the macro runs stops it. A stopped macro
+ * releases all keys it pressed, and delays end immediately on a stop.
  */
 class MacroAction : public G13Action {
 public:
-    class Event {
-    public:
-        virtual ~Event() = default;
-        virtual void execute() = 0;
-    };
+    MacroAction(const std::string &sequence, int repeats);
+    ~MacroAction() override;
 
-    class KeyDownEvent : public Event {
-    private:
-        int keycode;
-    public:
-        KeyDownEvent(int code) : keycode(code) {}
-        void execute() override {
-            UInput::send_event(EV_KEY, keycode, 1); 
-            UInput::send_event(EV_SYN, SYN_REPORT, 0);
-        }
-    };
+    MacroAction(const MacroAction &) = delete;
+    MacroAction &operator=(const MacroAction &) = delete;
+    MacroAction(MacroAction &&) = delete;
+    MacroAction &operator=(MacroAction &&) = delete;
 
-    class KeyUpEvent : public Event {
-    private:
-        int keycode;
-    public:
-        KeyUpEvent(int code) : keycode(code) {}
-        void execute() override {
-            UInput::send_event(EV_KEY, keycode, 0); 
-            UInput::send_event(EV_SYN, SYN_REPORT, 0);
-        }
-    };
-
-    class WaitEvent : public Event {
-    private:
-        int delay_ms;
-    public:
-        WaitEvent(int delay) : delay_ms(delay) {}
-        void execute() override {
-            // Modern C++ sleep
-            std::this_thread::sleep_for(std::chrono::milliseconds(delay_ms));
-        }
-    };
-
-    // --- Public Methods ---
-    MacroAction(const std::string& sequence);
-    virtual ~MacroAction();
-
-    void setRepeats(int r);
-    int getRepeats() const;
+    static constexpr int RunOnce = 0;
+    static constexpr int RepeatWhileHeld = 1;
 
 protected:
     void key_down() override;
     void key_up() override;
 
 private:
-    // --- Private Methods ---
-    void execute_macro_loop();
-    std::unique_ptr<MacroAction::Event> tokenToEvent(const std::string& token);
+    struct Step {
+        enum class Type : std::uint8_t { KeyDown, KeyUp, Delay } type;
+        int value;   // key code or milliseconds
+    };
 
-    // --- Private Member Variables ---
-    std::vector<std::unique_ptr<Event>> _events;
-    
-    int _repeats;
-    
-    // Threading control
-    std::atomic<bool> _is_macro_running;
-    std::atomic<bool> _should_stop;
-    std::thread _macro_thread;
+    static bool parseStep(const std::string &token, Step &step);
+
+    void run();
+    bool runSteps(std::vector<int> &pressed);   // false when stopped
+    void requestStop();
+    void stopAndJoin();
+
+    std::vector<Step> m_steps;
+    int m_repeats;
+
+    std::thread m_thread;
+    std::atomic<bool> m_running{false};
+    std::mutex m_mutex;                 // protects m_stop for the condition variable
+    std::condition_variable m_wakeup;
+    bool m_stop = false;
 };
 
-#endif // __MACRO_ACTION_H__
+#endif // G13_DRIVER_MACROACTION_H

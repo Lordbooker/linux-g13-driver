@@ -28,8 +28,10 @@ QString Event::displayText() const
     return {};
 }
 
+namespace {
+
 // Reads "<prefix><number>" with a non-negative integer; false otherwise.
-static bool readValue(const QString &token, const QString &prefix, int &value)
+bool readValue(const QString &token, const QString &prefix, int &value)
 {
     if (!token.startsWith(prefix))
         return false;
@@ -40,6 +42,8 @@ static bool readValue(const QString &token, const QString &prefix, int &value)
     value = v;
     return true;
 }
+
+} // namespace
 
 ParseResult parse(const QString &sequence)
 {

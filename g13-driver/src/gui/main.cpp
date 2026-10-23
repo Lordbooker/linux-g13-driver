@@ -48,11 +48,11 @@ void installTranslations(QApplication &app)
     auto *qtTranslator = new QTranslator(&app);
     if (qtTranslator->load(locale, "qtbase", "_",
                             QLibraryInfo::path(QLibraryInfo::TranslationsPath)))
-        app.installTranslator(qtTranslator);
+        QApplication::installTranslator(qtTranslator);
 
     auto *appTranslator = new QTranslator(&app);
     if (appTranslator->load(locale, "g13-gui", "_", ":/i18n"))
-        app.installTranslator(appTranslator);
+        QApplication::installTranslator(appTranslator);
 }
 
 }
@@ -60,23 +60,23 @@ void installTranslations(QApplication &app)
 int main(int argc, char *argv[])
 {
     QApplication app(argc, argv);
-    app.setApplicationName("G13 Config Tool");
-    app.setApplicationVersion(G13_VERSION);
-    app.setOrganizationName("linux-g13-project");
-    app.setDesktopFileName("g13-gui");          // link to g13-gui.desktop (icon on Wayland)
-    app.setWindowIcon(MainWindow::appIcon());
+    QApplication::setApplicationName("G13 Config Tool");
+    QApplication::setApplicationVersion(G13_VERSION);
+    QApplication::setOrganizationName("linux-g13-project");
+    QApplication::setDesktopFileName("g13-gui");   // link to g13-gui.desktop (icon on Wayland)
+    QApplication::setWindowIcon(MainWindow::appIcon());
     installTranslations(app);
 
     // Closing the window does not quit the app while the tray icon is active
     // (see MainWindow::closeEvent).
-    app.setQuitOnLastWindowClosed(false);
+    QApplication::setQuitOnLastWindowClosed(false);
 
     QCommandLineParser parser;
     parser.setApplicationDescription(
         QCoreApplication::translate("main", "Configuration tool for the Logitech G13 driver"));
     parser.addHelpOption();
     parser.addVersionOption();
-    QCommandLineOption trayOption({"t", "tray"},
+    const QCommandLineOption trayOption({"t", "tray"},
         QCoreApplication::translate("main", "Start only the tray icon, without a window (for autostart)."));
     parser.addOption(trayOption);
     parser.process(app);
@@ -124,5 +124,5 @@ int main(int argc, char *argv[])
         timer->start(1000);
     }
 
-    return app.exec();
+    return QApplication::exec();
 }

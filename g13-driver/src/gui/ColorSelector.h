@@ -19,7 +19,6 @@ private slots:
 private:
     QSlider    *createSlider();
     void        sendColorToDriver(int r, int g, int b);
-    QString     bindingFilePath() const;
 
     QSlider    *slRed, *slGreen, *slBlue;
     QLabel     *colorPreview;

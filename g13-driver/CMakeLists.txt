@@ -1,6 +1,7 @@
 cmake_minimum_required(VERSION 3.20)
 
-project(Linux-G13-Driver VERSION 2.0.0 LANGUAGES CXX)
+# The version must match the release tag (checked by the release workflow).
+project(Linux-G13-Driver VERSION 2.6.2 LANGUAGES CXX)
 
 # --- Version ------------------------------------------------------------------
 # G13_VERSION: displayed version (driver log, GUI). Default: "git describe"
@@ -25,35 +26,34 @@ message(STATUS "linux-g13-driver version: ${G13_VERSION}")
 
 set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_CXX_EXTENSIONS OFF)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)  # for clang-tidy
 
-# --- Build Options ---
+# --- Build options ---
 option(BUILD_CONFIG_TOOL "Build the Qt6 config tool" ON)
-option(BUILD_TESTS       "Build unit and integration tests" OFF)
 option(ENABLE_SANITIZERS "Enable ASan/UBSan in debug builds" OFF)
+option(G13_WERROR        "Treat compiler warnings as errors (used by CI)" OFF)
 
-# --- Dependencies (Daemon) ---
+add_compile_options(-Wall -Wextra -Wpedantic -Wshadow)
+if(G13_WERROR)
+    add_compile_options(-Werror)
+endif()
+
+if(ENABLE_SANITIZERS AND CMAKE_BUILD_TYPE STREQUAL "Debug")
+    add_compile_options(-fsanitize=address,undefined -fno-omit-frame-pointer)
+    add_link_options(-fsanitize=address,undefined)
+endif()
+
+# --- Dependencies ---
+find_package(Threads REQUIRED)
 find_package(PkgConfig REQUIRED)
-pkg_check_modules(LIBUSB  REQUIRED libusb-1.0)
+pkg_check_modules(LIBUSB REQUIRED IMPORTED_TARGET libusb-1.0)
 
-# --- Dependencies (GUI) ---
 if(BUILD_CONFIG_TOOL)
     find_package(Qt6 REQUIRED COMPONENTS Widgets Core Gui Network LinguistTools)
     set(CMAKE_AUTOMOC ON)
     set(CMAKE_AUTORCC ON)
     set(CMAKE_AUTOUIC ON)
-endif()
-
-# --- Dependencies (Tests) ---
-if(BUILD_TESTS)
-    enable_testing()
-    find_package(GTest REQUIRED)
-endif()
-
-# --- Sanitizer support (Debug only) ---
-if(ENABLE_SANITIZERS AND CMAKE_BUILD_TYPE STREQUAL "Debug")
-    add_compile_options(-fsanitize=address,undefined -fno-omit-frame-pointer)
-    add_link_options(-fsanitize=address,undefined)
 endif()
 
 # =========================================================
@@ -63,26 +63,14 @@ add_executable(linux-g13-driver
     src/driver/Main.cpp
     src/driver/G13.cpp
     src/driver/G13Action.cpp
-    src/driver/Macro.cpp
     src/driver/MacroAction.cpp
     src/driver/ConfigPath.cpp
     src/driver/PassThroughAction.cpp
     src/driver/Output.cpp
     src/driver/IntroAnimation.cpp
 )
-
-target_include_directories(linux-g13-driver PRIVATE
-    src/driver
-    ${LIBUSB_INCLUDE_DIRS}
-)
-
-target_link_libraries(linux-g13-driver PRIVATE
-    ${LIBUSB_LIBRARIES}
-)
-
-target_compile_options(linux-g13-driver PRIVATE
-    ${LIBUSB_CFLAGS_OTHER}
-)
+target_include_directories(linux-g13-driver PRIVATE src/driver)
+target_link_libraries(linux-g13-driver PRIVATE PkgConfig::LIBUSB Threads::Threads)
 target_compile_definitions(linux-g13-driver PRIVATE G13_VERSION="${G13_VERSION}")
 
 # =========================================================
@@ -110,6 +98,8 @@ if(BUILD_CONFIG_TOOL)
         src/gui/G13Keys.cpp
         src/gui/G13Keys.h
         src/gui/KeyNames.h
+        src/gui/PropertiesFile.cpp
+        src/gui/PropertiesFile.h
         src/resources.qrc
     )
 
