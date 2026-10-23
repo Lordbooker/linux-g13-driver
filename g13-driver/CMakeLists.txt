@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.20)
 
 # The version must match the release tag (checked by the release workflow).
-project(Linux-G13-Driver VERSION 2.6.2 LANGUAGES CXX)
+project(Linux-G13-Driver VERSION 2.6.3 LANGUAGES CXX)
 
 # --- Version ------------------------------------------------------------------
 # G13_VERSION: displayed version (driver log, GUI). Default: "git describe"
